@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import AdminQuickLinks from "@/components/AdminQuickLinks";
 import CitationActions from "@/components/CitationActions";
 import DashboardMetrics from "@/components/DashboardMetrics";
 import DemoTools from "@/components/DemoTools";
@@ -14,6 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN">
       <body>
         {children}
+        <AdminQuickLinks />
         <CitationActions />
         <DashboardMetrics />
         <DemoTools />
