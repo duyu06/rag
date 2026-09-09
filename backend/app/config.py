@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,9 +27,9 @@ class Settings(BaseSettings):
     web_search_max_results: int = 5
     web_search_timeout_seconds: int = 8
 
-    # P1.4 Ornith Agent. The loop is intentionally bounded for demo reliability and cost control.
+    # P1.4 Ornith Agent. Three rounds is a hard product/safety ceiling, not only a default.
     agent_mode_default: str = "auto"
-    agent_max_tool_rounds: int = 3
+    agent_max_tool_rounds: int = Field(default=3, ge=1, le=3)
     agent_llm_timeout_seconds: int = 120
 
     chunk_size: int = 800
