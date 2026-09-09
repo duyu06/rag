@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, nexuskb-p1-1, nexuskb-p1-2, nexuskb-p1-3]
+    branches: [main]
   pull_request:
     branches: [main]
 

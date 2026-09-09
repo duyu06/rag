@@ -42,13 +42,13 @@ export default function DashboardMetrics() {
     void hydrate();
     timer = window.setInterval(() => void hydrate(), 15_000);
     const authHandler = () => void hydrate();
-    window.addEventListener("nexuskb-auth", authHandler);
+    window.addEventListener("yaoke-auth", authHandler);
 
     return () => {
       active = false;
       observer.disconnect();
       if (timer) window.clearInterval(timer);
-      window.removeEventListener("nexuskb-auth", authHandler);
+      window.removeEventListener("yaoke-auth", authHandler);
     };
   }, []);
 

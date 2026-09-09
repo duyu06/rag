@@ -68,7 +68,7 @@ def issue_token(user: CurrentUser) -> str:
         "role": user.role,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=settings.jwt_expire_hours)).timestamp()),
-        "iss": "nexuskb",
+        "iss": "yaoke",
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
@@ -84,7 +84,7 @@ def require_user(
             token,
             settings.jwt_secret,
             algorithms=["HS256"],
-            issuer="nexuskb",
+            issuer="yaoke",
         )
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(status_code=401, detail="登录已过期，请重新登录") from exc

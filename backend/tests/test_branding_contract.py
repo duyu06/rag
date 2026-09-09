@@ -17,7 +17,7 @@ TEXT_SUFFIXES = {
     ".css",
     ".html",
 }
-LEGACY_BRAND = "Nexus" + "KB"
+LEGACY_BRAND = ("Nexus" + "KB").lower()
 
 
 class BrandingContractsTest(unittest.TestCase):
@@ -36,7 +36,7 @@ class BrandingContractsTest(unittest.TestCase):
         self.assertTrue(readme.startswith('<p align="center">'))
         self.assertIn('# yaoke · 企业 AI 知识中台', readme)
 
-    def test_legacy_brand_string_is_absent_from_repository_text(self):
+    def test_legacy_brand_string_is_absent_from_repository_text_case_insensitive(self):
         offenders: list[str] = []
         skip_dirs = {".git", "node_modules", ".next", "__pycache__", ".venv", "venv"}
 
@@ -49,7 +49,7 @@ class BrandingContractsTest(unittest.TestCase):
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 continue
-            if LEGACY_BRAND in text:
+            if LEGACY_BRAND in text.lower():
                 offenders.append(str(path.relative_to(ROOT)))
 
         self.assertEqual(

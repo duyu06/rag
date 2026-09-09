@@ -20,8 +20,8 @@ export default function AdminQuickLinks() {
 
   useEffect(() => {
     void sync();
-    window.addEventListener("nexuskb-auth", sync);
-    return () => window.removeEventListener("nexuskb-auth", sync);
+    window.addEventListener("yaoke-auth", sync);
+    return () => window.removeEventListener("yaoke-auth", sync);
   }, [sync]);
 
   if (user?.role !== "ADMIN") return null;

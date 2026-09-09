@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""
-    qdrant_collection: str = "nexuskb"
+    qdrant_collection: str = "yaoke"
 
     embedding_model: str = "BAAI/bge-small-zh-v1.5"
     rerank_model: str = "BAAI/bge-reranker-base"
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     top_k: int = 5
     max_file_size_mb: int = 20
 
-    jwt_secret: str = "change-me-before-production-nexuskb-demo-secret"
+    jwt_secret: str = "change-me-before-production-yaoke-demo-secret"
     jwt_expire_hours: int = 8
 
     # Local backend cwd is normally ./backend, so ../demo-data points to repo demo data.
