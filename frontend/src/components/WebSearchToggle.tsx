@@ -1,7 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { session, webSearchPreference } from "@/lib/api";
+import { session } from "@/lib/api";
+
+const WEB_SEARCH_KEY = "nexuskb_web_search_enabled";
+const WEB_SEARCH_MARKER = "[[NEXUS_WEB_SEARCH]]";
+const WEB_SEARCH_EVENT = "nexuskb-web-search";
+
+function preferenceEnabled() {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(WEB_SEARCH_KEY) === "1";
+}
+
+function setPreference(value: boolean) {
+  localStorage.setItem(WEB_SEARCH_KEY, value ? "1" : "0");
+  window.dispatchEvent(new Event(WEB_SEARCH_EVENT));
+}
+
+function shouldDecorateRequest(input: RequestInfo | URL) {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+  return url.includes("/api/query") && !url.includes("/api/retrieval/");
+}
 
 export default function WebSearchToggle() {
   const [visible, setVisible] = useState(false);
@@ -10,14 +29,42 @@ export default function WebSearchToggle() {
   useEffect(() => {
     const sync = () => {
       setVisible(session.hasToken());
-      setEnabled(webSearchPreference.enabled());
+      setEnabled(preferenceEnabled());
     };
     sync();
     window.addEventListener("nexuskb-auth", sync);
-    window.addEventListener("nexuskb-web-search", sync);
+    window.addEventListener(WEB_SEARCH_EVENT, sync);
     return () => {
       window.removeEventListener("nexuskb-auth", sync);
-      window.removeEventListener("nexuskb-web-search", sync);
+      window.removeEventListener(WEB_SEARCH_EVENT, sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (!preferenceEnabled() || !shouldDecorateRequest(input) || typeof init?.body !== "string") {
+        return originalFetch(input, init);
+      }
+      try {
+        const payload = JSON.parse(init.body);
+        if (typeof payload.question === "string" && !payload.question.startsWith(WEB_SEARCH_MARKER)) {
+          const nextInit: RequestInit = {
+            ...init,
+            body: JSON.stringify({
+              ...payload,
+              question: `${WEB_SEARCH_MARKER} ${payload.question}`,
+            }),
+          };
+          return originalFetch(input, nextInit);
+        }
+      } catch {
+        // Non-JSON request: leave it untouched.
+      }
+      return originalFetch(input, init);
+    };
+    return () => {
+      window.fetch = originalFetch;
     };
   }, []);
 
@@ -25,7 +72,7 @@ export default function WebSearchToggle() {
 
   const toggle = () => {
     const next = !enabled;
-    webSearchPreference.set(next);
+    setPreference(next);
     setEnabled(next);
   };
 
