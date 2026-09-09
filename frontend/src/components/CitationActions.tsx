@@ -13,7 +13,11 @@ const KB_NAME_TO_ID: Record<string, string> = {
 
 function webUrlFromCard(card: HTMLElement): string | null {
   const kbName = card.querySelector<HTMLElement>(".kb-tag")?.textContent?.trim() || "";
-  if (!kbName.startsWith("Web ·")) return null;
+  // Agent web evidence currently has no enterprise KB name, so the base UI falls back to “知识库”.
+  // Treat only that fallback (or an already decorated Web tag) as eligible for URL classification;
+  // known enterprise KB cards are never inferred as public web evidence even if their text contains a URL.
+  if (kbName !== "知识库" && !kbName.startsWith("Web ·")) return null;
+
   const text = card.querySelector("p")?.textContent || "";
   const match = text.match(/https?:\/\/[^\s]+/i);
   if (!match) return null;
@@ -36,15 +40,21 @@ export default function CitationActions() {
 
     const decorate = () => {
       if (stopped) return;
-      document.querySelectorAll<HTMLElement>(".source-card").forEach((card) => {
+      const cards = Array.from(document.querySelectorAll<HTMLElement>(".source-card"));
+
+      cards.forEach((card) => {
         if (card.dataset.sourceActionReady === "1") return;
         const fileName = card.querySelector("strong")?.textContent?.trim();
-        const kbName = card.querySelector<HTMLElement>(".kb-tag")?.textContent?.trim();
+        const kbTag = card.querySelector<HTMLElement>(".kb-tag");
+        const kbName = kbTag?.textContent?.trim();
         const body = card.querySelector("div:last-child");
         if (!body || !fileName) return;
 
         const webUrl = webUrlFromCard(card);
         if (webUrl) {
+          const parsed = new URL(webUrl);
+          if (kbTag) kbTag.textContent = `Web · ${parsed.hostname}`;
+
           const link = document.createElement("a");
           link.className = "link-btn yaoke-web-source-open";
           link.textContent = "打开网页";
@@ -81,6 +91,11 @@ export default function CitationActions() {
         body.appendChild(button);
         card.dataset.sourceActionReady = "1";
       });
+
+      const sourceCount = document.querySelector<HTMLElement>(".source-panel .panel-head p");
+      if (sourceCount && cards.length > 0) {
+        sourceCount.textContent = `${cards.length} 个证据来源`;
+      }
     };
 
     decorate();
