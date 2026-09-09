@@ -3,9 +3,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 STALE_MARKERS = (
-    "0.3.0",
-    "P1.2 · 真实指标 + 审计",
-    "当前内置 10 道",
+    "0." + "3.0",
+    "P1." + "2 · 真实指标 + 审计",
+    "当前内置 " + "10 道",
 )
 
 
