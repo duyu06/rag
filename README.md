@@ -2,7 +2,9 @@
 
 基于 **Next.js + FastAPI + Qdrant + BGE Embedding + BM25 + Hybrid Search + Cross-Encoder Rerank** 的企业 RAG 演示项目。
 
-当前版本：**P1.2 / v0.3.0**
+当前版本：**P1.3 / v0.3.1**
+
+默认本地 LLM：**`ornith-1.5:9b`（Ollama）**。
 
 ## P1.2 重点
 
@@ -70,8 +72,14 @@ Audit Trail
 git clone https://github.com/duyu06/rag.git
 cd rag
 cp backend/.env.example backend/.env
-ollama pull qwen2.5:7b
+ollama pull ornith-1.5:9b
 docker compose up --build
+```
+
+如需先单独验证模型：
+
+```bash
+ollama run ornith-1.5:9b
 ```
 
 访问：
@@ -168,6 +176,7 @@ GitHub Actions：
 
 ```text
 python -m compileall -q backend/app scripts
+python scripts/validate_demo_assets.py
 python -m unittest discover -s backend/tests -p 'test_*.py' -v
 npm install
 npm run build
