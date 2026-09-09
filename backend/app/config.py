@@ -28,5 +28,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-before-production-nexuskb-demo-secret"
     jwt_expire_hours: int = 8
 
+    # Local backend cwd is normally ./backend, so ../demo-data points to repo demo data.
+    # Docker overrides this to /app/demo-data via docker-compose.
+    demo_data_dir: str = "../demo-data"
+
 
 settings = Settings()
