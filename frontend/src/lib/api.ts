@@ -1,8 +1,8 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
-const TOKEN_KEY = "nexuskb_access_token";
-const AGENT_MODE_KEY = "nexuskb_agent_mode";
-const LAST_TRACE_KEY = "nexuskb_last_agent_trace";
-const AGENT_MODE_EVENT = "nexuskb-agent-mode";
+const TOKEN_KEY = "yaoke_access_token";
+const AGENT_MODE_KEY = "yaoke_agent_mode";
+const LAST_TRACE_KEY = "yaoke_last_agent_trace";
+const AGENT_MODE_EVENT = "yaoke-agent-mode";
 
 export type AgentMode = "local" | "auto" | "web";
 
@@ -125,7 +125,7 @@ function querySuffix(knowledgeBaseId?: string | null) {
 }
 
 function emitAuthChanged() {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("nexuskb-auth"));
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("yaoke-auth"));
 }
 
 export const session = {
@@ -160,7 +160,7 @@ export const agentModePreference = {
   saveTraceId(traceId: string) {
     if (typeof window === "undefined" || !traceId) return;
     localStorage.setItem(LAST_TRACE_KEY, traceId);
-    window.dispatchEvent(new Event("nexuskb-agent-trace"));
+    window.dispatchEvent(new Event("yaoke-agent-trace"));
   },
 };
 
