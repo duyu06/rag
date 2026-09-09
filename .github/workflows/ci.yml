@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, nexuskb-p1-1, nexuskb-p1-2]
+    branches: [main, nexuskb-p1-1, nexuskb-p1-2, nexuskb-p1-3]
   pull_request:
     branches: [main]
 
@@ -15,6 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m compileall -q backend/app scripts
+      - run: python scripts/validate_demo_assets.py
       - run: python -m unittest discover -s backend/tests -p 'test_*.py' -v
 
   frontend-build:
