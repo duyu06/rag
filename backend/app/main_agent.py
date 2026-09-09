@@ -3,11 +3,12 @@ from __future__ import annotations
 from app.agent_routes import router as agent_router
 from app.main import app
 
-# yaoke branding lives at the P1.4 entrypoint while preserving legacy RAG routes.
+# P1.4 runtime metadata for the yaoke Agent entrypoint.
 app.title = "yaoke API"
+app.version = "0.4.0"
 app.description = "yaoke enterprise AI knowledge and tool-calling agent API"
 
-# Replace the legacy root identity without touching the stable P1.3 route module.
+# Replace the base RAG root with the P1.4 product identity.
 for route in list(app.router.routes):
     if getattr(route, "path", None) == "/" and "GET" in (getattr(route, "methods", set()) or set()):
         app.router.routes.remove(route)
