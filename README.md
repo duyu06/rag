@@ -1,109 +1,154 @@
 # NexusKB · 企业 AI 知识中台
 
-一个用于面试和企业 AI 场景演示的 RAG 知识库项目，基于 `Exalt24/enterprise-rag-knowledge-base` 的架构思路二次开发并针对中文企业资料做了收敛。
+基于 **Next.js + FastAPI + Qdrant + BGE Embedding + BM25 + Hybrid Search + Cross-Encoder Rerank** 的企业 RAG 演示项目。
 
-## P0 已实现
+当前版本：**P1 / v0.2.0**
 
-- 企业 SaaS 中文工作台
-- PDF / DOCX / TXT / Markdown 上传与解析
-- Qdrant 向量索引
-- BGE 中文 Embedding
-- BM25 关键词检索
-- Vector + BM25 Hybrid Search
-- 可选 Cross-Encoder Rerank
-- AI 问答 + 来源 Citation
-- SSE 流式展示
-- 检索调试器：Vector / BM25 / Hybrid / Rerank 分数可视化
-- 文档列表、删除、索引统计、系统健康检查
-- 4 份企业演示资料
-- Docker Compose 一键启动
+## P1 新增
 
-## 架构
+- 多知识库：公共 / HR / 产品 / 销售 / 售后
+- JWT 登录与 RBAC
+- Qdrant 检索前 ACL 过滤
+- BM25 语料同样按权限过滤
+- 不同角色只能看到授权知识库与文档
+- 管理员文档上传 / 删除
+- RAG 离线评测入口：Hit@1 / Hit@3 / MRR
+- 登录页、权限矩阵、知识域筛选器
+- 5 份中文企业 Demo 文档
+
+## 技术链路
 
 ```text
-员工 / 管理员
-      │
-      ▼
-Next.js 16 Web
-      │
-      ▼
-FastAPI
- ├─ 文档解析 / Chunk
- ├─ BGE Embedding
- ├─ Qdrant Vector Search
- ├─ BM25 Keyword Search
- ├─ Hybrid Fusion
- ├─ Optional Reranker
- └─ RAG Generation
-      │
-      ├─ Ollama（默认）
-      └─ OpenAI-compatible API（可选）
+User
+ ↓
+JWT
+ ↓
+Role → Allowed Knowledge Base IDs
+ ↓
+Qdrant Metadata Filter
+ ↓
+┌───────────────┬──────────────┐
+│ Vector Search │ BM25 Search  │
+└───────┬───────┴──────┬───────┘
+        └──── Hybrid ───┘
+               ↓
+          Cross-Encoder
+               ↓
+          Top-K Context
+               ↓
+          LLM + Citation
 ```
 
-## 快速启动
+**权限不是在 Prompt 层处理。**
 
-### 1. 准备环境变量
+NexusKB 会先根据 JWT Role 得到允许访问的 Knowledge Base IDs，并在 Qdrant 查询与 BM25 corpus 构建阶段过滤无权限 Chunk。无权限资料不会进入候选集，也不会进入 LLM Context。
+
+## 演示账号
+
+| 角色 | 用户名 | 密码 | 可访问知识库 |
+|---|---|---|---|
+| 管理员 | `admin` | `admin123` | 全部 |
+| 销售 | `sales01` | `sales123` | 公共 / 产品 / 销售 / 售后 |
+| HR | `hr01` | `hr123` | 公共 / HR |
+
+> 这些账号仅用于 Demo。生产环境请将 `backend/app/auth.py` 替换为企业 OIDC / SAML / 企业微信 / 飞书等身份源，并修改 `JWT_SECRET`。
+
+## Demo 数据映射
+
+启动后使用管理员账号上传：
+
+| 文件 | 目标知识库 |
+|---|---|
+| `demo-data/01-差旅费用管理制度.md` | 公共制度 |
+| `demo-data/02-售后退款SOP.md` | 售后知识库 |
+| `demo-data/03-X100产品说明书.md` | 产品知识库 |
+| `demo-data/04-销售折扣管理办法.md` | 销售知识库 |
+| `demo-data/05-HR员工手册.md` | HR 知识库 |
+
+然后切换销售和 HR 账号验证权限隔离。
+
+## 最快启动
 
 ```bash
+git clone https://github.com/duyu06/rag.git
+cd rag
+
 cp backend/.env.example backend/.env
-```
 
-### 2. 默认使用 Ollama
-
-```bash
 ollama pull qwen2.5:7b
-```
-
-### 3. 启动
-
-```bash
 docker compose up --build
 ```
 
 访问：
 
-- Web：http://localhost:3000
-- FastAPI Docs：http://localhost:8001/docs
-- Qdrant Dashboard：http://localhost:6333/dashboard
+- Web：`http://localhost:3000`
+- FastAPI Swagger：`http://localhost:8001/docs`
+- Qdrant Dashboard：`http://localhost:6333/dashboard`
 
-> 第一次执行向量化会下载 `BAAI/bge-small-zh-v1.5`，可选 Rerank 第一次启用时会下载 `BAAI/bge-reranker-base`。
+## 推荐演示路径
 
-## OpenAI-compatible 模型
+1. 管理员登录
+2. 将 5 份 Demo 文档分别上传到对应知识库
+3. 在「检索测试」展示 Vector / BM25 / Hybrid / Rerank
+4. 在「AI 知识助手」展示 Citation
+5. 退出并切换 `sales01`
+6. 验证销售看不到 HR 知识库
+7. 切换 `hr01`
+8. 验证 HR 看不到销售 / 产品 / 售后资料
+9. 管理员进入「RAG 评测」，实际运行 Hit@K / MRR
 
-如果不使用 Ollama，可在 `backend/.env` 配置：
+## RAG 评测
 
-```env
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=your-key
-OPENAI_MODEL=gpt-4.1-mini
+确保 Demo 文档已经入库后：
+
+```bash
+cd backend
+python eval_retrieval.py
 ```
 
-设置 `OPENAI_API_KEY` 后优先使用 OpenAI-compatible provider。
+或者管理员直接在前端「RAG 评测」页面点击 **运行评测**。
 
-## 演示流程
+当前内置 QA 集位于：
 
-1. 打开「知识库」，上传 `demo-data/` 下 4 份 Markdown。
-2. 打开「AI 助手」，依次提问：
-   - 广州普通员工出差住宿标准是多少？
-   - 退款超过 500 元需要谁审批？
-   - X100 产品保修期多久？
-   - 销售折扣超过多少需要主管审批？
-3. 打开「检索测试」，输入相同问题。
-4. 切换 Vector / BM25 / Hybrid，并开启 Rerank，对比排序和分数。
-5. 展示回答下方 Citation，说明答案可追溯到企业原文。
+```text
+backend/eval_dataset.json
+```
 
-## 面试项目表达
+不要把评测数字写死在 UI 中，结果由当前向量库实时计算。
 
-可以这样介绍：
+## 主要 API
 
-> 我把企业内部制度、SOP 和产品文档做成 RAG 知识中台。检索层不是单纯向量检索，而是同时使用 BGE Embedding 和 BM25，通过 Hybrid Fusion 兼顾自然语言语义查询与 SOP 编号、产品型号、金额等精确词检索，并支持 Cross-Encoder 二次重排。生成层要求关键事实附带 Citation，检索调试器可以直接观察 Vector、BM25、Hybrid 与 Rerank 分数，便于定位召回和排序问题。
+```text
+POST /api/auth/login
+GET  /api/auth/me
+GET  /api/knowledge-bases
 
-## 当前边界
+GET  /api/stats
+GET  /api/documents
+POST /api/ingest
+DELETE /api/documents/{file_name}
 
-P0 暂不实现多租户、RBAC、多知识库、Agent、ERP/CRM 等能力，先保证知识库链路最小可验证。后续 P1 再加入多知识库 + RBAC + RAG Evaluation。
+POST /api/query
+POST /api/query/stream
+POST /api/retrieval/debug
+POST /api/evaluation/run
+```
 
-## Upstream & License
+## 项目定位
 
-架构和实现参考：`https://github.com/Exalt24/enterprise-rag-knowledge-base`
+这是一个 **企业 RAG / 企业知识中台的面试演示项目**，重点展示：
 
-上游项目采用 MIT License。原版权声明保留在本仓库 `LICENSE`。
+- 企业文档处理
+- Hybrid Retrieval
+- Reranking
+- Citation
+- 多知识库
+- RBAC / ACL
+- Retrieval Evaluation
+- 可观测的检索调试界面
+
+P1 暂不加入多租户、Agent、MCP、ERP / CRM、复杂工作流，保持项目可快速演示、可解释、可继续二开。
+
+## License
+
+MIT。项目二开基础来源于 `Exalt24/enterprise-rag-knowledge-base`，保留原项目 MIT License。
