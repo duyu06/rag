@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import CitationActions from "@/components/CitationActions";
+import DashboardMetrics from "@/components/DashboardMetrics";
 import DemoTools from "@/components/DemoTools";
 import "./globals.css";
 
@@ -14,6 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         {children}
         <CitationActions />
+        <DashboardMetrics />
         <DemoTools />
       </body>
     </html>

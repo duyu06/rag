@@ -2,35 +2,21 @@
 
 基于 **Next.js + FastAPI + Qdrant + BGE Embedding + BM25 + Hybrid Search + Cross-Encoder Rerank** 的企业 RAG 演示项目。
 
-当前版本：**P1.1 / v0.2.1**
+当前版本：**P1.2 / v0.3.0**
 
-## P1.1 演示加固
+## P1.2 重点
 
-- 管理员 **一键初始化 Demo**：自动把 5 份资料写入对应知识库并建立向量索引
-- 初始化幂等：资料与索引已存在时跳过，避免重复 Embedding
-- **重置 Demo**：只重建内置 5 份资料，不删除额外上传的企业文档
-- Docker Compose 增加 Qdrant / Backend / Frontend healthcheck 与依赖顺序
-- `/api/ready` 用于容器 readiness；`/api/health` 会真实探测 Qdrant 与 LLM/Ollama
-- 新增 `scripts/check_demo.py` 本地演示前置检查
-- 新增 `scripts/init_demo.py` 命令行初始化兜底
-- RBAC/ACL 自动回归测试加入 CI
-- RAG Evaluation 扩展到 **Vector / BM25 / Hybrid / Hybrid + Rerank**
-- 四路评测输出 Hit@1 / Hit@3 / MRR / 耗时
-- 管理员登录后右下角提供独立 **Demo 工具** 浮层
+- Demo Corpus 从 5 份扩展到 **20 份企业资料**，每个知识域 4 份文档
+- Retrieval Evaluation 从 10 道扩展到 **30 道题**
+- 四路对比：Vector / BM25 / Hybrid / Hybrid + Rerank
+- Citation 增加 **查看原文**；文件返回前再次执行 KB ACL
+- 新增审计日志：登录、问答、拒绝访问、入库、删除、来源查看、检索调试、评测、Demo 初始化/重置
+- `/api/stats` 返回真实 **今日查询 / 平均查询耗时 / 拒绝访问次数**
+- 工作台运行指标实时刷新；管理员 Demo 工具显示最近审计
+- 新增 `scripts/demo_smoke.py` 运行时 RBAC 检查
+- 新增 `docs/DEMO_SCRIPT.md` 5 分钟面试演示脚本
 
-## 核心能力
-
-- 多知识库：公共 / HR / 产品 / 销售 / 售后
-- JWT 登录与 RBAC
-- Qdrant 检索前 ACL 过滤
-- BM25 语料同样按权限过滤
-- 管理员文档上传 / 删除
-- Hybrid Search + Cross-Encoder Rerank
-- Citation 来源引用
-- Retrieval Debugger
-- 实时 Retrieval Evaluation
-
-## 技术链路
+## 企业检索链路
 
 ```text
 User
@@ -39,21 +25,34 @@ JWT
  ↓
 Role → Allowed Knowledge Base IDs
  ↓
-Qdrant Metadata Filter
+Qdrant Metadata Filter + Authorized BM25 Corpus
  ↓
-┌───────────────┬──────────────┐
-│ Vector Search │ BM25 Search  │
-└───────┬───────┴──────┬───────┘
-        └──── Hybrid ───┘
-               ↓
-          Cross-Encoder
-               ↓
-          Top-K Context
-               ↓
-          LLM + Citation
+Vector + BM25
+ ↓
+Hybrid
+ ↓
+Cross-Encoder Rerank (optional)
+ ↓
+Top-K Authorized Context
+ ↓
+LLM + Citation
+ ↓
+Audit Trail
 ```
 
-**权限不是在 Prompt 层处理。** 无权限资料不会进入 Vector 候选、BM25 corpus 或 LLM Context。
+**权限不是 Prompt 规则。** 无权限 Chunk 在召回前被排除，不进入候选集，也不会进入 LLM Context。
+
+## 知识库与演示数据
+
+| 知识域 | 文档示例 | 数量 |
+|---|---|---:|
+| 公共制度 | 差旅、信息安全、会议接待、采购 | 4 |
+| HR | 员工手册、考勤加班、休假、绩效调薪 | 4 |
+| 产品 | X100、X200、产品 FAQ、安装部署 | 4 |
+| 销售 | 折扣、客户分级、报价、合同审批 | 4 |
+| 售后 | 退款、退换货、投诉、质保维修 | 4 |
+
+管理员一键初始化时，会把 `demo-data/` 里的 20 份资料自动写到对应知识库并建立索引；已完成索引的同版本资料会跳过。
 
 ## 演示账号
 
@@ -63,7 +62,7 @@ Qdrant Metadata Filter
 | 销售 | `sales01` | `sales123` | 公共 / 产品 / 销售 / 售后 |
 | HR | `hr01` | `hr123` | 公共 / HR |
 
-> 账号仅用于 Demo。生产环境应接 OIDC / SAML / 企业微信 / 飞书等身份源，并替换 `JWT_SECRET`。
+> Demo 用户仅用于面试演示。生产环境应替换为 OIDC / SAML / 企业微信 / 飞书等身份源，并替换 `JWT_SECRET`。
 
 ## 最快启动
 
@@ -81,73 +80,35 @@ docker compose up --build
 - FastAPI Swagger：`http://localhost:8001/docs`
 - Qdrant Dashboard：`http://localhost:6333/dashboard`
 
-启动后可以先执行：
+检查运行环境：
 
 ```bash
 python scripts/check_demo.py
 ```
 
-期望看到：
-
-```text
-[OK] Qdrant
-[OK] Backend
-[OK] Frontend
-[OK] LLM
-
-Demo preflight: PASS
-```
-
-## 一键初始化 Demo
-
-推荐方式：使用 `admin` 登录 Web，点击右下角 **Demo 工具 → 初始化 Demo**。
-
-系统自动映射：
-
-| 文件 | 目标知识库 |
-|---|---|
-| `01-差旅费用管理制度.md` | 公共制度 |
-| `02-售后退款SOP.md` | 售后知识库 |
-| `03-X100产品说明书.md` | 产品知识库 |
-| `04-销售折扣管理办法.md` | 销售知识库 |
-| `05-HR员工手册.md` | HR 知识库 |
-
-命令行兜底：
+初始化 Demo：登录 `admin` 后点击右下角 **Demo 工具 → 初始化 Demo**，或：
 
 ```bash
 python scripts/init_demo.py
 ```
 
-首次初始化会加载/下载 BGE Embedding 模型，因此第一次可能明显慢于后续运行。
-
-## RBAC 自动测试
-
-CI 执行：
+运行 RBAC smoke：
 
 ```bash
-python -m unittest discover -s backend/tests -p 'test_*.py' -v
+python scripts/demo_smoke.py
 ```
 
-当前覆盖：
+如果 Demo 已完成 Embedding 并希望额外验证检索层不泄漏：
 
-- ADMIN 可访问 5 个知识库
-- SALES 不可访问 HR
-- HR 不可访问销售 / 产品 / 售后
-- `all` scope 必须收敛为角色 ACL
-- Qdrant vector query / scroll 必须注入 KB Filter
-- BM25 corpus 必须来自授权 Chunk
+```bash
+python scripts/demo_smoke.py --retrieval
+```
 
-这里的 CI 测试负责快速防回归；真正的模型/Qdrant 运行时联调仍通过本地 Demo 与检索调试器验证。
+## RAG Evaluation
 
-## RAG 评测
+内置评测集：`backend/eval_dataset.json`，共 30 道题。
 
-管理员可以：
-
-1. 先一键初始化 Demo
-2. 打开右下角 **Demo 工具**
-3. 点击 **运行四路 RAG 评测**
-
-实时比较：
+管理员可在 Demo 工具中直接运行：
 
 ```text
 Vector
@@ -156,24 +117,82 @@ Hybrid
 Hybrid + Rerank
 ```
 
-指标：
+输出：
 
 - Hit@1
 - Hit@3
 - MRR
 - elapsed_ms
 
-评测集：`backend/eval_dataset.json`，结果由当前 Qdrant 数据实时计算，不在 UI 写死。
+所有结果由当前 Qdrant 数据实时计算，不写死指标。
 
-## 推荐 5 分钟演示路径
+## Citation 与来源查看
 
-1. `admin` 登录 → Demo 工具 → 初始化 Demo
-2. 工作台确认 5 个知识库和文档已就绪
-3. AI 助手提问“广州普通员工出差住宿标准是多少？”展示 Citation
-4. 检索测试切换 Vector / BM25 / Hybrid / Rerank
-5. Demo 工具运行四路评测
-6. 退出切换 `sales01`，验证 HR 知识库不可见
-7. 切换 `hr01`，验证销售/产品/售后资料不可见
+回答中的 Citation 来自 Retrieval Chunk metadata。点击 **查看原文** 时，前端携带 JWT 请求：
+
+```text
+GET /api/source/{knowledge_base_id}/{file_name}
+```
+
+后端会重新执行 Knowledge Base ACL；因此 Citation 展示与文件访问使用同一权限边界。
+
+## 审计
+
+Demo 使用 `backend/data/audit.jsonl` 持久化以下事件：
+
+```text
+LOGIN
+QUERY
+ACCESS / DENIED
+INGEST
+DELETE
+SOURCE_VIEW
+RETRIEVAL_DEBUG
+EVALUATION
+DEMO_INIT / DEMO_RESET
+```
+
+管理员接口：
+
+```text
+GET /api/audit?limit=50
+```
+
+`/api/stats` 同时输出 `today_queries`、`avg_query_latency_ms`、`denied_access` 和 `events_today`。
+
+> JSONL 是为了让面试 Demo 保持零额外数据库依赖。生产环境应替换为 PostgreSQL / ClickHouse / OpenTelemetry + 日志平台，并根据多实例部署处理统一 trace_id。
+
+## 自动检查
+
+GitHub Actions：
+
+```text
+python -m compileall -q backend/app scripts
+python -m unittest discover -s backend/tests -p 'test_*.py' -v
+npm install
+npm run build
+```
+
+RBAC contract tests 防止以下回归：
+
+- SALES 访问 HR
+- HR 访问销售 / 产品 / 售后
+- Qdrant query/scroll 丢失 KB Filter
+- BM25 corpus 误用全量 Chunk
+
+## 5 分钟演示
+
+完整脚本：[`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+
+推荐顺序：
+
+1. Admin 一键初始化 20 份资料
+2. AI 助手：回答 + Citation + 查看原文
+3. 检索测试：Vector/BM25/Hybrid/Rerank
+4. 30 题四路 Evaluation
+5. Sales 问 HR 问题，证明 Retrieval 层无 HR Chunk
+6. HR 问销售合同问题，反向验证
+7. Admin 查看 ACCESS/DENIED 与 QUERY 审计
 
 ## 主要 API
 
@@ -189,9 +208,11 @@ POST /api/demo/initialize
 POST /api/demo/reset
 
 GET  /api/stats
+GET  /api/audit
 GET  /api/documents
 POST /api/ingest
 DELETE /api/documents/{file_name}
+GET  /api/source/{knowledge_base_id}/{file_name}
 
 POST /api/query
 POST /api/query/stream
@@ -199,12 +220,22 @@ POST /api/retrieval/debug
 POST /api/evaluation/run
 ```
 
-## 项目定位
+## 当前边界
 
-这是一个 **企业 RAG / 企业知识中台的面试演示项目**。重点不是堆 Agent，而是把检索、权限、引用、评测和可演示性做清楚。
+目前仍刻意冻结：
 
-当前仍冻结：多租户、Multi-Agent、MCP、GraphRAG、Kubernetes、ERP/CRM 和复杂工作流。
+```text
+Multi-Agent
+MCP
+GraphRAG
+多租户 SaaS
+Kubernetes
+ERP / CRM Action Tools
+复杂长流程 Workflow
+```
+
+先把企业 RAG 的 **检索质量、权限、引用、评测、审计、可演示性** 做实，再扩 Agent。
 
 ## License
 
-MIT。项目二开基础来源于 `Exalt24/enterprise-rag-knowledge-base`，保留原项目 MIT License。
+MIT。二开基础来源于 `Exalt24/enterprise-rag-knowledge-base`，保留原项目 MIT License。
