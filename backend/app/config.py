@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,12 +20,17 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-mini"
 
-    # Optional controlled web search. Backend capability is enabled, while the UI toggle is off by default.
+    # Controlled web search backend. Agent mode decides whether the tool is exposed to Ornith.
     web_search_enabled: bool = True
     web_search_backend: str = "auto"
     web_search_region: str = "cn-zh"
     web_search_max_results: int = 5
     web_search_timeout_seconds: int = 8
+
+    # P1.4 Ornith Agent. Three rounds is a hard product/safety ceiling, not only a default.
+    agent_mode_default: str = "auto"
+    agent_max_tool_rounds: int = Field(default=3, ge=1, le=3)
+    agent_llm_timeout_seconds: int = 120
 
     chunk_size: int = 800
     chunk_overlap: int = 120

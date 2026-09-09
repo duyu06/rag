@@ -19,4 +19,4 @@ COPY eval_retrieval.py ./eval_retrieval.py
 RUN mkdir -p /app/data/documents /app/demo-data
 
 EXPOSE 8001
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "app.main_agent:app", "--host", "0.0.0.0", "--port", "8001"]

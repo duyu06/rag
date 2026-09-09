@@ -28,6 +28,7 @@ export default function AdminQuickLinks() {
 
   return (
     <nav style={{ position: "fixed", right: 18, top: 88, zIndex: 998, display: "flex", gap: 6 }} aria-label="管理员快捷入口">
+      <a href="/admin/agent" style={linkStyle}>Agent Trace</a>
       <a href="/admin/evaluation" style={linkStyle}>四路评测</a>
       <a href="/admin/audit" style={linkStyle}>审计日志</a>
     </nav>

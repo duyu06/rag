@@ -1,23 +1,34 @@
-# NexusKB · 5 分钟面试演示脚本
+# NexusKB · P1.4 五分钟面试演示脚本
 
-目标：用 5 分钟证明这不是“套壳聊天机器人”，而是一套有检索工程、权限边界、引用溯源和评测能力的企业 RAG。
+目标：用 5 分钟证明 NexusKB 不只是“知识库聊天”，而是一个具备 **Hybrid Retrieval、RBAC、Ornith Tool Calling、联网检索、Citation、Audit 和 Agent Trace** 的企业 AI 知识中台。
 
-## 演示前 2 分钟检查（不计入正式演示）
+## 演示前检查（不计入正式时间）
 
 ```bash
 python scripts/check_demo.py
 python scripts/demo_smoke.py
+python scripts/agent_smoke.py
 ```
 
-管理员登录后打开右下角 **Demo 工具**，确认 `20/20 ready`。如果不是，点击 **初始化 Demo**。
+严格验证 Ornith Agent：
 
-推荐预先运行一次 Reranker，让模型完成首次下载，避免现场等待。
+```bash
+python scripts/agent_smoke.py --agent
+```
+
+网络稳定时再跑：
+
+```bash
+python scripts/agent_smoke.py --agent --web
+```
+
+管理员登录后确认 Demo 工具显示 `20/20 ready`。建议提前让 `ornith-1.5:9b` 和 Reranker 各运行一次，避免首次加载影响演示节奏。
 
 ---
 
-## 00:00–00:40｜工作台：项目定位
+## 00:00–00:35｜工作台：一句话定位
 
-打开 `http://localhost:3000`，使用：
+登录：
 
 ```text
 admin / admin123
@@ -25,78 +36,99 @@ admin / admin123
 
 讲：
 
-> 这是 NexusKB 企业知识中台。现在内置 5 个知识域、20 份企业资料。核心链路不是单纯向量搜索，而是 JWT/RBAC 先确定数据范围，再做 Vector + BM25 Hybrid Retrieval，可选 Cross-Encoder Rerank，最后让 LLM 只基于授权证据回答并给出 Citation。
+> NexusKB 是我做的企业 RAG / Agent 演示系统。它先用 JWT 和 RBAC 确定数据边界，再由 Ornith-1.5:9b 决定调用企业检索还是 Web Search。模型可以选 Tool，但不能决定权限；企业检索仍然在 Qdrant 和 BM25 候选生成前做 ACL。
 
-指一下工作台：
-
-- 知识库数量
-- 文档 / Chunk
-- **今日查询、平均延迟、拒绝访问**（真实审计数据）
+快速指一下：5 个知识域、20 份资料、Chunks、运行指标。
 
 ---
 
-## 00:40–01:40｜AI 助手：回答 + Citation
+## 00:35–01:35｜Auto：Ornith 自主选择企业检索
 
-问题：
+左下角选择：
 
 ```text
-广州普通员工出差住宿标准是多少？
+自动
 ```
 
-展示：
+提问：
 
-1. 流式回答
-2. Citation 来源卡片
-3. 点击 **查看原文**
+```text
+X100 的标准整机质保多久？
+```
+
+预期：
+
+```text
+Ornith
+→ enterprise_search
+→ 产品知识库
+→ Answer + Citation
+```
+
+展示右侧来源，然后点击管理员快捷入口 **Agent Trace**。
+
+在 Trace 中指出：
+
+```text
+User
+→ Model Decision: enterprise_search
+→ Tool Start
+→ Tool Result: N chunks / latency
+→ Final Answer
+```
 
 讲：
 
-> Citation 不是模型自己写一个文件名。来源来自 Retrieval 返回的 Chunk metadata，查看原文接口会再次执行知识库 ACL 校验。
-
-再快速问一个容易区分精确词检索的问题：
-
-```text
-X200 的防护等级是什么？
-```
+> 这里展示的是可审计的执行轨迹，不是模型的隐藏思维链。Tool Call、耗时和结果数量可以看，但 reasoning 不落盘。
 
 ---
 
-## 01:40–02:40｜检索测试：为什么 Hybrid
+## 01:35–02:20｜Web：最新信息调用联网 Tool
 
-进入 **检索测试**，Query：
+切换：
 
 ```text
-设备本地管理页面默认端口是多少？
+联网
 ```
 
-依次展示：
+提问：
 
-- Vector
-- BM25
-- Hybrid
-- Hybrid + Rerank（如现场机器性能允许）
+```text
+今天 AI 行业有什么重要新闻？
+```
+
+预期：
+
+```text
+Ornith
+→ web_search
+→ DDGS public results
+→ Web Citation
+```
+
+展示来源中的网页标题、域名和 URL，再打开最新 Agent Trace 指出 `web_search`。
 
 讲：
 
-> Vector 解决自然语言语义近似；BM25 对型号、金额、端口、SOP 编号等精确词更可靠。Hybrid 做候选融合，Reranker 再直接对 Query-Chunk 对进行相关性评分。
+> Web Search 是工具，不是让模型裸联网。Local 模式甚至不会把这个 Tool 暴露给模型，执行层还有第二道 DENIED 检查。
 
-打开右下角 Demo 工具，运行 30 道题四路评测，展示 Hit@1 / Hit@3 / MRR。
+如果现场外网不稳定，直接跳过这一幕，不影响后面的企业 RAG 演示。
 
 ---
 
-## 02:40–03:50｜RBAC：销售看不到 HR
+## 02:20–03:15｜RBAC：SALES 不能通过 Agent 绕过 HR 权限
 
-退出管理员，切换：
+切换：
 
 ```text
 sales01 / sales123
 ```
 
-先让面试官看到顶部知识域中没有 HR。
+模式选择：
 
-如果对方问“前端隐藏有什么意义”，直接回答：
-
-> 前端隐藏只是 UX。真正安全边界在 Retrieval 层。
+```text
+本地
+```
 
 问：
 
@@ -104,47 +136,66 @@ sales01 / sales123
 公司年度调薪通常安排在几月？
 ```
 
-进入检索测试，再运行同样问题。指出返回候选里没有 `kb_hr`。
+讲：
+
+> 即使模型尝试调用 enterprise_search，它拿到的不是全库权限。Backend 会根据当前 SALES JWT 重新解析 Allowed KB IDs，所以 HR Chunk 不可能进入 Tool Result。
+
+如果需要进一步证明，打开“检索测试”跑同样 Query，指出返回候选里没有 `kb_hr`。
+
+关键话术：
+
+> 前端隐藏 HR 只是 UX；真正安全边界在 Tool 执行层和 Retrieval 层。
+
+---
+
+## 03:15–04:10｜为什么还要 Hybrid + Evaluation
+
+切回管理员，进入 **检索测试**。
+
+Query：
+
+```text
+设备本地管理页面默认端口是多少？
+```
+
+快速解释：
+
+- Vector：自然语言语义相似
+- BM25：型号、金额、端口、SOP 编号等精确词
+- Hybrid：融合两类候选
+- Rerank：Query-Chunk 二次相关性排序
+
+然后打开 **四路评测**，展示 30 题实时：
+
+```text
+Hit@1
+Hit@3
+MRR
+elapsed_ms
+```
 
 讲：
 
-> Role 会解析为 Allowed Knowledge Base IDs，这组 ID 同时进入 Qdrant query filter 和 BM25 corpus 构建。未授权 HR Chunk 在召回前就被排除了，不会进入候选集，更不会发给 LLM。
+> 所以 Agent 上层不是替代 RAG，而是把经过评测和权限控制的 Retrieval 封装成 Tool。
 
 ---
 
-## 03:50–04:30｜反向验证：HR 看不到销售
+## 04:10–05:00｜Audit + 收尾
 
-切换：
-
-```text
-hr01 / hr123
-```
-
-问题：
+打开 **审计日志**，展示：
 
 ```text
-合同金额超过100万需要谁审批？
+QUERY
+TOOL_CALL
+TOOL_RESULT
+ACCESS / DENIED
+SOURCE_VIEW
+EVALUATION
 ```
-
-说明 HR 只能访问公共 + HR，销售合同资料不会进入 Retrieval。
-
----
-
-## 04:30–05:00｜审计与收尾
-
-切回管理员，打开 **Demo 工具**。
-
-展示最近审计：
-
-- QUERY
-- ACCESS / DENIED
-- RETRIEVAL_DEBUG
-- SOURCE_VIEW
-- EVALUATION
 
 收尾话术：
 
-> 这个 Demo 我重点做的不是功能数量，而是企业 RAG 最容易被忽略的四件事：检索质量、数据权限、来源可追溯和效果可评测。生产环境下一步会把 Demo JWT 换成企业 IdP，把 JSONL 审计换成数据库或 OpenTelemetry 日志管道，再根据业务需要接 Agent Tools。
+> 我这个项目重点不是堆 Agent 数量，而是先把企业 AI 最关键的四层做实：检索质量、权限边界、证据引用和可观测性。Ornith 负责判断应该调用什么工具，Backend 负责真正执行权限和数据访问。下一步如果接 ERP 或 CRM，我也会沿用同一原则：读操作可以自动化，写操作和高风险动作必须增加确认与审计，而不是让模型直接拥有业务权限。
 
 ---
 
@@ -152,20 +203,20 @@ hr01 / hr123
 
 | 场景 | 问题 |
 |---|---|
-| 公共制度 | 公司密码多久必须更换一次？ |
-| 公共制度 | 采购 3500 元办公用品需要谁审批？ |
-| HR | 周末加班是否需要提前审批？ |
-| HR | 绩效等级有哪些？ |
-| 产品 | X200 标准整机质保几年？ |
-| 产品 | X200 断网后最多缓存多久数据？ |
-| 销售 | 普通报价单默认有效期多少天？ |
-| 销售 | A 类客户至少多久跟进一次？ |
-| 售后 | P1 客户投诉多久必须首次响应？ |
-| 售后 | 保内非人为损坏维修是否收费？ |
+| 企业 / 产品 | X200 标准整机质保几年？ |
+| 企业 / 产品 | X200 断网后最多缓存多久数据？ |
+| 企业 / 公共 | 公司密码多久必须更换一次？ |
+| 企业 / HR | 周末加班是否需要提前审批？ |
+| 企业 / 销售 | A 类客户至少多久跟进一次？ |
+| 企业 / 售后 | P1 客户投诉多久必须首次响应？ |
+| Web | Ornith 最近有什么公开更新？ |
+| Web | 最近一周有哪些值得关注的大模型发布？ |
 
 ## 现场止损规则
 
-- Ollama 不可用：展示 Retrieval Debugger + Citation 原文，不硬演 LLM。
-- Reranker 首次加载慢：先关闭 Rerank，演 Vector/BM25/Hybrid。
-- 评测未跑完：用已经完成的前三路结果，不等待。
-- 切换账号后页面缓存异常：直接刷新，不现场排查 UI。
+- **Ollama 不可用**：展示 Retrieval Debugger + Citation + RBAC，不硬演 Agent。
+- **Web Search 不可用**：切回“本地”，企业知识库仍可正常演示。
+- **Ornith 未调用预期 Tool**：不要现场反复 Prompt；展示上一条已成功 Trace，再用 `/api/tools` 解释工具策略。
+- **Reranker 首次加载慢**：关闭 Rerank，演 Vector/BM25/Hybrid。
+- **Evaluation 太慢**：展示已经完成的模式，不等待全部结束。
+- **账号切换 UI 缓存异常**：刷新页面，不现场排查样式问题。

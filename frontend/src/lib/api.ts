@@ -1,5 +1,10 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
 const TOKEN_KEY = "nexuskb_access_token";
+const AGENT_MODE_KEY = "nexuskb_agent_mode";
+const LAST_TRACE_KEY = "nexuskb_last_agent_trace";
+const AGENT_MODE_EVENT = "nexuskb-agent-mode";
+
+export type AgentMode = "local" | "auto" | "web";
 
 export type User = {
   username: string;
@@ -15,12 +20,17 @@ export type KnowledgeBase = {
 };
 
 export type Source = {
+  citation_index?: number | null;
+  source_type?: "enterprise" | "web";
+  title?: string | null;
   file_name: string;
   page?: number | null;
   content_preview: string;
   relevance_score?: number | null;
   knowledge_base_id?: string | null;
   knowledge_base_name?: string | null;
+  url?: string | null;
+  domain?: string | null;
 };
 
 export type DocumentItem = {
@@ -56,6 +66,35 @@ export type AuditEvent = {
   latency_ms?: number;
   num_sources?: number;
   detail?: string;
+};
+
+export type AgentTraceEvent = {
+  type: string;
+  timestamp?: string;
+  round?: number;
+  mode?: AgentMode;
+  tool?: string;
+  tools?: string[];
+  status?: string;
+  latency_ms?: number;
+  result_count?: number;
+  arguments?: Record<string, unknown>;
+  question_preview?: string;
+  answer_preview?: string;
+  max_tool_rounds?: number;
+};
+
+export type AgentTrace = {
+  trace_id: string;
+  timestamp: string;
+  username: string;
+  role: string;
+  mode: AgentMode;
+  model: string;
+  max_tool_rounds: number;
+  evidence_count: number;
+  elapsed_ms: number;
+  events: AgentTraceEvent[];
 };
 
 function token() {
@@ -100,6 +139,28 @@ export const session = {
   clear() {
     localStorage.removeItem(TOKEN_KEY);
     emitAuthChanged();
+  },
+};
+
+export const agentModePreference = {
+  get(): AgentMode {
+    if (typeof window === "undefined") return "auto";
+    const value = localStorage.getItem(AGENT_MODE_KEY);
+    return value === "local" || value === "web" || value === "auto" ? value : "auto";
+  },
+  set(mode: AgentMode) {
+    localStorage.setItem(AGENT_MODE_KEY, mode);
+    window.dispatchEvent(new Event(AGENT_MODE_EVENT));
+  },
+  event: AGENT_MODE_EVENT,
+  lastTraceId() {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(LAST_TRACE_KEY) || "";
+  },
+  saveTraceId(traceId: string) {
+    if (typeof window === "undefined" || !traceId) return;
+    localStorage.setItem(LAST_TRACE_KEY, traceId);
+    window.dispatchEvent(new Event("nexuskb-agent-trace"));
   },
 };
 
@@ -156,6 +217,26 @@ export const api = {
       cache: "no-store",
     });
     if (!response.ok) throw new Error(await parseError(response, "审计日志加载失败"));
+    return response.json();
+  },
+
+  async agentTools(mode: AgentMode = agentModePreference.get()) {
+    const response = await fetch(`${API_BASE_URL}/tools?mode=${encodeURIComponent(mode)}`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "Agent 工具列表加载失败"));
+    return response.json();
+  },
+
+  async agentTrace(traceId?: string): Promise<AgentTrace> {
+    const id = traceId || agentModePreference.lastTraceId();
+    if (!id) throw new Error("暂无 Agent Trace");
+    const response = await fetch(`${API_BASE_URL}/agent/traces/${encodeURIComponent(id)}`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "Agent Trace 加载失败"));
     return response.json();
   },
 
@@ -270,22 +351,22 @@ export const api = {
       onSources: (sources: Source[]) => void;
       onToken: (text: string) => void;
       onDone: () => void;
+      onTrace?: (traceId: string) => void;
     },
   ) {
-    const response = await fetch(`${API_BASE_URL}/query/stream`, {
+    const response = await fetch(`${API_BASE_URL}/agent/query/stream`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         question,
-        k: 5,
-        include_sources: true,
-        use_hybrid_search: true,
-        use_reranking: rerank,
+        mode: agentModePreference.get(),
         knowledge_base_id: knowledgeBaseId === "all" ? null : knowledgeBaseId,
+        top_k: 5,
+        rerank,
       }),
     });
     if (!response.ok || !response.body) {
-      throw new Error(await parseError(response, "问答请求失败"));
+      throw new Error(await parseError(response, "Agent 问答请求失败"));
     }
 
     const reader = response.body.getReader();
@@ -303,6 +384,10 @@ export const api = {
         const raw = lines.find((line) => line.startsWith("data:"))?.slice(5).trim();
         if (!raw) continue;
         const data = JSON.parse(raw);
+        if (event === "trace" && data.trace_id) {
+          agentModePreference.saveTraceId(String(data.trace_id));
+          handlers.onTrace?.(String(data.trace_id));
+        }
         if (event === "sources") handlers.onSources(data.sources || []);
         if (event === "token") handlers.onToken(String(data.text || ""));
         if (event === "done") handlers.onDone();
