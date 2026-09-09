@@ -1,4 +1,4 @@
-# NexusKB Demo Security Review
+# yaoke Demo Security Review
 
 This document defines what the project demonstrates and what must **not** be presented as production-ready security.
 
