@@ -41,7 +41,7 @@ export default function AdminEvaluationPage() {
   };
 
   if (loading) return <Shell><p>正在校验管理员身份…</p></Shell>;
-  if (user?.role !== "ADMIN") return <Shell><h1>无权访问</h1><p>四路评测仅管理员可执行。</p><a href="/">返回 NexusKB</a></Shell>;
+  if (user?.role !== "ADMIN") return <Shell><h1>无权访问</h1><p>四路评测仅管理员可执行。</p><a href="/">返回 yaoke</a></Shell>;
 
   return (
     <Shell>
