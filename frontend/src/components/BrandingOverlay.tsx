@@ -5,8 +5,8 @@ import { useEffect } from "react";
 const BRAND_NAME = "yaoke";
 const LOGO_URL = "/yaoke-logo.webp";
 
-function replaceBrandText(root: ParentNode = document.body) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+function replaceBrandText() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
   let current = walker.nextNode();
   while (current) {
@@ -14,12 +14,12 @@ function replaceBrandText(root: ParentNode = document.body) {
     current = walker.nextNode();
   }
   nodes.forEach((node) => {
-    node.nodeValue = node.nodeValue?.replaceAll("NexusKB", BRAND_NAME) ?? node.nodeValue;
+    if (node.nodeValue) node.nodeValue = node.nodeValue.replaceAll("NexusKB", BRAND_NAME);
   });
 }
 
-function decorateLogoMarks(root: ParentNode = document.body) {
-  root.querySelectorAll<HTMLElement>(".brand-mark, .large-mark").forEach((element) => {
+function decorateLogoMarks() {
+  document.querySelectorAll<HTMLElement>(".brand-mark, .large-mark").forEach((element) => {
     if (element.dataset.yaokeLogoReady === "1") return;
     element.textContent = "";
     element.style.backgroundImage = `url(${LOGO_URL})`;
