@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY eval_dataset.json ./eval_dataset.json
 COPY eval_retrieval.py ./eval_retrieval.py
-RUN mkdir -p /app/data/documents
+RUN mkdir -p /app/data/documents /app/demo-data
 
 EXPOSE 8001
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

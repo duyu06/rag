@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -13,16 +14,17 @@ from pydantic import BaseModel, Field
 
 from app.auth import CurrentUser, authenticate, issue_token, require_admin, require_user
 from app.config import settings
+from app.demo import demo_status, initialize_demo, reset_demo
 from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_file
 from app.knowledge import get_base, resolve_requested, visible_bases
-from app.rag import current_model_name, generate_answer
+from app.rag import current_model_name, generate_answer, probe_llm
 from app.retrieval import retrieval_service
 from app.store import vector_store
 
 app = FastAPI(
     title="NexusKB 企业 AI 知识中台 API",
-    version="0.2.0",
-    description="Enterprise RAG demo: RBAC + multi-KB + Hybrid Retrieval + Rerank + Citation",
+    version="0.2.1",
+    description="Enterprise RAG demo: RBAC + multi-KB + Hybrid Retrieval + Rerank + Citation + Evaluation",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -55,8 +57,13 @@ class DebugRequest(BaseModel):
     knowledge_base_id: str | None = None
 
 
+EvalMode = Literal["vector", "bm25", "hybrid", "hybrid_rerank"]
+
+
 class EvaluationRequest(BaseModel):
-    modes: list[Literal["vector", "hybrid"]] = ["vector", "hybrid"]
+    modes: list[EvalMode] = Field(
+        default_factory=lambda: ["vector", "bm25", "hybrid", "hybrid_rerank"]
+    )
     top_k: int = Field(default=3, ge=1, le=10)
 
 
@@ -109,20 +116,33 @@ def safe_rows(
 def root():
     return {
         "name": "NexusKB Enterprise Knowledge Copilot",
-        "version": "0.2.0",
+        "version": "0.2.1",
         "docs": "/docs",
         "health": "/api/health",
+        "ready": "/api/ready",
     }
+
+
+@app.get("/api/ready")
+def ready():
+    """Container readiness: backend process is usable and Qdrant is reachable."""
+    qdrant_ok = vector_store.ping()
+    if not qdrant_ok:
+        raise HTTPException(status_code=503, detail="Qdrant not ready")
+    return {"status": "ready", "vector_db_connected": True}
 
 
 @app.get("/api/health")
 def health():
     qdrant_ok = vector_store.ping()
+    llm_ok, llm_detail = probe_llm()
     provider = "openai-compatible" if settings.openai_api_key else "ollama"
     return {
-        "status": "healthy" if qdrant_ok else "degraded",
+        "status": "healthy" if (qdrant_ok and llm_ok) else "degraded",
         "vector_db_connected": qdrant_ok,
-        "ollama_connected": provider == "ollama",
+        "llm_connected": llm_ok,
+        "llm_detail": llm_detail,
+        "ollama_connected": llm_ok if provider == "ollama" else False,
         "llm_provider": provider,
         "llm_model": current_model_name(),
     }
@@ -288,6 +308,33 @@ def delete_document(
     return {"success": True, "message": "文档已删除"}
 
 
+@app.get("/api/demo/status")
+def get_demo_status(user: CurrentUser = Depends(require_user)):
+    require_admin(user)
+    try:
+        return demo_status()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Demo 状态读取失败：{exc}") from exc
+
+
+@app.post("/api/demo/initialize")
+def init_demo(user: CurrentUser = Depends(require_user)):
+    require_admin(user)
+    try:
+        return initialize_demo(force=False)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Demo 初始化失败：{exc}") from exc
+
+
+@app.post("/api/demo/reset")
+def reset_demo_endpoint(user: CurrentUser = Depends(require_user)):
+    require_admin(user)
+    try:
+        return reset_demo()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Demo 重置失败：{exc}") from exc
+
+
 @app.post("/api/query")
 def query(request: QueryRequest, user: CurrentUser = Depends(require_user)):
     rows = safe_rows(
@@ -379,7 +426,12 @@ def run_evaluation(request: EvaluationRequest, user: CurrentUser = Depends(requi
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
 
     report: dict[str, dict] = {}
-    for mode in request.modes:
+    for eval_mode in request.modes:
+        retrieval_mode: Literal["vector", "bm25", "hybrid"] = (
+            "hybrid" if eval_mode == "hybrid_rerank" else eval_mode
+        )
+        use_rerank = eval_mode == "hybrid_rerank"
+        started = time.perf_counter()
         hits_at_1 = 0
         hits_at_k = 0
         reciprocal_rank = 0.0
@@ -389,8 +441,8 @@ def run_evaluation(request: EvaluationRequest, user: CurrentUser = Depends(requi
             rows = retrieval_service.search(
                 item["question"],
                 top_k=request.top_k,
-                mode=mode,
-                rerank=False,
+                mode=retrieval_mode,
+                rerank=use_rerank,
                 knowledge_base_ids=[item["knowledge_base_id"]],
             )
             names = [str(row.get("file_name", "")) for row in rows]
@@ -404,6 +456,7 @@ def run_evaluation(request: EvaluationRequest, user: CurrentUser = Depends(requi
             cases.append(
                 {
                     "question": item["question"],
+                    "knowledge_base_id": item["knowledge_base_id"],
                     "expected_file": expected,
                     "rank": rank,
                     "top_files": names,
@@ -411,12 +464,19 @@ def run_evaluation(request: EvaluationRequest, user: CurrentUser = Depends(requi
             )
 
         total = max(len(dataset), 1)
-        report[mode] = {
+        report[eval_mode] = {
             "total": len(dataset),
             "hit_at_1": round(hits_at_1 / total, 4),
             f"hit_at_{request.top_k}": round(hits_at_k / total, 4),
             "mrr": round(reciprocal_rank / total, 4),
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+            "rerank": use_rerank,
             "cases": cases,
         }
 
-    return {"dataset_size": len(dataset), "top_k": request.top_k, "report": report}
+    return {
+        "dataset_size": len(dataset),
+        "top_k": request.top_k,
+        "modes": request.modes,
+        "report": report,
+    }

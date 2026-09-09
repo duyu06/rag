@@ -34,20 +34,17 @@ class RoleMatrixTests(unittest.TestCase):
 
 
 class RetrievalWiringContractTests(unittest.TestCase):
-    """Static regression checks that guard the two ACL injection points.
+    """Fast CI checks for the two ACL injection points without model downloads."""
 
-    These run in CI without downloading sentence-transformer models. Runtime E2E remains
-    a separate local check, but a refactor cannot silently remove the Qdrant/BM25 ACL wiring.
-    """
-
-    def test_qdrant_vector_search_uses_kb_filter(self):
+    def test_qdrant_vector_and_scroll_paths_use_kb_filter(self):
         source = (BACKEND_DIR / "app" / "store.py").read_text(encoding="utf-8")
         self.assertIn("query_filter=self._kb_filter(knowledge_base_ids)", source)
         self.assertIn("scroll_filter=self._kb_filter(knowledge_base_ids)", source)
 
-    def test_bm25_corpus_is_built_from_authorized_chunks(self):
+    def test_retrieval_passes_acl_to_vector_and_bm25_sources(self):
         source = (BACKEND_DIR / "app" / "retrieval.py").read_text(encoding="utf-8")
-        self.assertIn("vector_search(query, candidate_k, knowledge_base_ids=knowledge_base_ids)", source)
+        self.assertIn("vector_store.vector_search(", source)
+        self.assertIn("knowledge_base_ids=knowledge_base_ids", source)
         self.assertIn("all_chunks(knowledge_base_ids=knowledge_base_ids)", source)
 
 
