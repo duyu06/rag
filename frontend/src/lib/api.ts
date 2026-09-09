@@ -72,15 +72,21 @@ function querySuffix(knowledgeBaseId?: string | null) {
   return `?knowledge_base_id=${encodeURIComponent(knowledgeBaseId)}`;
 }
 
+function emitAuthChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("nexuskb-auth"));
+}
+
 export const session = {
   hasToken() {
     return Boolean(token());
   },
   save(accessToken: string) {
     localStorage.setItem(TOKEN_KEY, accessToken);
+    emitAuthChanged();
   },
   clear() {
     localStorage.removeItem(TOKEN_KEY);
+    emitAuthChanged();
   },
 };
 
@@ -166,6 +172,35 @@ export const api = {
     return response.json();
   },
 
+  async demoStatus() {
+    const response = await fetch(`${API_BASE_URL}/demo/status`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "Demo 状态读取失败"));
+    return response.json();
+  },
+
+  async initializeDemo() {
+    const response = await fetch(`${API_BASE_URL}/demo/initialize`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: "{}",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "Demo 初始化失败"));
+    return response.json();
+  },
+
+  async resetDemo() {
+    const response = await fetch(`${API_BASE_URL}/demo/reset`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: "{}",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "Demo 重置失败"));
+    return response.json();
+  },
+
   async debug(
     query: string,
     mode: "vector" | "bm25" | "hybrid",
@@ -239,7 +274,10 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/evaluation/run`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ modes: ["vector", "hybrid"], top_k: 3 }),
+      body: JSON.stringify({
+        modes: ["vector", "bm25", "hybrid", "hybrid_rerank"],
+        top_k: 3,
+      }),
     });
     if (!response.ok) throw new Error(await parseError(response, "评测失败"));
     return response.json();

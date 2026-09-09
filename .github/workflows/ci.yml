@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, nexuskb-p0]
+    branches: [main, nexuskb-p1-1]
   pull_request:
     branches: [main]
 
 jobs:
-  backend-syntax:
+  backend-contracts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,6 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m compileall -q backend/app
+      - run: python -m unittest discover -s backend/tests -p 'test_*.py' -v
 
   frontend-build:
     runs-on: ubuntu-latest

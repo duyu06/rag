@@ -29,6 +29,33 @@ def current_model_name() -> str:
     return settings.ollama_model
 
 
+def probe_llm(timeout: float = 2.5) -> tuple[bool, str]:
+    """Cheap connectivity probe used by the status page and local preflight checks."""
+    try:
+        if settings.openai_api_key:
+            response = httpx.get(
+                settings.openai_base_url.rstrip("/") + "/models",
+                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            return True, "openai-compatible"
+
+        response = httpx.get(
+            settings.ollama_base_url.rstrip("/") + "/api/tags",
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        models = response.json().get("models", [])
+        wanted = settings.ollama_model.split(":", 1)[0]
+        installed = any(str(item.get("name", "")).split(":", 1)[0] == wanted for item in models)
+        if not installed:
+            return False, f"Ollama 已连接，但未发现模型 {settings.ollama_model}"
+        return True, "ollama"
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
 def generate_answer(question: str, rows: list[dict]) -> str:
     if not rows:
         return "当前知识库中未找到可靠依据。"
