@@ -7,6 +7,7 @@ import fitz
 from docx import Document as DocxDocument
 
 from app.config import settings
+from app.knowledge import get_base
 from app.store import vector_store
 
 DOC_DIR = Path("data/documents")
@@ -77,17 +78,26 @@ def parse_document(path: Path) -> list[dict[str, Any]]:
     ]
 
 
-def ingest_file(path: Path) -> int:
+def document_path(knowledge_base_id: str, file_name: str) -> Path:
+    directory = DOC_DIR / knowledge_base_id
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory / Path(file_name).name
+
+
+def ingest_file(path: Path, knowledge_base_id: str) -> int:
+    base = get_base(knowledge_base_id)
     chunks = parse_document(path)
     if not chunks:
         raise ValueError("文档未解析出有效文本")
 
-    vector_store.delete_file(path.name)
+    vector_store.delete_file(path.name, knowledge_base_id)
     enriched = [
         {
             **chunk,
             "file_name": path.name,
             "file_type": path.suffix.lower().lstrip("."),
+            "knowledge_base_id": knowledge_base_id,
+            "knowledge_base_name": base["name"],
         }
         for chunk in chunks
     ]

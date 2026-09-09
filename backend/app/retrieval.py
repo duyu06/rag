@@ -49,11 +49,16 @@ class RetrievalService:
         top_k: int | None = None,
         mode: SearchMode = "hybrid",
         rerank: bool = False,
+        knowledge_base_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         top_k = top_k or settings.top_k
         candidate_k = max(top_k * 4, 12)
 
-        vector_rows = vector_store.vector_search(query, candidate_k)
+        vector_rows = vector_store.vector_search(
+            query,
+            candidate_k,
+            knowledge_base_ids=knowledge_base_ids,
+        )
         vector_map = {row["id"]: row for row in vector_rows}
         raw_vector = [float(row.get("vector_raw_score", 0.0)) for row in vector_rows]
         vector_norm = {
@@ -61,7 +66,7 @@ class RetrievalService:
             for row, score in zip(vector_rows, normalize(raw_vector))
         }
 
-        all_rows = vector_store.all_chunks()
+        all_rows = vector_store.all_chunks(knowledge_base_ids=knowledge_base_ids)
         all_map = {row["id"]: row for row in all_rows}
         bm25_norm: dict[str, float] = {}
         if all_rows:

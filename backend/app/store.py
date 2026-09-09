@@ -11,6 +11,7 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     FilterSelector,
+    MatchAny,
     MatchValue,
     PointStruct,
     VectorParams,
@@ -63,6 +64,19 @@ class VectorStore:
                 vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
             )
 
+    @staticmethod
+    def _kb_filter(knowledge_base_ids: list[str] | None) -> Filter | None:
+        if not knowledge_base_ids:
+            return None
+        return Filter(
+            must=[
+                FieldCondition(
+                    key="knowledge_base_id",
+                    match=MatchAny(any=knowledge_base_ids),
+                )
+            ]
+        )
+
     def add_chunks(self, chunks: list[dict[str, Any]]) -> int:
         if not chunks:
             return 0
@@ -86,12 +100,18 @@ class VectorStore:
         )
         return len(points)
 
-    def vector_search(self, query: str, limit: int = 12) -> list[dict[str, Any]]:
+    def vector_search(
+        self,
+        query: str,
+        limit: int = 12,
+        knowledge_base_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         self.ensure_collection()
         vector = self.embedder.encode(query, normalize_embeddings=True).tolist()
         response = self.client.query_points(
             collection_name=settings.qdrant_collection,
             query=vector,
+            query_filter=self._kb_filter(knowledge_base_ids),
             limit=limit,
             with_payload=True,
         )
@@ -106,40 +126,54 @@ class VectorStore:
             )
         return rows
 
-    def all_chunks(self, limit: int = 10000) -> list[dict[str, Any]]:
+    def all_chunks(
+        self,
+        limit: int = 10000,
+        knowledge_base_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         self.ensure_collection()
         points, _ = self.client.scroll(
             collection_name=settings.qdrant_collection,
+            scroll_filter=self._kb_filter(knowledge_base_ids),
             limit=limit,
             with_payload=True,
             with_vectors=False,
         )
         return [{"id": str(point.id), **dict(point.payload or {})} for point in points]
 
-    def stats(self) -> dict[str, Any]:
+    def stats(self, knowledge_base_ids: list[str] | None = None) -> dict[str, Any]:
         self.ensure_collection()
-        info = self.client.get_collection(settings.qdrant_collection)
+        if knowledge_base_ids:
+            chunks = self.all_chunks(knowledge_base_ids=knowledge_base_ids)
+            count = len(chunks)
+        else:
+            info = self.client.get_collection(settings.qdrant_collection)
+            count = int(info.points_count or 0)
         return {
-            "total_chunks": int(info.points_count or 0),
+            "total_chunks": count,
             "collection_name": settings.qdrant_collection,
             "embedding_model": settings.embedding_model,
             "embedding_dimension": self.dimension,
         }
 
-    def delete_file(self, file_name: str) -> None:
+    def delete_file(self, file_name: str, knowledge_base_id: str | None = None) -> None:
         self.ensure_collection()
+        must = [
+            FieldCondition(
+                key="file_name",
+                match=MatchValue(value=file_name),
+            )
+        ]
+        if knowledge_base_id:
+            must.append(
+                FieldCondition(
+                    key="knowledge_base_id",
+                    match=MatchValue(value=knowledge_base_id),
+                )
+            )
         self.client.delete(
             collection_name=settings.qdrant_collection,
-            points_selector=FilterSelector(
-                filter=Filter(
-                    must=[
-                        FieldCondition(
-                            key="file_name",
-                            match=MatchValue(value=file_name),
-                        )
-                    ]
-                )
-            ),
+            points_selector=FilterSelector(filter=Filter(must=must)),
             wait=True,
         )
 

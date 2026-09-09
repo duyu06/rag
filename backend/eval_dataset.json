@@ -1,0 +1,52 @@
+[
+  {
+    "question": "广州普通员工出差住宿标准是多少？",
+    "knowledge_base_id": "kb_public",
+    "expected_file": "01-差旅费用管理制度.md"
+  },
+  {
+    "question": "北京出差酒店最多能报多少钱？",
+    "knowledge_base_id": "kb_public",
+    "expected_file": "01-差旅费用管理制度.md"
+  },
+  {
+    "question": "退款超过500元需要谁审批？",
+    "knowledge_base_id": "kb_service",
+    "expected_file": "02-售后退款SOP.md"
+  },
+  {
+    "question": "订单已经发货后怎么申请退款？",
+    "knowledge_base_id": "kb_service",
+    "expected_file": "02-售后退款SOP.md"
+  },
+  {
+    "question": "X100产品的整机保修期是多久？",
+    "knowledge_base_id": "kb_product",
+    "expected_file": "03-X100产品说明书.md"
+  },
+  {
+    "question": "X100的防护等级是什么？",
+    "knowledge_base_id": "kb_product",
+    "expected_file": "03-X100产品说明书.md"
+  },
+  {
+    "question": "销售折扣超过多少需要主管审批？",
+    "knowledge_base_id": "kb_sales",
+    "expected_file": "04-销售折扣管理办法.md"
+  },
+  {
+    "question": "大客户特殊折扣怎么审批？",
+    "knowledge_base_id": "kb_sales",
+    "expected_file": "04-销售折扣管理办法.md"
+  },
+  {
+    "question": "年假申请需要提前几个工作日？",
+    "knowledge_base_id": "kb_hr",
+    "expected_file": "05-HR员工手册.md"
+  },
+  {
+    "question": "公司年度调薪通常安排在几月？",
+    "knowledge_base_id": "kb_hr",
+    "expected_file": "05-HR员工手册.md"
+  }
+]

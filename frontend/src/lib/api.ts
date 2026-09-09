@@ -1,10 +1,26 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
+const TOKEN_KEY = "nexuskb_access_token";
+
+export type User = {
+  username: string;
+  display_name: string;
+  role: "ADMIN" | "SALES" | "HR";
+};
+
+export type KnowledgeBase = {
+  id: string;
+  name: string;
+  description: string;
+  department: string;
+};
 
 export type Source = {
   file_name: string;
   page?: number | null;
   content_preview: string;
   relevance_score?: number | null;
+  knowledge_base_id?: string | null;
+  knowledge_base_name?: string | null;
 };
 
 export type DocumentItem = {
@@ -13,72 +29,189 @@ export type DocumentItem = {
   file_size_kb: number;
   upload_date: string;
   chunk_count: number;
+  knowledge_base_id: string;
+  knowledge_base_name: string;
 };
 
 export type DebugResult = {
   file_name?: string;
   page?: number | null;
   content: string;
+  knowledge_base_id?: string;
+  knowledge_base_name?: string;
   vector_score: number;
   bm25_score: number;
   hybrid_score: number;
   rerank_score?: number | null;
 };
 
+function token() {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+
+function authHeaders(extra?: Record<string, string>) {
+  const value = token();
+  return {
+    ...(value ? { Authorization: `Bearer ${value}` } : {}),
+    ...(extra || {}),
+  };
+}
+
+async function parseError(response: Response, fallback: string) {
+  try {
+    const data = await response.json();
+    return data.detail || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function querySuffix(knowledgeBaseId?: string | null) {
+  if (!knowledgeBaseId || knowledgeBaseId === "all") return "";
+  return `?knowledge_base_id=${encodeURIComponent(knowledgeBaseId)}`;
+}
+
+export const session = {
+  hasToken() {
+    return Boolean(token());
+  },
+  save(accessToken: string) {
+    localStorage.setItem(TOKEN_KEY, accessToken);
+  },
+  clear() {
+    localStorage.removeItem(TOKEN_KEY);
+  },
+};
+
 export const api = {
+  async login(username: string, password: string): Promise<{ access_token: string; user: User }> {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) throw new Error(await parseError(response, "登录失败"));
+    const data = await response.json();
+    session.save(data.access_token);
+    return data;
+  },
+
+  async me(): Promise<User> {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "登录已失效"));
+    return response.json();
+  },
+
+  async knowledgeBases(): Promise<KnowledgeBase[]> {
+    const response = await fetch(`${API_BASE_URL}/knowledge-bases`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "知识库加载失败"));
+    const data = await response.json();
+    return data.knowledge_bases || [];
+  },
+
   async health() {
     const response = await fetch(`${API_BASE_URL}/health`, { cache: "no-store" });
     if (!response.ok) throw new Error("健康检查失败");
     return response.json();
   },
 
-  async stats() {
-    const response = await fetch(`${API_BASE_URL}/stats`, { cache: "no-store" });
-    if (!response.ok) throw new Error("统计数据加载失败");
+  async stats(knowledgeBaseId?: string | null) {
+    const response = await fetch(`${API_BASE_URL}/stats${querySuffix(knowledgeBaseId)}`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "统计数据加载失败"));
     return response.json();
   },
 
-  async documents(): Promise<{ documents: DocumentItem[]; total_documents: number; total_chunks: number }> {
-    const response = await fetch(`${API_BASE_URL}/documents`, { cache: "no-store" });
-    if (!response.ok) throw new Error("文档列表加载失败");
+  async documents(knowledgeBaseId?: string | null): Promise<{
+    documents: DocumentItem[];
+    total_documents: number;
+    total_chunks: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/documents${querySuffix(knowledgeBaseId)}`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "文档列表加载失败"));
     return response.json();
   },
 
-  async upload(file: File) {
+  async upload(file: File, knowledgeBaseId: string) {
     const form = new FormData();
     form.append("file", file);
-    const response = await fetch(`${API_BASE_URL}/ingest`, { method: "POST", body: form });
-    if (!response.ok) throw new Error((await response.json()).detail || "上传失败");
+    form.append("knowledge_base_id", knowledgeBaseId);
+    const response = await fetch(`${API_BASE_URL}/ingest`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: form,
+    });
+    if (!response.ok) throw new Error(await parseError(response, "上传失败"));
     return response.json();
   },
 
-  async deleteDocument(fileName: string) {
-    const response = await fetch(`${API_BASE_URL}/documents/${encodeURIComponent(fileName)}`, { method: "DELETE" });
-    if (!response.ok) throw new Error("删除失败");
+  async deleteDocument(fileName: string, knowledgeBaseId: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/documents/${encodeURIComponent(fileName)}?knowledge_base_id=${encodeURIComponent(knowledgeBaseId)}`,
+      { method: "DELETE", headers: authHeaders() },
+    );
+    if (!response.ok) throw new Error(await parseError(response, "删除失败"));
     return response.json();
   },
 
-  async debug(query: string, mode: "vector" | "bm25" | "hybrid", rerank: boolean) {
+  async debug(
+    query: string,
+    mode: "vector" | "bm25" | "hybrid",
+    rerank: boolean,
+    knowledgeBaseId?: string | null,
+  ) {
     const response = await fetch(`${API_BASE_URL}/retrieval/debug`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, mode, top_k: 8, rerank }),
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        query,
+        mode,
+        top_k: 8,
+        rerank,
+        knowledge_base_id: knowledgeBaseId === "all" ? null : knowledgeBaseId,
+      }),
     });
-    if (!response.ok) throw new Error((await response.json()).detail || "检索失败");
+    if (!response.ok) throw new Error(await parseError(response, "检索失败"));
     return response.json() as Promise<{ results: DebugResult[] }>;
   },
 
   async queryStream(
     question: string,
     rerank: boolean,
-    handlers: { onSources: (sources: Source[]) => void; onToken: (text: string) => void; onDone: () => void },
+    knowledgeBaseId: string | null,
+    handlers: {
+      onSources: (sources: Source[]) => void;
+      onToken: (text: string) => void;
+      onDone: () => void;
+    },
   ) {
     const response = await fetch(`${API_BASE_URL}/query/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, k: 5, include_sources: true, use_hybrid_search: true, use_reranking: rerank }),
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        question,
+        k: 5,
+        include_sources: true,
+        use_hybrid_search: true,
+        use_reranking: rerank,
+        knowledge_base_id: knowledgeBaseId === "all" ? null : knowledgeBaseId,
+      }),
     });
-    if (!response.ok || !response.body) throw new Error("问答请求失败");
+    if (!response.ok || !response.body) {
+      throw new Error(await parseError(response, "问答请求失败"));
+    }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -100,5 +233,15 @@ export const api = {
         if (event === "done") handlers.onDone();
       }
     }
+  },
+
+  async runEvaluation() {
+    const response = await fetch(`${API_BASE_URL}/evaluation/run`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ modes: ["vector", "hybrid"], top_k: 3 }),
+    });
+    if (!response.ok) throw new Error(await parseError(response, "评测失败"));
+    return response.json();
   },
 };
