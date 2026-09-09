@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-API = os.environ.get("NEXUSKB_API", "http://localhost:8001/api").rstrip("/")
+API = os.environ.get("YAOKE_API", "http://localhost:8001/api").rstrip("/")
 
 
 def request(method: str, path: str, body: dict | None = None, token: str | None = None, timeout: int = 180):
@@ -65,7 +65,7 @@ def agent_query(token: str, *, question: str, mode: str, knowledge_base_id: str 
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="NexusKB P1.4 Ornith Agent runtime acceptance smoke")
+    parser = argparse.ArgumentParser(description="yaoke P1.4 Ornith Agent runtime acceptance smoke")
     parser.add_argument("--agent", action="store_true", help="run real Ornith tool-calling and RBAC checks")
     parser.add_argument("--web", action="store_true", help="also require a real DDGS web_search call (implies --agent)")
     args = parser.parse_args()
