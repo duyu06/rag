@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from urllib.parse import urlparse
-
 from ddgs import DDGS
 
 from app.config import settings
+from app.web_safety import safe_public_url
 
 WEB_SEARCH_MARKER = "[[NEXUS_WEB_SEARCH]]"
 
@@ -20,21 +19,11 @@ def clean_question(question: str) -> str:
     return value
 
 
-def _safe_public_url(value: str) -> str | None:
-    try:
-        parsed = urlparse(value.strip())
-    except Exception:
-        return None
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return None
-    return parsed.geturl()
-
-
 def normalize_web_results(raw_results: list[dict]) -> list[dict]:
     rows: list[dict] = []
     seen: set[str] = set()
     for item in raw_results:
-        url = _safe_public_url(str(item.get("href") or item.get("url") or ""))
+        url = safe_public_url(str(item.get("href") or item.get("url") or ""))
         if not url or url in seen:
             continue
         seen.add(url)
