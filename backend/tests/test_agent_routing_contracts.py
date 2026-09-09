@@ -15,7 +15,7 @@ class AgentRoutingContractsTest(unittest.TestCase):
     def test_agent_prompt_routes_internal_and_current_queries(self):
         agent = (ROOT / "backend/app/agent.py").read_text(encoding="utf-8")
         self.assertIn("Internal policies", agent)
-        self.assertIn("current external", agent.lower())
+        self.assertIn("current/external", agent.lower())
         self.assertIn("enterprise_search", agent)
         self.assertIn("web_search", agent)
 
