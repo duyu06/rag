@@ -5,7 +5,7 @@ import httpx
 from app.config import settings
 from app.web_search import clean_question, search_web, wants_web_search
 
-SYSTEM_PROMPT = """你是 NexusKB 企业知识助手。
+SYSTEM_PROMPT = """你是 yaoke 企业知识助手。
 你可以使用两类证据：企业知识库资料，以及用户明确开启联网搜索后提供的互联网搜索摘要。
 必须遵守：
 1. 企业制度、金额、日期、流程、产品参数等内部事实，以企业知识库为最高优先级；互联网资料不得覆盖内部制度。
