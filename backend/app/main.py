@@ -24,7 +24,7 @@ from app.retrieval import retrieval_service
 from app.store import vector_store
 
 app = FastAPI(
-    title="NexusKB 企业 AI 知识中台 API",
+    title="yaoke 企业 AI 知识中台 API",
     version="0.3.0",
     description="Enterprise RAG demo: RBAC + multi-KB + Hybrid Retrieval + Rerank + Citation + Audit",
 )
@@ -128,7 +128,7 @@ def safe_rows(
 @app.get("/")
 def root():
     return {
-        "name": "NexusKB Enterprise Knowledge Copilot",
+        "name": "yaoke Enterprise Knowledge Copilot",
         "version": "0.3.0",
         "docs": "/docs",
         "health": "/api/health",
