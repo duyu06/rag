@@ -9,10 +9,25 @@ from app.store import vector_store
 
 DEMO_MANIFEST = [
     {"file_name": "01-差旅费用管理制度.md", "knowledge_base_id": "kb_public"},
-    {"file_name": "02-售后退款SOP.md", "knowledge_base_id": "kb_service"},
-    {"file_name": "03-X100产品说明书.md", "knowledge_base_id": "kb_product"},
-    {"file_name": "04-销售折扣管理办法.md", "knowledge_base_id": "kb_sales"},
+    {"file_name": "06-信息安全管理规范.md", "knowledge_base_id": "kb_public"},
+    {"file_name": "07-会议与接待管理制度.md", "knowledge_base_id": "kb_public"},
+    {"file_name": "08-办公用品采购规范.md", "knowledge_base_id": "kb_public"},
     {"file_name": "05-HR员工手册.md", "knowledge_base_id": "kb_hr"},
+    {"file_name": "09-考勤与加班管理办法.md", "knowledge_base_id": "kb_hr"},
+    {"file_name": "10-休假与请假制度.md", "knowledge_base_id": "kb_hr"},
+    {"file_name": "11-绩效与调薪管理制度.md", "knowledge_base_id": "kb_hr"},
+    {"file_name": "03-X100产品说明书.md", "knowledge_base_id": "kb_product"},
+    {"file_name": "12-X200产品说明书.md", "knowledge_base_id": "kb_product"},
+    {"file_name": "13-产品常见问题FAQ.md", "knowledge_base_id": "kb_product"},
+    {"file_name": "14-设备安装与部署指南.md", "knowledge_base_id": "kb_product"},
+    {"file_name": "04-销售折扣管理办法.md", "knowledge_base_id": "kb_sales"},
+    {"file_name": "15-客户分级管理办法.md", "knowledge_base_id": "kb_sales"},
+    {"file_name": "16-销售报价流程.md", "knowledge_base_id": "kb_sales"},
+    {"file_name": "17-合同审批规范.md", "knowledge_base_id": "kb_sales"},
+    {"file_name": "02-售后退款SOP.md", "knowledge_base_id": "kb_service"},
+    {"file_name": "18-退换货处理规范.md", "knowledge_base_id": "kb_service"},
+    {"file_name": "19-客户投诉处理SOP.md", "knowledge_base_id": "kb_service"},
+    {"file_name": "20-质保与维修政策.md", "knowledge_base_id": "kb_service"},
 ]
 
 
@@ -108,7 +123,7 @@ def initialize_demo(force: bool = False) -> dict:
 
 
 def reset_demo() -> dict:
-    """Reset only the bundled demo documents; user-uploaded documents are preserved."""
+    """Reset only bundled demo documents; user-uploaded documents are preserved."""
     for item in DEMO_MANIFEST:
         kb_id = item["knowledge_base_id"]
         file_name = item["file_name"]

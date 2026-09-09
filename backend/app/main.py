@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import time
 from collections import Counter
 from datetime import datetime
@@ -9,9 +10,10 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.audit import recent_events, record_event, today_summary
 from app.auth import CurrentUser, authenticate, issue_token, require_admin, require_user
 from app.config import settings
 from app.demo import demo_status, initialize_demo, reset_demo
@@ -23,8 +25,8 @@ from app.store import vector_store
 
 app = FastAPI(
     title="NexusKB 企业 AI 知识中台 API",
-    version="0.2.1",
-    description="Enterprise RAG demo: RBAC + multi-KB + Hybrid Retrieval + Rerank + Citation + Evaluation",
+    version="0.3.0",
+    description="Enterprise RAG demo: RBAC + multi-KB + Hybrid Retrieval + Rerank + Citation + Audit",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -67,10 +69,21 @@ class EvaluationRequest(BaseModel):
     top_k: int = Field(default=3, ge=1, le=10)
 
 
+def _audit(user: CurrentUser, action: str, **kwargs) -> None:
+    record_event(username=user.username, role=user.role, action=action, **kwargs)
+
+
 def _allowed_ids(user: CurrentUser, knowledge_base_id: str | None) -> list[str]:
     try:
         return resolve_requested(user.role, knowledge_base_id)
     except PermissionError as exc:
+        _audit(
+            user,
+            "ACCESS",
+            status="DENIED",
+            knowledge_base_id=knowledge_base_id,
+            detail=str(exc),
+        )
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -116,7 +129,7 @@ def safe_rows(
 def root():
     return {
         "name": "NexusKB Enterprise Knowledge Copilot",
-        "version": "0.2.1",
+        "version": "0.3.0",
         "docs": "/docs",
         "health": "/api/health",
         "ready": "/api/ready",
@@ -125,7 +138,6 @@ def root():
 
 @app.get("/api/ready")
 def ready():
-    """Container readiness: backend process is usable and Qdrant is reachable."""
     qdrant_ok = vector_store.ping()
     if not qdrant_ok:
         raise HTTPException(status_code=503, detail="Qdrant not ready")
@@ -152,7 +164,15 @@ def health():
 def login(request: LoginRequest):
     user = authenticate(request.username.strip(), request.password)
     if not user:
+        record_event(
+            username=request.username.strip() or "unknown",
+            role="UNKNOWN",
+            action="LOGIN",
+            status="DENIED",
+            detail="invalid_credentials",
+        )
         raise HTTPException(status_code=401, detail="用户名或密码错误")
+    _audit(user, "LOGIN")
     return {
         "access_token": issue_token(user),
         "token_type": "bearer",
@@ -187,6 +207,7 @@ def stats(
         for row in chunks
         if row.get("file_name")
     }
+    audit = today_summary()
     return {
         "total_documents": len(documents),
         "total_chunks": store_stats["total_chunks"],
@@ -195,7 +216,17 @@ def stats(
         "embedding_model": store_stats["embedding_model"],
         "embedding_dimension": store_stats["embedding_dimension"],
         "llm_model": current_model_name(),
+        **audit,
     }
+
+
+@app.get("/api/audit")
+def audit_log(
+    limit: int = Query(default=50, ge=1, le=500),
+    user: CurrentUser = Depends(require_user),
+):
+    require_admin(user)
+    return {"events": recent_events(limit), "summary": today_summary()}
 
 
 @app.post("/api/ingest")
@@ -227,8 +258,16 @@ async def ingest(
         chunk_count = ingest_file(path, knowledge_base_id)
     except Exception as exc:
         path.unlink(missing_ok=True)
+        _audit(user, "INGEST", status="FAILED", knowledge_base_id=knowledge_base_id, detail=str(exc))
         raise HTTPException(status_code=500, detail=f"文档处理失败：{exc}") from exc
 
+    _audit(
+        user,
+        "INGEST",
+        knowledge_base_id=knowledge_base_id,
+        num_sources=chunk_count,
+        detail=safe_name,
+    )
     return {
         "success": True,
         "message": "文档已写入知识库",
@@ -286,6 +325,22 @@ def documents(
     }
 
 
+@app.get("/api/source/{knowledge_base_id}/{file_name}")
+def source_document(
+    knowledge_base_id: str,
+    file_name: str,
+    user: CurrentUser = Depends(require_user),
+):
+    _allowed_ids(user, knowledge_base_id)
+    safe_name = Path(file_name).name
+    path = document_path(knowledge_base_id, safe_name)
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="来源文件不存在")
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    _audit(user, "SOURCE_VIEW", knowledge_base_id=knowledge_base_id, detail=safe_name)
+    return FileResponse(path, media_type=media_type)
+
+
 @app.delete("/api/documents/{file_name}")
 def delete_document(
     file_name: str,
@@ -302,9 +357,11 @@ def delete_document(
     try:
         vector_store.delete_file(safe_name, knowledge_base_id)
     except Exception as exc:
+        _audit(user, "DELETE", status="FAILED", knowledge_base_id=knowledge_base_id, detail=str(exc))
         raise HTTPException(status_code=503, detail=f"删除向量失败：{exc}") from exc
 
     document_path(knowledge_base_id, safe_name).unlink(missing_ok=True)
+    _audit(user, "DELETE", knowledge_base_id=knowledge_base_id, detail=safe_name)
     return {"success": True, "message": "文档已删除"}
 
 
@@ -320,23 +377,32 @@ def get_demo_status(user: CurrentUser = Depends(require_user)):
 @app.post("/api/demo/initialize")
 def init_demo(user: CurrentUser = Depends(require_user)):
     require_admin(user)
+    started = time.perf_counter()
     try:
-        return initialize_demo(force=False)
+        result = initialize_demo(force=False)
     except Exception as exc:
+        _audit(user, "DEMO_INIT", status="FAILED", detail=str(exc))
         raise HTTPException(status_code=500, detail=f"Demo 初始化失败：{exc}") from exc
+    _audit(user, "DEMO_INIT", latency_ms=(time.perf_counter() - started) * 1000, detail=f"{result['status']['ready_count']}/{result['status']['total']}")
+    return result
 
 
 @app.post("/api/demo/reset")
 def reset_demo_endpoint(user: CurrentUser = Depends(require_user)):
     require_admin(user)
+    started = time.perf_counter()
     try:
-        return reset_demo()
+        result = reset_demo()
     except Exception as exc:
+        _audit(user, "DEMO_RESET", status="FAILED", detail=str(exc))
         raise HTTPException(status_code=500, detail=f"Demo 重置失败：{exc}") from exc
+    _audit(user, "DEMO_RESET", latency_ms=(time.perf_counter() - started) * 1000, detail=f"{result['status']['ready_count']}/{result['status']['total']}")
+    return result
 
 
 @app.post("/api/query")
 def query(request: QueryRequest, user: CurrentUser = Depends(require_user)):
+    started = time.perf_counter()
     rows = safe_rows(
         request.question,
         request.k,
@@ -347,6 +413,14 @@ def query(request: QueryRequest, user: CurrentUser = Depends(require_user)):
     )
     answer = generate_answer(request.question, rows)
     sources = [source_from_row(row) for row in rows] if request.include_sources else []
+    _audit(
+        user,
+        "QUERY",
+        knowledge_base_id=request.knowledge_base_id or "all",
+        query=request.question,
+        latency_ms=(time.perf_counter() - started) * 1000,
+        num_sources=len(sources),
+    )
     return {
         "answer": answer,
         "query": request.question,
@@ -358,6 +432,7 @@ def query(request: QueryRequest, user: CurrentUser = Depends(require_user)):
 
 @app.post("/api/query/stream")
 def query_stream(request: QueryRequest, user: CurrentUser = Depends(require_user)):
+    started = time.perf_counter()
     rows = safe_rows(
         request.question,
         request.k,
@@ -369,12 +444,22 @@ def query_stream(request: QueryRequest, user: CurrentUser = Depends(require_user
     sources = [source_from_row(row) for row in rows] if request.include_sources else []
 
     def event_stream():
-        yield "event: sources\ndata: " + json.dumps({"sources": sources}, ensure_ascii=False) + "\n\n"
-        answer = generate_answer(request.question, rows)
-        for start in range(0, len(answer), 14):
-            payload = json.dumps({"text": answer[start : start + 14]}, ensure_ascii=False)
-            yield f"event: token\ndata: {payload}\n\n"
-        yield 'event: done\ndata: {"finish_reason":"stop"}\n\n'
+        try:
+            yield "event: sources\ndata: " + json.dumps({"sources": sources}, ensure_ascii=False) + "\n\n"
+            answer = generate_answer(request.question, rows)
+            for start in range(0, len(answer), 14):
+                payload = json.dumps({"text": answer[start : start + 14]}, ensure_ascii=False)
+                yield f"event: token\ndata: {payload}\n\n"
+            yield 'event: done\ndata: {"finish_reason":"stop"}\n\n'
+        finally:
+            _audit(
+                user,
+                "QUERY",
+                knowledge_base_id=request.knowledge_base_id or "all",
+                query=request.question,
+                latency_ms=(time.perf_counter() - started) * 1000,
+                num_sources=len(sources),
+            )
 
     return StreamingResponse(
         event_stream(),
@@ -386,6 +471,7 @@ def query_stream(request: QueryRequest, user: CurrentUser = Depends(require_user
 @app.post("/api/retrieval/debug")
 def retrieval_debug(request: DebugRequest, user: CurrentUser = Depends(require_user)):
     kb_ids = _allowed_ids(user, request.knowledge_base_id)
+    started = time.perf_counter()
     try:
         rows = retrieval_service.search(
             request.query,
@@ -395,8 +481,18 @@ def retrieval_debug(request: DebugRequest, user: CurrentUser = Depends(require_u
             knowledge_base_ids=kb_ids,
         )
     except Exception as exc:
+        _audit(user, "RETRIEVAL_DEBUG", status="FAILED", query=request.query, detail=str(exc))
         raise HTTPException(status_code=503, detail=f"检索服务不可用：{exc}") from exc
 
+    _audit(
+        user,
+        "RETRIEVAL_DEBUG",
+        knowledge_base_id=request.knowledge_base_id or "all",
+        query=request.query,
+        latency_ms=(time.perf_counter() - started) * 1000,
+        num_sources=len(rows),
+        detail=f"mode={request.mode},rerank={request.rerank}",
+    )
     return {
         "query": request.query,
         "mode": request.mode,
@@ -424,6 +520,7 @@ def run_evaluation(request: EvaluationRequest, user: CurrentUser = Depends(requi
     require_admin(user)
     dataset_path = Path(__file__).resolve().parent.parent / "eval_dataset.json"
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+    overall_started = time.perf_counter()
 
     report: dict[str, dict] = {}
     for eval_mode in request.modes:
@@ -474,6 +571,12 @@ def run_evaluation(request: EvaluationRequest, user: CurrentUser = Depends(requi
             "cases": cases,
         }
 
+    _audit(
+        user,
+        "EVALUATION",
+        latency_ms=(time.perf_counter() - overall_started) * 1000,
+        detail=",".join(request.modes),
+    )
     return {
         "dataset_size": len(dataset),
         "top_k": request.top_k,
