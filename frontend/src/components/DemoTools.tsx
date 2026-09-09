@@ -66,10 +66,10 @@ export default function DemoTools() {
 
   useEffect(() => {
     void syncUser();
-    window.addEventListener("nexuskb-auth", syncUser);
+    window.addEventListener("yaoke-auth", syncUser);
     window.addEventListener("focus", syncUser);
     return () => {
-      window.removeEventListener("nexuskb-auth", syncUser);
+      window.removeEventListener("yaoke-auth", syncUser);
       window.removeEventListener("focus", syncUser);
     };
   }, [syncUser]);
