@@ -39,6 +39,17 @@ function score(value?: number | null) {
   return value == null ? "—" : value.toFixed(3);
 }
 
+function BrandLogo({ large = false }: { large?: boolean }) {
+  return (
+    <img
+      className={large ? "brand-mark large" : "brand-mark"}
+      src="/yaoke-logo.webp"
+      alt="yaoke"
+      style={{ objectFit: "contain", background: "#fff" }}
+    />
+  );
+}
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [booting, setBooting] = useState(true);
@@ -95,7 +106,7 @@ export default function Home() {
   );
 
   if (booting) {
-    return <div className="boot-screen"><div className="brand-mark large">N</div><p>正在加载 NexusKB…</p></div>;
+    return <div className="boot-screen"><BrandLogo large /><p>正在加载 yaoke…</p></div>;
   }
 
   if (!user) {
@@ -115,8 +126,8 @@ export default function Home() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">N</div>
-          <div><strong>NexusKB</strong><span>企业 AI 知识中台</span></div>
+          <BrandLogo />
+          <div><strong>yaoke</strong><span>企业 AI 知识中台</span></div>
         </div>
 
         <nav className="nav-list">
@@ -147,7 +158,7 @@ export default function Home() {
       <section className="main-area">
         <header className="topbar">
           <div>
-            <h1>{nav.find((item) => item.key === view)?.label || "NexusKB"}</h1>
+            <h1>{nav.find((item) => item.key === view)?.label || "yaoke"}</h1>
             <p>Enterprise Retrieval-Augmented Generation</p>
           </div>
           <div className="top-actions">
@@ -223,7 +234,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
   return (
     <main className="login-shell">
       <section className="login-intro">
-        <div className="brand login-brand"><div className="brand-mark">N</div><div><strong>NexusKB</strong><span>Enterprise Knowledge Copilot</span></div></div>
+        <div className="brand login-brand"><BrandLogo /><div><strong>yaoke</strong><span>Enterprise Knowledge Copilot</span></div></div>
         <div className="login-copy">
           <span className="eyebrow">ENTERPRISE RAG / RBAC</span>
           <h1>企业知识，按权限被准确检索。</h1>
@@ -240,7 +251,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: User) => void }) {
           <label>用户名<input value={username} onChange={(e) => setUsername(e.target.value)} /></label>
           <label>密码<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submit(); }} /></label>
           {error && <p className="error-text">{error}</p>}
-          <button className="primary full" disabled={running} onClick={() => void submit()}>{running ? "登录中…" : "登录 NexusKB"}</button>
+          <button className="primary full" disabled={running} onClick={() => void submit()}>{running ? "登录中…" : "登录 yaoke"}</button>
 
           <div className="demo-accounts">
             <div className="section-label">演示账号</div>
@@ -287,7 +298,7 @@ function Dashboard({
     <>
       <section className="hero-card">
         <div>
-          <span className="eyebrow">NexusKB / Enterprise RAG P1</span>
+          <span className="eyebrow">yaoke / Enterprise RAG P1</span>
           <h2>把“能问答”升级为“有权限边界的企业知识系统”</h2>
           <p>当前用户的角色会在检索前转换为 Qdrant metadata filter；无权限 Chunk 不会进入 Vector、BM25 或 LLM Context。</p>
         </div>
@@ -372,7 +383,7 @@ function ChatPanel({ selectedKb, bases }: { selectedKb: string; bases: Knowledge
 
         {!answer && !running && (
           <div className="chat-empty">
-            <span className="large-mark">N</span>
+            <img className="large-mark" src="/yaoke-logo.webp" alt="yaoke" style={{ objectFit: "contain", background: "#fff" }} />
             <h2>今天想查什么企业知识？</h2>
             <p>系统只会从当前账号有权访问的知识库中召回证据。</p>
             <div className="suggestions">{suggestions.map((item) => <button key={item} onClick={() => void ask(item)}>{item}</button>)}</div>
