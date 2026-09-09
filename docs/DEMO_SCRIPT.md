@@ -1,6 +1,6 @@
-# NexusKB · P1.4 五分钟面试演示脚本
+# yaoke · P1.4 五分钟面试演示脚本
 
-目标：用 5 分钟证明 NexusKB 不只是“知识库聊天”，而是一个具备 **Hybrid Retrieval、RBAC、Ornith Tool Calling、联网检索、Citation、Audit 和 Agent Trace** 的企业 AI 知识中台。
+目标：用 5 分钟证明 yaoke 不只是“知识库聊天”，而是一个具备 **Hybrid Retrieval、RBAC、Ornith Tool Calling、联网检索、Citation、Audit 和 Agent Trace** 的企业 AI 知识中台。
 
 ## 演示前检查（不计入正式时间）
 
@@ -36,7 +36,7 @@ admin / admin123
 
 讲：
 
-> NexusKB 是我做的企业 RAG / Agent 演示系统。它先用 JWT 和 RBAC 确定数据边界，再由 Ornith-1.5:9b 决定调用企业检索还是 Web Search。模型可以选 Tool，但不能决定权限；企业检索仍然在 Qdrant 和 BM25 候选生成前做 ACL。
+> yaoke 是我做的企业 RAG / Agent 演示系统。它先用 JWT 和 RBAC 确定数据边界，再由 Ornith-1.5:9b 决定调用企业检索还是 Web Search。模型可以选 Tool，但不能决定权限；企业检索仍然在 Qdrant 和 BM25 候选生成前做 ACL。
 
 快速指一下：5 个知识域、20 份资料、Chunks、运行指标。
 

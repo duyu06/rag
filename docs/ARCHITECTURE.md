@@ -1,4 +1,4 @@
-# NexusKB Architecture
+# yaoke Architecture
 
 ## Runtime path
 

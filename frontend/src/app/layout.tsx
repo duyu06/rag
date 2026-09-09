@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import AdminQuickLinks from "@/components/AdminQuickLinks";
 import AgentModeToggle from "@/components/AgentModeToggle";
-import BrandingOverlay from "@/components/BrandingOverlay";
 import CitationActions from "@/components/CitationActions";
 import DashboardMetrics from "@/components/DashboardMetrics";
 import DemoTools from "@/components/DemoTools";
@@ -22,7 +21,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN">
       <body>
         {children}
-        <BrandingOverlay />
         <AdminQuickLinks />
         <CitationActions />
         <DashboardMetrics />

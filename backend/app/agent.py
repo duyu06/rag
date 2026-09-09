@@ -14,7 +14,7 @@ from app.knowledge import allowed_ids, visible_bases
 from app.tools.base import AgentMode, ToolContext, ToolExecutionError
 from app.tools.registry import tool_registry
 
-AGENT_SYSTEM_PROMPT = """You are NexusKB Agent running with the local Ornith model.
+AGENT_SYSTEM_PROMPT = """You are yaoke Agent running with the local Ornith model.
 You may answer simple conversation directly, but factual enterprise or current external questions should use tools.
 Rules:
 1. Internal policies, HR, product parameters, sales rules and after-sales SOPs: use enterprise_search.
@@ -162,8 +162,6 @@ def run_agent(
             )
             break
 
-        # Keep the assistant tool-call message in the in-memory Ollama conversation.
-        # The optional `thinking` field is never persisted to trace/audit.
         messages.append(message)
         decisions: list[str] = []
         for call in tool_calls:
@@ -220,7 +218,6 @@ def run_agent(
                         evidence.append(item)
                     else:
                         item["citation_index"] = evidence_keys[key]
-                # Send citation-indexed evidence back to Ornith.
                 result = dict(result)
                 result["evidence"] = [
                     {**item, "citation_index": evidence_keys.get(_evidence_key(item))}
@@ -264,7 +261,6 @@ def run_agent(
                 }
             )
     else:
-        # The loop exhausted its tool-call budget. Force one synthesis call with no tools.
         messages.append(
             {
                 "role": "system",

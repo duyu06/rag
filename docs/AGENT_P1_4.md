@@ -1,4 +1,4 @@
-# NexusKB P1.4 · Ornith Tool Calling Agent
+# yaoke P1.4 · Ornith Tool Calling Agent
 
 P1.4 upgrades `ornith-1.5:9b` from passive RAG synthesis to a bounded tool-calling agent.
 
@@ -55,7 +55,7 @@ Default:
 AGENT_MAX_TOOL_ROUNDS=3
 ```
 
-If Ornith still asks for tools after the third round, NexusKB removes tools and requests a final synthesis from evidence already collected. This prevents accidental infinite tool loops.
+If Ornith still asks for tools after the third round, yaoke removes tools and requests a final synthesis from evidence already collected. This prevents accidental infinite tool loops.
 
 ## APIs
 

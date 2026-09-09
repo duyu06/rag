@@ -9,7 +9,7 @@ _BLOCKED_HOSTS = {"localhost", "localhost.localdomain", "metadata.google.interna
 def safe_public_url(value: str) -> str | None:
     """Accept only normal public HTTP(S) URLs.
 
-    NexusKB currently stores search-result URLs instead of fetching them, but keeping
+    yaoke currently stores search-result URLs instead of fetching them, but keeping
     this boundary strict prevents a future web_fetch tool from inheriting unsafe URL handling.
     """
     try:

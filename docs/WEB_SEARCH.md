@@ -1,8 +1,8 @@
-# NexusKB 联网搜索
+# yaoke 联网搜索
 
 ## 目标
 
-NexusKB 的联网能力不是让 LLM 无限制访问外网，而是增加一个受控的 Web Search evidence channel：
+yaoke 的联网能力不是让 LLM 无限制访问外网，而是增加一个受控的 Web Search evidence channel：
 
 ```text
 User

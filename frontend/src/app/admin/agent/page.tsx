@@ -56,7 +56,7 @@ export default function AgentDebuggerPage() {
       <section style={{ ...card, maxWidth: 1060 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 12, color: "#1570ef", fontWeight: 800 }}>NexusKB / P1.4</div>
+            <div style={{ fontSize: 12, color: "#1570ef", fontWeight: 800 }}>yaoke / P1.4</div>
             <h1 style={{ margin: "8px 0" }}>Agent Debugger</h1>
             <p style={{ margin: 0, color: "#667085" }}>只展示可公开的执行事件，不展示 Ornith hidden reasoning / chain-of-thought。</p>
           </div>
