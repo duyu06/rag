@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
 import AdminQuickLinks from "@/components/AdminQuickLinks";
 import AgentModeToggle from "@/components/AgentModeToggle";
+import BrandingOverlay from "@/components/BrandingOverlay";
 import CitationActions from "@/components/CitationActions";
 import DashboardMetrics from "@/components/DashboardMetrics";
 import DemoTools from "@/components/DemoTools";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NexusKB · 企业 AI 知识中台",
-  description: "Hybrid RAG Knowledge Platform",
+  title: "yaoke",
+  description: "yaoke · 企业 AI 知识与 Agent 平台",
+  icons: {
+    icon: "/yaoke-logo.webp",
+    shortcut: "/yaoke-logo.webp",
+    apple: "/yaoke-logo.webp",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -16,6 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN">
       <body>
         {children}
+        <BrandingOverlay />
         <AdminQuickLinks />
         <CitationActions />
         <DashboardMetrics />
