@@ -14,12 +14,15 @@ class AgentContractsTest(unittest.TestCase):
 
     def test_agent_loop_is_bounded_and_discards_hidden_reasoning_from_trace(self):
         agent = (ROOT / "backend/app/agent.py").read_text(encoding="utf-8")
+        trace = (ROOT / "backend/app/agent_trace.py").read_text(encoding="utf-8")
         config = (ROOT / "backend/app/config.py").read_text(encoding="utf-8")
         self.assertIn("agent_max_tool_rounds: int = Field(default=3, ge=1, le=3)", config)
         self.assertIn("for round_index in range(1, max_rounds + 1)", agent)
         self.assertIn("Tool-call limit reached", agent)
-        self.assertIn("thinking", agent)
-        self.assertIn("never persisted", agent)
+        self.assertIn('"think": True', agent)
+        self.assertIn("messages.append(message)", agent)
+        self.assertNotIn("reasoning_content", trace)
+        self.assertNotIn('"thinking"', trace)
 
     def test_agent_routes_and_tools_endpoint_exist(self):
         routes = (ROOT / "backend/app/agent_routes.py").read_text(encoding="utf-8")
