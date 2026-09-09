@@ -30,7 +30,7 @@ export default function AdminAuditPage() {
   const visible = filter === "ALL" ? events : events.filter((event) => event.action === filter);
 
   if (loading) return <Shell><p>正在加载审计数据…</p></Shell>;
-  if (user?.role !== "ADMIN") return <Shell><h1>无权访问</h1><p>审计日志仅管理员可查看。</p><a href="/">返回 NexusKB</a></Shell>;
+  if (user?.role !== "ADMIN") return <Shell><h1>无权访问</h1><p>审计日志仅管理员可查看。</p><a href="/">返回 yaoke</a></Shell>;
 
   return (
     <Shell>
