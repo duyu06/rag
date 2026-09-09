@@ -9,6 +9,7 @@ from sentence_transformers import CrossEncoder
 
 from app.config import settings
 from app.store import vector_store
+from app.web_search import clean_question
 
 SearchMode = Literal["vector", "bm25", "hybrid"]
 
@@ -51,6 +52,7 @@ class RetrievalService:
         rerank: bool = False,
         knowledge_base_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
+        query = clean_question(query)
         top_k = top_k or settings.top_k
         candidate_k = max(top_k * 4, 12)
 
