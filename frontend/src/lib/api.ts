@@ -45,6 +45,19 @@ export type DebugResult = {
   rerank_score?: number | null;
 };
 
+export type AuditEvent = {
+  timestamp: string;
+  username: string;
+  role: string;
+  action: string;
+  status: string;
+  knowledge_base_id?: string;
+  query?: string;
+  latency_ms?: number;
+  num_sources?: number;
+  detail?: string;
+};
+
 function token() {
   if (typeof window === "undefined") return "";
   return localStorage.getItem(TOKEN_KEY) || "";
@@ -137,6 +150,15 @@ export const api = {
     return response.json();
   },
 
+  async audit(limit = 20): Promise<{ events: AuditEvent[]; summary: Record<string, number> }> {
+    const response = await fetch(`${API_BASE_URL}/audit?limit=${limit}`, {
+      headers: authHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(await parseError(response, "审计日志加载失败"));
+    return response.json();
+  },
+
   async documents(knowledgeBaseId?: string | null): Promise<{
     documents: DocumentItem[];
     total_documents: number;
@@ -170,6 +192,24 @@ export const api = {
     );
     if (!response.ok) throw new Error(await parseError(response, "删除失败"));
     return response.json();
+  },
+
+  async openSource(knowledgeBaseId: string, fileName: string) {
+    const response = await fetch(
+      `${API_BASE_URL}/source/${encodeURIComponent(knowledgeBaseId)}/${encodeURIComponent(fileName)}`,
+      { headers: authHeaders() },
+    );
+    if (!response.ok) throw new Error(await parseError(response, "来源文件打开失败"));
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   },
 
   async demoStatus() {
