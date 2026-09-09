@@ -3,6 +3,7 @@ import AdminQuickLinks from "@/components/AdminQuickLinks";
 import CitationActions from "@/components/CitationActions";
 import DashboardMetrics from "@/components/DashboardMetrics";
 import DemoTools from "@/components/DemoTools";
+import WebSearchToggle from "@/components/WebSearchToggle";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <CitationActions />
         <DashboardMetrics />
         <DemoTools />
+        <WebSearchToggle />
       </body>
     </html>
   );

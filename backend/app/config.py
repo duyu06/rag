@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-mini"
 
+    # Optional controlled web search. Backend capability is enabled, while the UI toggle is off by default.
+    web_search_enabled: bool = True
+    web_search_backend: str = "auto"
+    web_search_region: str = "cn-zh"
+    web_search_max_results: int = 5
+    web_search_timeout_seconds: int = 8
+
     chunk_size: int = 800
     chunk_overlap: int = 120
     vector_weight: float = 0.70
