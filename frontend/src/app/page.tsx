@@ -159,7 +159,7 @@ export default function Home() {
         <header className="topbar">
           <div>
             <h1>{nav.find((item) => item.key === view)?.label || "yaoke"}</h1>
-            <p>Enterprise Retrieval-Augmented Generation</p>
+            <p>Enterprise RAG · Tool Calling Agent</p>
           </div>
           <div className="top-actions">
             <label className="kb-filter">
@@ -298,7 +298,7 @@ function Dashboard({
     <>
       <section className="hero-card">
         <div>
-          <span className="eyebrow">yaoke / Enterprise RAG P1</span>
+          <span className="eyebrow">yaoke / Enterprise RAG P1.4</span>
           <h2>把“能问答”升级为“有权限边界的企业知识系统”</h2>
           <p>当前用户的角色会在检索前转换为 Qdrant metadata filter；无权限 Chunk 不会进入 Vector、BM25 或 LLM Context。</p>
         </div>
@@ -601,26 +601,30 @@ function EvaluationPanel() {
   };
 
   const vector = result?.report?.vector;
+  const bm25 = result?.report?.bm25;
   const hybrid = result?.report?.hybrid;
+  const hybridRerank = result?.report?.hybrid_rerank;
 
   return (
     <>
       <section className="hero-card evaluation-hero">
-        <div><span className="eyebrow">OFFLINE RETRIEVAL EVALUATION</span><h2>用固定 QA 集衡量检索，而不是凭感觉调参数</h2><p>当前内置 10 道企业知识检索题，对比 Vector 与 Hybrid 的 Hit@1、Hit@3 和 MRR。结果来自当前 Qdrant 数据，不使用伪造指标。</p></div>
-        <button className="primary" disabled={running} onClick={() => void run()}>{running ? "评测中…" : "运行评测"}</button>
+        <div><span className="eyebrow">OFFLINE RETRIEVAL EVALUATION</span><h2>30 题 · 四路 RAG 检索评测</h2><p>固定企业知识 QA 集实时对比 Vector、BM25、Hybrid 与 Hybrid + Rerank 的 Hit@1、Hit@3 和 MRR。结果来自当前 Qdrant 数据，不使用预置或伪造指标。</p></div>
+        <button className="primary" disabled={running} onClick={() => void run()}>{running ? "评测中…" : "运行四路评测"}</button>
       </section>
 
       {error && <div className="notice danger">{error}</div>}
 
       <section className="eval-grid">
         <EvalCard title="Vector Search" data={vector} />
+        <EvalCard title="BM25 Search" data={bm25} />
         <EvalCard title="Hybrid Search" data={hybrid} />
+        <EvalCard title="Hybrid + Rerank" data={hybridRerank} />
       </section>
 
       <section className="panel">
-        <div className="panel-head"><div><h3>逐题结果</h3><p>{result ? `${result.dataset_size} questions · Top ${result.top_k}` : "运行评测后展示错误案例"}</p></div></div>
-        {!result && <Empty text="请先确保 5 份 demo-data 已按指定知识库上传，然后运行评测。" />}
-        {result && (hybrid?.cases || []).map((item: any, index: number) => (
+        <div className="panel-head"><div><h3>逐题结果 · Hybrid + Rerank</h3><p>{result ? `${result.dataset_size} questions · Top ${result.top_k}` : "运行评测后展示命中与错误案例"}</p></div></div>
+        {!result && <Empty text="请先使用管理员 Demo 工具初始化 20 份演示资料，然后运行评测。" />}
+        {result && (hybridRerank?.cases || []).map((item: any, index: number) => (
           <div className="eval-case" key={index}>
             <span className={item.rank ? "case-status pass" : "case-status fail"}>{item.rank ? `#${item.rank}` : "MISS"}</span>
             <div><strong>{item.question}</strong><span>Expected: {item.expected_file}</span><small>Top: {(item.top_files || []).join(" / ") || "无结果"}</small></div>
@@ -634,7 +638,7 @@ function EvaluationPanel() {
 function EvalCard({ title, data }: { title: string; data: any }) {
   return (
     <div className="panel eval-card">
-      <div className="panel-head"><div><h3>{title}</h3><p>{data ? `${data.total} questions` : "等待评测"}</p></div></div>
+      <div className="panel-head"><div><h3>{title}</h3><p>{data ? `${data.total} questions · ${Math.round(data.elapsed_ms || 0)} ms` : "等待评测"}</p></div></div>
       <div className="eval-metrics">
         <div><span>Hit@1</span><strong>{data ? `${Math.round(data.hit_at_1 * 100)}%` : "—"}</strong></div>
         <div><span>Hit@3</span><strong>{data ? `${Math.round((data.hit_at_3 || 0) * 100)}%` : "—"}</strong></div>
