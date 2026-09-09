@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-API = os.environ.get("NEXUSKB_API", "http://localhost:8001/api").rstrip("/")
+API = os.environ.get("YAOKE_API", "http://localhost:8001/api").rstrip("/")
 
 EXPECTED = {
     "ADMIN": {"kb_public", "kb_hr", "kb_product", "kb_sales", "kb_service"},
@@ -44,7 +44,7 @@ def expect_denied(path: str, token: str) -> bool:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="NexusKB runtime RBAC smoke test")
+    parser = argparse.ArgumentParser(description="yaoke runtime RBAC smoke test")
     parser.add_argument("--retrieval", action="store_true", help="also run model-backed retrieval ACL checks")
     args = parser.parse_args()
 
