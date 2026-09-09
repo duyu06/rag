@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     enable_rerank: bool = False
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:7b"
+    ollama_model: str = "ornith-1.5:9b"
 
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = ""
