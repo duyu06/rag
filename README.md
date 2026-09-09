@@ -1,4 +1,8 @@
-# NexusKB · 企业 AI 知识中台
+<p align="center">
+  <img src="frontend/public/yaoke-logo.webp" width="420" alt="yaoke logo" />
+</p>
+
+# yaoke · 企业 AI 知识中台
 
 基于 **Next.js + FastAPI + Qdrant + BGE Embedding + BM25 + Hybrid Search + Cross-Encoder Rerank + Ornith Tool Calling** 的企业 RAG / Agent 演示项目。
 
