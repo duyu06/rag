@@ -8,13 +8,15 @@ class WebSearchContractsTest(unittest.TestCase):
     def test_web_search_is_explicit_and_controlled(self):
         rag = (ROOT / "backend/app/rag.py").read_text(encoding="utf-8")
         web = (ROOT / "backend/app/web_search.py").read_text(encoding="utf-8")
+        safety = (ROOT / "backend/app/web_safety.py").read_text(encoding="utf-8")
         self.assertIn("[[NEXUS_WEB_SEARCH]]", web)
         self.assertIn("wants_web_search(question)", rag)
         self.assertIn("企业知识库证据优先", rag)
-        self.assertIn("http", web)
-        self.assertIn("https", web)
+        self.assertIn('{"http", "https"}', safety)
+        self.assertIn("is_private", safety)
+        self.assertIn("is_loopback", safety)
 
-    def test_retrieval_strips_control_marker(self):
+    def test_retrieval_strips_legacy_control_marker(self):
         retrieval = (ROOT / "backend/app/retrieval.py").read_text(encoding="utf-8")
         self.assertIn("query = clean_question(query)", retrieval)
 
@@ -24,6 +26,7 @@ class WebSearchContractsTest(unittest.TestCase):
         self.assertIn("ddgs", requirements)
         self.assertIn("WEB_SEARCH_ENABLED=true", env)
         self.assertIn("WEB_SEARCH_MAX_RESULTS=5", env)
+        self.assertIn("AGENT_MAX_TOOL_ROUNDS=3", env)
 
 
 if __name__ == "__main__":
