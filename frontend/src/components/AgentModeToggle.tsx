@@ -19,10 +19,10 @@ export default function AgentModeToggle() {
       setMode(agentModePreference.get());
     };
     sync();
-    window.addEventListener("nexuskb-auth", sync);
+    window.addEventListener("yaoke-auth", sync);
     window.addEventListener(agentModePreference.event, sync);
     return () => {
-      window.removeEventListener("nexuskb-auth", sync);
+      window.removeEventListener("yaoke-auth", sync);
       window.removeEventListener(agentModePreference.event, sync);
     };
   }, []);
