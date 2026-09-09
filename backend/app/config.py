@@ -25,5 +25,8 @@ class Settings(BaseSettings):
     top_k: int = 5
     max_file_size_mb: int = 20
 
+    jwt_secret: str = "change-me-before-production-nexuskb-demo-secret"
+    jwt_expire_hours: int = 8
+
 
 settings = Settings()

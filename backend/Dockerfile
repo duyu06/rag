@@ -14,6 +14,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY eval_dataset.json ./eval_dataset.json
+COPY eval_retrieval.py ./eval_retrieval.py
 RUN mkdir -p /app/data/documents
 
 EXPOSE 8001
