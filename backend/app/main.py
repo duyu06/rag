@@ -25,7 +25,7 @@ from app.store import vector_store
 
 app = FastAPI(
     title="yaoke 企业 AI 知识中台 API",
-    version="0.3.0",
+    version="0.4.0",
     description="Enterprise RAG demo: RBAC + multi-KB + Hybrid Retrieval + Rerank + Citation + Audit",
 )
 app.add_middleware(
@@ -129,7 +129,7 @@ def safe_rows(
 def root():
     return {
         "name": "yaoke Enterprise Knowledge Copilot",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "docs": "/docs",
         "health": "/api/health",
         "ready": "/api/ready",
