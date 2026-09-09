@@ -46,7 +46,7 @@ export default function CitationActions() {
         const webUrl = webUrlFromCard(card);
         if (webUrl) {
           const link = document.createElement("a");
-          link.className = "link-btn nexuskb-web-source-open";
+          link.className = "link-btn yaoke-web-source-open";
           link.textContent = "打开网页";
           link.href = webUrl;
           link.target = "_blank";
@@ -62,7 +62,7 @@ export default function CitationActions() {
         if (!kbId) return;
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "link-btn nexuskb-source-open";
+        button.className = "link-btn yaoke-source-open";
         button.textContent = "查看原文";
         button.style.marginTop = "6px";
         button.addEventListener("click", async () => {
