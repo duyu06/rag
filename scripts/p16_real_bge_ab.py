@@ -21,11 +21,10 @@ from sentence_transformers import SentenceTransformer
 from app.demo import DEMO_MANIFEST
 from app.ingestion import chunk_markdown, chunk_text
 from app.knowledge import get_base
-from app.retrieval import diversify_by_document, normalize, reciprocal_rank_fusion, tokenize
+from app.retrieval import build_dense_query, diversify_by_document, normalize, reciprocal_rank_fusion, tokenize
 from app.retrieval_text import build_retrieval_text
 
 MODEL = "BAAI/bge-small-zh-v1.5"
-BGE_QUERY_INSTRUCTION = "为这个句子生成表示以用于检索相关文章："
 BASELINE_COLLECTION = "yaoke_p15_real_bge_ab"
 P16_COLLECTION = "yaoke_p16_real_bge_ab"
 DATASET = BACKEND / "eval_dataset.json"
@@ -221,7 +220,7 @@ def main() -> int:
         "p16_bm25": ([], []),
         "p16_hybrid": ([], []),
     }
-    embedding_latencies: list[float] = []
+    vector_query_embedding_latencies: list[float] = []
     vector_debug: list[dict[str, object]] = []
 
     for item in dataset:
@@ -229,19 +228,23 @@ def main() -> int:
         kb_id = item["knowledge_base_id"]
         expected = item["expected_file"]
 
-        # Preserve the P1.5 baseline exactly. P1.6 evaluates BGE's documented
-        # short-query retrieval instruction while passages remain unchanged.
-        baseline_query_vector = model.encode(question, normalize_embeddings=True)
-        started = time.perf_counter()
-        p16_query_vector = model.encode(
-            BGE_QUERY_INSTRUCTION + question,
+        # P1.5 and P1.6 Hybrid both use the raw query. P1.6 pure Vector uses the
+        # production mode-aware BGE instruction because that measured better for
+        # dense Top-3 recall; passages are identical regardless of query mode.
+        raw_query_vector = model.encode(
+            build_dense_query(question, use_instruction=False),
             normalize_embeddings=True,
         )
-        embedding_latencies.append((time.perf_counter() - started) * 1000)
+        started = time.perf_counter()
+        p16_vector_query_vector = model.encode(
+            build_dense_query(question, use_instruction=True),
+            normalize_embeddings=True,
+        )
+        vector_query_embedding_latencies.append((time.perf_counter() - started) * 1000)
 
         # P1.5 baseline.
         started = time.perf_counter()
-        b_vector = vector_rank(client, BASELINE_COLLECTION, baseline_query_vector, kb_id, 12)
+        b_vector = vector_rank(client, BASELINE_COLLECTION, raw_query_vector, kb_id, 12)
         elapsed = (time.perf_counter() - started) * 1000
         b_vector_ids = [point_id for point_id, _ in b_vector[:TOP_K]]
         results["p15_vector"][0].append(rank_for(b_vector_ids, baseline_map, expected))
@@ -260,9 +263,9 @@ def main() -> int:
         results["p15_hybrid"][0].append(rank_for(b_hybrid, baseline_map, expected))
         results["p15_hybrid"][1].append(elapsed)
 
-        # P1.6 candidate. Retrieval latency includes the very small diversity pass.
+        # P1.6 pure Vector uses the instructed query.
         started = time.perf_counter()
-        n_vector = vector_rank(client, P16_COLLECTION, p16_query_vector, kb_id, 30)
+        n_vector = vector_rank(client, P16_COLLECTION, p16_vector_query_vector, kb_id, 30)
         n_vector_ids = diversify_ids([point_id for point_id, _ in n_vector], p16_map)
         elapsed = (time.perf_counter() - started) * 1000
         results["p16_vector"][0].append(rank_for(n_vector_ids, p16_map, expected))
@@ -284,16 +287,19 @@ def main() -> int:
         results["p16_bm25"][0].append(rank_for(n_bm25_ids, p16_map, expected))
         results["p16_bm25"][1].append(elapsed)
 
+        # P1.6 Hybrid intentionally keeps the raw dense query: real-BGE A/B showed
+        # raw query + RRF has higher Hit@1/MRR than globally applying the instruction.
+        n_hybrid_vector = vector_rank(client, P16_COLLECTION, raw_query_vector, kb_id, 30)
         started = time.perf_counter()
-        n_hybrid = p16_hybrid(n_vector, n_ranked, p16_map)
+        n_hybrid = p16_hybrid(n_hybrid_vector, n_ranked, p16_map)
         elapsed = (time.perf_counter() - started) * 1000
         results["p16_hybrid"][0].append(rank_for(n_hybrid, p16_map, expected))
         results["p16_hybrid"][1].append(elapsed)
 
     report = {name: metrics(ranks, latencies) for name, (ranks, latencies) in results.items()}
-    report["query_embedding"] = {
-        "latency_p50_ms": round(statistics.median(embedding_latencies), 2),
-        "latency_p95_ms": round(percentile(embedding_latencies, 0.95), 2),
+    report["vector_query_embedding"] = {
+        "latency_p50_ms": round(statistics.median(vector_query_embedding_latencies), 2),
+        "latency_p95_ms": round(percentile(vector_query_embedding_latencies, 0.95), 2),
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
