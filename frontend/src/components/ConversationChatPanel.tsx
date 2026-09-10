@@ -252,41 +252,25 @@ export default function ConversationChatPanel({
   };
 
   return (
-    <section
-      aria-label="持久化 AI 会话"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "230px minmax(0, 1fr) 310px",
-        gap: 16,
-        minHeight: "calc(100vh - 150px)",
-      }}
-    >
-      <aside className="panel" style={{ padding: 12, overflow: "hidden" }}>
+    <section className="conversation-shell" aria-label="持久化 AI 会话">
+      <aside className="conversation-history panel">
         <button className="primary full" onClick={() => void createConversation()} disabled={running}>
           ＋ 新建会话
         </button>
-        <div style={{ marginTop: 12, display: "grid", gap: 7, maxHeight: "calc(100vh - 230px)", overflowY: "auto" }}>
+        <div className="conversation-history-list">
           {items.map((item) => {
             const active = conversation?.id === item.id;
             return (
-              <div
-                key={item.id}
-                style={{
-                  border: active ? "1px solid #1570ef" : "1px solid #eaecf0",
-                  borderRadius: 10,
-                  background: active ? "#eff8ff" : "#fff",
-                  padding: 9,
-                }}
-              >
+              <div key={item.id} className={active ? "conversation-history-item active" : "conversation-history-item"}>
                 <button
                   type="button"
+                  className="conversation-history-open"
                   onClick={() => void openConversation(item.id)}
-                  style={{ width: "100%", textAlign: "left", border: 0, background: "transparent", cursor: "pointer", padding: 0 }}
                 >
-                  <strong style={{ display: "block", color: "#101828", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</strong>
-                  <span style={{ display: "block", marginTop: 4, color: "#667085", fontSize: 11 }}>{item.message_count} 条消息 · {compactTime(item.updated_at)}</span>
+                  <strong>{item.title}</strong>
+                  <span>{item.message_count} 条消息 · {compactTime(item.updated_at)}</span>
                 </button>
-                <div style={{ marginTop: 7, display: "flex", gap: 8 }}>
+                <div className="conversation-history-actions">
                   <button className="link-btn" onClick={() => void renameConversation(item)}>重命名</button>
                   <button className="danger-link" onClick={() => void removeConversation(item)}>删除</button>
                 </div>
@@ -296,7 +280,7 @@ export default function ConversationChatPanel({
         </div>
       </aside>
 
-      <div className="chat-main panel" style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <div className="conversation-chat-main chat-main panel">
         <div className="chat-title">
           <div>
             <span className="assistant-logo">AI</span>
@@ -310,9 +294,9 @@ export default function ConversationChatPanel({
           </label>
         </div>
 
-        {error && <div className="notice danger" style={{ margin: "8px 0" }}>{error}</div>}
+        {error && <div className="notice danger conversation-error">{error}</div>}
 
-        <div style={{ flex: 1, minHeight: 360, overflowY: "auto", padding: "8px 0 18px" }}>
+        <div className="conversation-message-list">
           {!conversation?.messages.length && !running ? (
             <div className="chat-empty">
               <img className="large-mark" src="/yaoke-logo.webp" alt="yaoke" style={{ objectFit: "contain", background: "#fff" }} />
@@ -323,7 +307,7 @@ export default function ConversationChatPanel({
               </div>
             </div>
           ) : (
-            <div className="conversation" style={{ display: "grid", gap: 12 }}>
+            <div className="conversation persistent-conversation">
               {(conversation?.messages || []).map((message) => (
                 <div
                   key={message.id}
@@ -340,7 +324,7 @@ export default function ConversationChatPanel({
                     message.content
                   )}
                   {message.status === "failed" && (
-                    <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                    <div className="conversation-retry">
                       <small>本条回答生成失败。</small>
                       <button
                         type="button"
@@ -379,7 +363,7 @@ export default function ConversationChatPanel({
         </div>
       </div>
 
-      <aside className="source-panel panel" style={{ minWidth: 0 }}>
+      <aside className="conversation-sources source-panel panel">
         <div className="panel-head">
           <div>
             <h3>引用来源</h3>
