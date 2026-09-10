@@ -57,6 +57,44 @@ jobs:
         run: python scripts/conversation_p1_integration.py
       - name: Verify warm BM25 cache against real Qdrant
         run: python scripts/retrieval_cache_integration.py
+      - name: Verify P1.6 metadata/RRF/query-enrichment/Ollama policy
+        run: python scripts/p16_retrieval_integration.py
+
+  backend-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      qdrant:
+        image: qdrant/qdrant:v1.19.1
+        ports:
+          - 6333:6333
+    env:
+      HF_HOME: ${{ github.workspace }}/.hf-cache
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Cache real BGE model
+        uses: actions/cache@v4
+        with:
+          path: .hf-cache
+          key: yaoke-bge-small-zh-v1.5-${{ runner.os }}
+      - name: Install CPU model-quality dependencies
+        run: |
+          python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --disable-pip-version-check \
+            "sentence-transformers>=3.0,<6" \
+            "qdrant-client>=1.12,<2" \
+            "rank-bm25>=0.2.2" \
+            "pydantic>=2.8,<3" \
+            "pydantic-settings>=2.4,<3" \
+            "pymupdf>=1.24,<2" \
+            "python-docx>=1.1,<2" \
+            "ddgs>=9.0,<10"
+      - name: Compare P1.5 vs P1.6 with real BGE
+        run: python scripts/p16_real_bge_ab.py
 
   frontend-build:
     runs-on: ubuntu-latest

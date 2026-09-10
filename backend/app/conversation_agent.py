@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any
 
@@ -13,12 +14,19 @@ from app.knowledge import allowed_ids, visible_bases
 from app.tools.base import AgentMode, ToolContext, ToolExecutionError
 from app.tools.registry import tool_registry
 
+ENTITY_PATTERN = re.compile(r"(?i)(?<![a-z0-9])[a-z]{1,12}[-_]?\d+[a-z0-9_-]*(?![a-z0-9])")
+
 
 def _contextual_retrieval_query(
     question: str,
     history_messages: list[dict[str, str]],
 ) -> tuple[str, bool]:
-    """Use recent user context for short/elliptical follow-ups without another LLM call."""
+    """Enrich short follow-ups from recent context without another LLM call.
+
+    If the current follow-up contains a new product/version entity (for example
+    X200 after an X100 question), replace the old entity in the previous topic so
+    dense/BM25 retrieval does not receive two competing product identifiers.
+    """
     current = question.strip()
     previous_user = next(
         (
@@ -37,9 +45,21 @@ def _contextual_retrieval_query(
     if not looks_like_followup:
         return current, False
 
-    # Retrieval gets context, while audit and the final answer still use only the
-    # current question. The previous message is capped to avoid query inflation.
-    return f"{previous_user[:500]}\n{current}", True
+    context = previous_user
+    current_entities = ENTITY_PATTERN.findall(current)
+    previous_entities = ENTITY_PATTERN.findall(previous_user)
+    if current_entities and previous_entities:
+        replacement = current_entities[0]
+        for old in previous_entities:
+            if old.lower() == replacement.lower():
+                continue
+            context = re.sub(re.escape(old), replacement, context, flags=re.IGNORECASE)
+
+    max_chars = max(80, int(settings.retrieval_query_context_max_chars))
+    context = context[:max_chars].strip()
+    if not context:
+        return current, False
+    return f"{current}\n上下文主题：{context}", True
 
 
 def _with_citation_indexes(evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -237,6 +257,9 @@ def _local_fast_path(
         "retrieval_total_ms": _timing_value(retrieval_breakdown, "total_ms"),
         "bm25_cache_hit": retrieval_breakdown.get("bm25_cache_hit"),
         "parallel_hybrid": retrieval_breakdown.get("parallel_hybrid"),
+        "fusion": retrieval_breakdown.get("fusion"),
+        "vector_candidates": retrieval_breakdown.get("vector_candidates"),
+        "bm25_candidates": retrieval_breakdown.get("bm25_candidates"),
         "llm_ms": round(llm_ms, 2),
         "total_ms": round(total_ms, 2),
         "llm_calls": llm_calls,

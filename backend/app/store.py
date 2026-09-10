@@ -13,12 +13,14 @@ from qdrant_client.models import (
     FilterSelector,
     MatchAny,
     MatchValue,
+    PayloadSchemaType,
     PointStruct,
     VectorParams,
 )
 from sentence_transformers import SentenceTransformer
 
 from app.config import settings
+from app.retrieval_text import build_retrieval_text
 
 
 class VectorStore:
@@ -75,13 +77,26 @@ class VectorStore:
             self.client.collection_exists(collection_name=settings.qdrant_collection)
         )
 
+    def _ensure_payload_indexes(self) -> None:
+        info = self.client.get_collection(settings.qdrant_collection)
+        payload_schema = getattr(info, "payload_schema", None) or {}
+        for field_name in ("knowledge_base_id", "file_name"):
+            if field_name in payload_schema:
+                continue
+            self.client.create_payload_index(
+                collection_name=settings.qdrant_collection,
+                field_name=field_name,
+                field_schema=PayloadSchemaType.KEYWORD,
+                wait=True,
+            )
+
     def ensure_collection(self) -> None:
-        if self.collection_exists():
-            return
-        self.client.create_collection(
-            collection_name=settings.qdrant_collection,
-            vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
-        )
+        if not self.collection_exists():
+            self.client.create_collection(
+                collection_name=settings.qdrant_collection,
+                vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
+            )
+        self._ensure_payload_indexes()
 
     @staticmethod
     def _dimension_from_collection(info: Any) -> int | None:
@@ -115,7 +130,7 @@ class VectorStore:
             return 0
         self.ensure_collection()
         vectors = self.embedder.encode(
-            [str(chunk["content"]) for chunk in chunks],
+            [build_retrieval_text(chunk) for chunk in chunks],
             normalize_embeddings=True,
             batch_size=32,
             show_progress_bar=False,

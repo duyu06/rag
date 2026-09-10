@@ -36,13 +36,26 @@ def _mode_prompt(mode: AgentMode) -> str:
 
 
 def _ollama_chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    # Routing turns benefit from model reasoning. Evidence-only synthesis (no tools)
+    # should be fast, bounded and keep the already-loaded local model resident.
+    routing_turn = bool(tools)
+    think = settings.agent_think_tool_routing if routing_turn else settings.agent_think_synthesis
+    num_predict = (
+        settings.agent_num_predict_tool_routing
+        if routing_turn
+        else settings.agent_num_predict_synthesis
+    )
     payload: dict[str, Any] = {
         "model": settings.ollama_model,
         "stream": False,
-        "think": True,
+        "think": bool(think),
+        "keep_alive": settings.ollama_keep_alive,
         "messages": messages,
         "tools": tools,
-        "options": {"temperature": 0.2},
+        "options": {
+            "temperature": 0.2,
+            "num_predict": int(num_predict),
+        },
     }
     response = httpx.post(
         settings.ollama_base_url.rstrip("/") + "/api/chat",
