@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     retrieval_parallel_hybrid: bool = True
     # P1.6 metadata-aware index generation. Demo data is automatically reindexed
     # when the payload schema version changes.
-    retrieval_schema_version: str = "p16-metadata-rrf-v1"
+    retrieval_schema_version: str = "p16-metadata-rrf-v2"
     retrieval_vector_candidates: int = Field(default=30, ge=5, le=100)
     retrieval_bm25_candidates: int = Field(default=30, ge=5, le=100)
     retrieval_rrf_k: int = Field(default=60, ge=1, le=200)

@@ -74,7 +74,7 @@ class RetrievalPerformanceContractTests(unittest.TestCase):
         self.assertIn("create_payload_index", STORE)
 
     def test_demo_reindexes_when_retrieval_schema_changes(self):
-        self.assertIn('retrieval_schema_version: str = "p16-metadata-rrf-v1"', CONFIG)
+        self.assertIn('retrieval_schema_version: str = "p16-metadata-rrf-v2"', CONFIG)
         self.assertIn('"retrieval_schema_version": settings.retrieval_schema_version', INGESTION)
         self.assertIn("_is_current_index", DEMO)
         self.assertIn("settings.retrieval_schema_version", DEMO)

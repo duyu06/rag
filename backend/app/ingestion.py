@@ -47,24 +47,34 @@ def chunk_text(text: str, size: int | None = None, overlap: int | None = None) -
 
 
 def chunk_markdown(text: str) -> list[dict[str, Any]]:
-    """Split Markdown by heading first, then apply bounded chunks inside a section."""
+    """Split Markdown by heading hierarchy, then chunk body-bearing sections.
+
+    Parent headings are carried into child-section metadata and Citation content.
+    Adjacent headings do not emit empty heading-only chunks.
+    """
     sections: list[tuple[str, list[str]]] = []
-    current_heading = ""
+    heading_stack: list[tuple[int, str, str]] = []
     current_lines: list[str] = []
 
     def flush() -> None:
         nonlocal current_lines
-        if any(line.strip() for line in current_lines):
-            sections.append((current_heading, current_lines))
+        if not any(line.strip() for line in current_lines):
+            current_lines = []
+            return
+        section_title = " > ".join(title for _, title, _ in heading_stack)
+        heading_lines = [raw for _, _, raw in heading_stack]
+        sections.append((section_title, [*heading_lines, *current_lines]))
         current_lines = []
 
     for raw_line in text.splitlines():
         match = MARKDOWN_HEADING.match(raw_line)
         if match:
             flush()
-            current_heading = match.group(2).strip()
-            # Keep the heading in Citation content while also exposing it as metadata.
-            current_lines = [raw_line.strip()]
+            level = len(match.group(1))
+            title = match.group(2).strip()
+            while heading_stack and heading_stack[-1][0] >= level:
+                heading_stack.pop()
+            heading_stack.append((level, title, raw_line.strip()))
         else:
             current_lines.append(raw_line)
     flush()

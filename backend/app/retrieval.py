@@ -35,6 +35,25 @@ def normalize(values: list[float]) -> list[float]:
     return [(value - low) / (high - low) for value in values]
 
 
+def rank_bm25_match_ids(
+    rows: list[dict[str, Any]],
+    corpus: list[list[str]],
+    raw_scores: list[float],
+    query: str,
+) -> list[str]:
+    """Rank only rows with lexical overlap, even when BM25 scores are non-positive."""
+    query_tokens = set(tokenize(query))
+    if not query_tokens:
+        return []
+    matches = [
+        (row["id"], raw_score)
+        for row, tokens, raw_score in zip(rows, corpus, raw_scores)
+        if query_tokens.intersection(tokens)
+    ]
+    matches.sort(key=lambda item: item[1], reverse=True)
+    return [point_id for point_id, _ in matches]
+
+
 def reciprocal_rank_fusion(
     vector_ids: list[str],
     bm25_ids: list[str],
@@ -121,6 +140,7 @@ class _BM25CacheEntry:
     expires_at: float
     rows: list[dict[str, Any]]
     row_map: dict[str, dict[str, Any]]
+    corpus: list[list[str]]
     index: BM25Okapi | None
 
 
@@ -178,6 +198,7 @@ class RetrievalService:
             expires_at=now + ttl,
             rows=rows,
             row_map=row_map,
+            corpus=corpus,
             index=index,
         )
 
@@ -198,17 +219,24 @@ class RetrievalService:
         self,
         query: str,
         knowledge_base_ids: list[str] | None,
-    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, float], bool]:
+    ) -> tuple[
+        list[dict[str, Any]],
+        dict[str, dict[str, Any]],
+        dict[str, float],
+        list[str],
+        bool,
+    ]:
         entry, cache_hit = self._get_bm25_entry(knowledge_base_ids)
         if not entry.rows or entry.index is None:
-            return entry.rows, entry.row_map, {}, cache_hit
+            return entry.rows, entry.row_map, {}, [], cache_hit
 
         raw_bm25 = [float(value) for value in entry.index.get_scores(tokenize(query))]
         bm25_norm = {
             row["id"]: score
             for row, score in zip(entry.rows, normalize(raw_bm25))
         }
-        return entry.rows, entry.row_map, bm25_norm, cache_hit
+        bm25_match_ids = rank_bm25_match_ids(entry.rows, entry.corpus, raw_bm25, query)
+        return entry.rows, entry.row_map, bm25_norm, bm25_match_ids, cache_hit
 
     def _timed_vector_search(
         self,
@@ -228,10 +256,17 @@ class RetrievalService:
         self,
         query: str,
         knowledge_base_ids: list[str] | None,
-    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, float], bool, float]:
+    ) -> tuple[
+        list[dict[str, Any]],
+        dict[str, dict[str, Any]],
+        dict[str, float],
+        list[str],
+        bool,
+        float,
+    ]:
         started = time.perf_counter()
-        rows, row_map, scores, cache_hit = self._bm25_search(query, knowledge_base_ids)
-        return rows, row_map, scores, cache_hit, (time.perf_counter() - started) * 1000
+        rows, row_map, scores, match_ids, cache_hit = self._bm25_search(query, knowledge_base_ids)
+        return rows, row_map, scores, match_ids, cache_hit, (time.perf_counter() - started) * 1000
 
     def _search_impl(
         self,
@@ -261,6 +296,7 @@ class RetrievalService:
         all_rows: list[dict[str, Any]] = []
         all_map: dict[str, dict[str, Any]] = {}
         bm25_norm: dict[str, float] = {}
+        bm25_match_ids: list[str] = []
         bm25_cache_hit = False
         vector_ms = 0.0
         bm25_ms = 0.0
@@ -279,7 +315,9 @@ class RetrievalService:
                     knowledge_base_ids,
                 )
                 vector_rows, vector_ms = vector_future.result()
-                all_rows, all_map, bm25_norm, bm25_cache_hit, bm25_ms = bm25_future.result()
+                all_rows, all_map, bm25_norm, bm25_match_ids, bm25_cache_hit, bm25_ms = (
+                    bm25_future.result()
+                )
         else:
             if mode in {"vector", "hybrid"}:
                 vector_rows, vector_ms = self._timed_vector_search(
@@ -288,9 +326,11 @@ class RetrievalService:
                     knowledge_base_ids,
                 )
             if mode in {"bm25", "hybrid"}:
-                all_rows, all_map, bm25_norm, bm25_cache_hit, bm25_ms = self._timed_bm25_search(
-                    query,
-                    knowledge_base_ids,
+                all_rows, all_map, bm25_norm, bm25_match_ids, bm25_cache_hit, bm25_ms = (
+                    self._timed_bm25_search(
+                        query,
+                        knowledge_base_ids,
+                    )
                 )
 
         fusion_started = time.perf_counter()
@@ -307,6 +347,15 @@ class RetrievalService:
             for point_id in sorted(bm25_norm, key=bm25_norm.get, reverse=True)
             if bm25_norm.get(point_id, 0.0) > 0
         ][:bm25_candidate_k]
+        if len(bm25_ids) < bm25_candidate_k:
+            selected_bm25 = set(bm25_ids)
+            bm25_ids.extend(
+                [
+                    point_id
+                    for point_id in bm25_match_ids
+                    if point_id not in selected_bm25
+                ][: bm25_candidate_k - len(bm25_ids)]
+            )
 
         rrf_raw: dict[str, float] = {}
         rrf_norm: dict[str, float] = {}
