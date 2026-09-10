@@ -42,9 +42,26 @@ def trace_tools(trace: dict) -> list[str]:
     return result
 
 
+def trace_has_tool_status(trace: dict, tool_name: str, status: str) -> bool:
+    return any(
+        event.get("type") == "tool_end"
+        and event.get("tool") == tool_name
+        and event.get("status") == status
+        for event in trace.get("events", [])
+    )
+
+
 def has_hidden_reasoning(trace: dict) -> bool:
     raw = json.dumps(trace, ensure_ascii=False).lower()
     return any(key in raw for key in ('"thinking"', "reasoning_content", "chain-of-thought", "chain_of_thought"))
+
+
+def demo_ready(status: dict | None) -> bool:
+    if not isinstance(status, dict):
+        return False
+    ready_count = int(status.get("ready_count", 0) or 0)
+    total = int(status.get("total", 0) or 0)
+    return bool(status.get("ready")) and total > 0 and ready_count == total
 
 
 def agent_query(token: str, *, question: str, mode: str, knowledge_base_id: str | None = None):
@@ -62,6 +79,19 @@ def agent_query(token: str, *, question: str, mode: str, knowledge_base_id: str 
         timeout=240,
     )
     return result
+
+
+def load_trace(token: str, result: dict) -> dict:
+    trace_id = str(result.get("trace_id") or "")
+    if not trace_id:
+        raise ValueError("Agent response missing trace_id")
+    _, trace = request("GET", f"/agent/traces/{trace_id}", token=token)
+    return trace
+
+
+def citation_indexes_are_contiguous(sources: list[dict]) -> bool:
+    indexes = [item.get("citation_index") for item in sources]
+    return bool(indexes) and indexes == list(range(1, len(indexes) + 1))
 
 
 def main() -> int:
@@ -92,64 +122,94 @@ def main() -> int:
         print("[INFO] Policy-only checks complete. Use --agent for real Ollama Tool Calling.")
 
         if args.agent:
+            _, demo = request("GET", "/demo/status", token=admin_token)
+            if not demo_ready(demo):
+                print(
+                    f"[FAIL] Agent smoke requires Demo 100% ready; current "
+                    f"{demo.get('ready_count', 0)}/{demo.get('total', 0)}. "
+                    "Run Demo 初始化 / scripts/init_demo.py first."
+                )
+                return 1
+            print(f"[OK] Demo corpus ready: {demo.get('ready_count')}/{demo.get('total')}")
+
             internal = agent_query(
                 admin_token,
-                question="X100 的标准整机质保多久？请依据企业资料回答。",
+                question="X100 的标准整机质保多久？请先调用企业知识检索，并依据检索证据回答。",
                 mode="local",
             )
-            trace_id = str(internal.get("trace_id") or "")
-            _, trace = request("GET", f"/agent/traces/{trace_id}", token=admin_token)
+            trace = load_trace(admin_token, internal)
             tools = trace_tools(trace)
             enterprise_called = "enterprise_search" in tools
             local_no_web = "web_search" not in tools and not any(
                 source.get("source_type") == "web" for source in internal.get("sources", [])
             )
             trace_safe = not has_hidden_reasoning(trace)
-            ok &= enterprise_called and local_no_web and trace_safe
+            enterprise_sources = [
+                item for item in internal.get("sources", []) if item.get("source_type") == "enterprise"
+            ]
+            product_evidence = any(
+                item.get("knowledge_base_id") == "kb_product" for item in enterprise_sources
+            )
+            citations_ok = citation_indexes_are_contiguous(enterprise_sources)
+            ok &= enterprise_called and local_no_web and trace_safe and product_evidence and citations_ok
             print(f"{'[OK]' if enterprise_called else '[FAIL]'} internal query selected enterprise_search")
+            print(f"{'[OK]' if product_evidence else '[FAIL]'} internal query returned kb_product evidence")
+            print(f"{'[OK]' if citations_ok else '[FAIL]'} enterprise citation indexes are contiguous")
             print(f"{'[OK]' if local_no_web else '[FAIL]'} local mode produced no web evidence/tool call")
             print(f"{'[OK]' if trace_safe else '[FAIL]'} trace excludes hidden reasoning fields")
 
             sales = agent_query(
                 sales_token,
-                question="公司年度调薪通常安排在几月？请查询内部制度。",
+                question="请查询 HR 知识库中的年度调薪月份。若无权限请明确说明。",
                 mode="local",
+                knowledge_base_id="kb_hr",
             )
+            sales_trace = load_trace(sales_token, sales)
+            sales_denied = trace_has_tool_status(sales_trace, "enterprise_search", "DENIED")
             sales_leaks = [
                 item for item in sales.get("sources", []) if item.get("knowledge_base_id") == "kb_hr"
             ]
-            sales_ok = not sales_leaks
+            sales_ok = sales_denied and not sales_leaks
             ok &= sales_ok
-            print(f"{'[OK]' if sales_ok else '[FAIL]'} SALES Agent result excludes kb_hr")
+            print(f"{'[OK]' if sales_denied else '[FAIL]'} SALES -> kb_hr enterprise_search is DENIED")
+            print(f"{'[OK]' if not sales_leaks else '[FAIL]'} SALES Agent result contains no kb_hr evidence")
 
             hr = agent_query(
                 hr_token,
-                question="合同金额超过100万需要谁审批？请查询内部制度。",
+                question="请查询销售知识库中的合同审批规则。若无权限请明确说明。",
                 mode="local",
+                knowledge_base_id="kb_sales",
             )
+            hr_trace = load_trace(hr_token, hr)
+            hr_denied = trace_has_tool_status(hr_trace, "enterprise_search", "DENIED")
             forbidden = {"kb_sales", "kb_product", "kb_service"}
             hr_leaks = [
                 item for item in hr.get("sources", []) if item.get("knowledge_base_id") in forbidden
             ]
-            hr_ok = not hr_leaks
+            hr_ok = hr_denied and not hr_leaks
             ok &= hr_ok
-            print(f"{'[OK]' if hr_ok else '[FAIL]'} HR Agent result excludes sales/product/service KBs")
+            print(f"{'[OK]' if hr_denied else '[FAIL]'} HR -> kb_sales enterprise_search is DENIED")
+            print(f"{'[OK]' if not hr_leaks else '[FAIL]'} HR Agent result contains no forbidden evidence")
 
         if args.web:
             web = agent_query(
                 admin_token,
-                question="今天 AI 行业有什么重要新闻？请联网查找最新公开信息。",
+                question="今天 AI 行业有什么重要新闻？请调用联网搜索查找最新公开信息。",
                 mode="web",
             )
-            trace_id = str(web.get("trace_id") or "")
-            _, trace = request("GET", f"/agent/traces/{trace_id}", token=admin_token)
+            trace = load_trace(admin_token, web)
             tools = trace_tools(trace)
             web_called = "web_search" in tools
             web_sources = [item for item in web.get("sources", []) if item.get("source_type") == "web"]
-            web_ok = web_called and bool(web_sources)
+            urls_ok = bool(web_sources) and all(
+                str(item.get("url") or "").startswith(("http://", "https://"))
+                for item in web_sources
+            )
+            web_ok = web_called and bool(web_sources) and urls_ok
             ok &= web_ok
             print(f"{'[OK]' if web_called else '[FAIL]'} public-current query selected web_search")
             print(f"{'[OK]' if web_sources else '[FAIL]'} web_search returned public web evidence")
+            print(f"{'[OK]' if urls_ok else '[FAIL]'} web evidence exposes public HTTP(S) URLs")
 
     except (HTTPError, URLError, OSError, KeyError, ValueError, TypeError) as exc:
         print(f"[FAIL] Agent smoke aborted: {exc}")
