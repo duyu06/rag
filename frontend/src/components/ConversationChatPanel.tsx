@@ -173,6 +173,42 @@ export default function ConversationChatPanel({
     }
   };
 
+  const retryMessage = async (message: ConversationMessage) => {
+    if (!conversation || running || message.role !== "assistant" || message.status !== "failed") return;
+    const active = conversation;
+    setRunning(true);
+    setError("");
+    setSelectedMessageId(message.id);
+    setConversation({
+      ...active,
+      messages: active.messages.map((item) =>
+        item.id === message.id
+          ? { ...item, status: "generating", content: "", sources: [] }
+          : item,
+      ),
+    });
+
+    try {
+      const result = await conversationApi.retry(active.id, message.id, {
+        knowledgeBaseId: selectedKb,
+        rerank,
+      });
+      setConversation(result.conversation);
+      setSelectedMessageId(result.message.id);
+      await reloadList();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "重试失败");
+      try {
+        await openConversation(active.id);
+        await reloadList();
+      } catch {
+        // Keep the original retry error visible.
+      }
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const removeConversation = async (item: ConversationSummary) => {
     if (!confirm(`确认删除会话“${item.title}”？`)) return;
     setError("");
@@ -303,7 +339,22 @@ export default function ConversationChatPanel({
                   ) : (
                     message.content
                   )}
-                  {message.status === "failed" && <small style={{ display: "block", marginTop: 7 }}>生成失败，可重新发送原问题。</small>}
+                  {message.status === "failed" && (
+                    <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                      <small>本条回答生成失败。</small>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={running}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void retryMessage(message);
+                        }}
+                      >
+                        重试
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

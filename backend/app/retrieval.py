@@ -72,12 +72,7 @@ class RetrievalService:
         self,
         knowledge_base_ids: list[str] | None,
     ) -> tuple[_BM25CacheEntry, bool]:
-        """Return a cached BM25 index for the current authorized KB scope.
-
-        Cache is invalidated immediately for writes performed by this backend process
-        through vector_store.data_revision, and also expires by TTL to avoid stale data
-        when another process mutates the same Qdrant collection.
-        """
+        """Return a cached BM25 index for the current authorized KB scope."""
         key = self._scope_key(knowledge_base_ids)
         revision = vector_store.data_revision
         now = time.monotonic()
@@ -107,8 +102,6 @@ class RetrievalService:
 
         if ttl > 0 and vector_store.data_revision == revision:
             with self._bm25_cache_lock:
-                # Drop entries from previous data revisions while keeping distinct
-                # authorization scopes for the active revision.
                 stale = [
                     cache_key
                     for cache_key, value in self._bm25_cache.items()
@@ -136,17 +129,41 @@ class RetrievalService:
         }
         return entry.rows, entry.row_map, bm25_norm, cache_hit
 
-    def search(
+    def _timed_vector_search(
+        self,
+        query: str,
+        candidate_k: int,
+        knowledge_base_ids: list[str] | None,
+    ) -> tuple[list[dict[str, Any]], float]:
+        started = time.perf_counter()
+        rows = vector_store.vector_search(
+            query,
+            candidate_k,
+            knowledge_base_ids=knowledge_base_ids,
+        )
+        return rows, (time.perf_counter() - started) * 1000
+
+    def _timed_bm25_search(
+        self,
+        query: str,
+        knowledge_base_ids: list[str] | None,
+    ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, float], bool, float]:
+        started = time.perf_counter()
+        rows, row_map, scores, cache_hit = self._bm25_search(query, knowledge_base_ids)
+        return rows, row_map, scores, cache_hit, (time.perf_counter() - started) * 1000
+
+    def _search_impl(
         self,
         query: str,
         top_k: int | None = None,
         mode: SearchMode = "hybrid",
         rerank: bool = False,
         knowledge_base_ids: list[str] | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         if mode not in {"vector", "bm25", "hybrid"}:
             raise ValueError("无效检索模式")
 
+        total_started = time.perf_counter()
         query = clean_question(query)
         top_k = top_k or settings.top_k
         candidate_k = max(top_k * 4, 12)
@@ -156,38 +173,38 @@ class RetrievalService:
         all_map: dict[str, dict[str, Any]] = {}
         bm25_norm: dict[str, float] = {}
         bm25_cache_hit = False
+        vector_ms = 0.0
+        bm25_ms = 0.0
 
         if mode == "hybrid" and settings.retrieval_parallel_hybrid:
-            # Vector embedding/Qdrant query and BM25 scoring are independent. Running
-            # them concurrently reduces wall-clock latency, especially on the first
-            # query for a KB scope when its BM25 index is being built.
             with ThreadPoolExecutor(max_workers=2, thread_name_prefix="yaoke-retrieval") as executor:
                 vector_future = executor.submit(
-                    vector_store.vector_search,
+                    self._timed_vector_search,
                     query,
                     candidate_k,
                     knowledge_base_ids,
                 )
                 bm25_future = executor.submit(
-                    self._bm25_search,
+                    self._timed_bm25_search,
                     query,
                     knowledge_base_ids,
                 )
-                vector_rows = vector_future.result()
-                all_rows, all_map, bm25_norm, bm25_cache_hit = bm25_future.result()
+                vector_rows, vector_ms = vector_future.result()
+                all_rows, all_map, bm25_norm, bm25_cache_hit, bm25_ms = bm25_future.result()
         else:
             if mode in {"vector", "hybrid"}:
-                vector_rows = vector_store.vector_search(
+                vector_rows, vector_ms = self._timed_vector_search(
                     query,
                     candidate_k,
-                    knowledge_base_ids=knowledge_base_ids,
+                    knowledge_base_ids,
                 )
             if mode in {"bm25", "hybrid"}:
-                all_rows, all_map, bm25_norm, bm25_cache_hit = self._bm25_search(
+                all_rows, all_map, bm25_norm, bm25_cache_hit, bm25_ms = self._timed_bm25_search(
                     query,
                     knowledge_base_ids,
                 )
 
+        fusion_started = time.perf_counter()
         vector_map = {row["id"]: row for row in vector_rows}
         raw_vector = [float(row.get("vector_raw_score", 0.0)) for row in vector_rows]
         vector_norm = {
@@ -233,15 +250,62 @@ class RetrievalService:
 
         rows.sort(key=lambda item: item["hybrid_score"], reverse=True)
         rows = rows[:candidate_k]
+        fusion_ms = (time.perf_counter() - fusion_started) * 1000
 
+        rerank_ms = 0.0
         if rerank and rows:
+            rerank_started = time.perf_counter()
             pairs = [[query, str(row.get("content", ""))] for row in rows]
             raw_scores = [float(value) for value in self.reranker.predict(pairs)]
             for row, score in zip(rows, normalize(raw_scores)):
                 row["rerank_score"] = round(score, 6)
             rows.sort(key=lambda item: item["rerank_score"] or 0.0, reverse=True)
+            rerank_ms = (time.perf_counter() - rerank_started) * 1000
 
-        return rows[:top_k]
+        total_ms = (time.perf_counter() - total_started) * 1000
+        timings = {
+            "vector_ms": round(vector_ms, 2),
+            "bm25_ms": round(bm25_ms, 2),
+            "fusion_ms": round(fusion_ms, 2),
+            "rerank_ms": round(rerank_ms, 2),
+            "total_ms": round(total_ms, 2),
+            "bm25_cache_hit": bm25_cache_hit if mode in {"bm25", "hybrid"} else None,
+            "parallel_hybrid": bool(mode == "hybrid" and settings.retrieval_parallel_hybrid),
+        }
+        return rows[:top_k], timings
+
+    def search(
+        self,
+        query: str,
+        top_k: int | None = None,
+        mode: SearchMode = "hybrid",
+        rerank: bool = False,
+        knowledge_base_ids: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        rows, _ = self._search_impl(
+            query,
+            top_k=top_k,
+            mode=mode,
+            rerank=rerank,
+            knowledge_base_ids=knowledge_base_ids,
+        )
+        return rows
+
+    def search_with_timings(
+        self,
+        query: str,
+        top_k: int | None = None,
+        mode: SearchMode = "hybrid",
+        rerank: bool = False,
+        knowledge_base_ids: list[str] | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        return self._search_impl(
+            query,
+            top_k=top_k,
+            mode=mode,
+            rerank=rerank,
+            knowledge_base_ids=knowledge_base_ids,
+        )
 
 
 retrieval_service = RetrievalService()

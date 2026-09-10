@@ -204,6 +204,35 @@ class ConversationStore:
         with self.connect() as db:
             db.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
 
+    @staticmethod
+    def _insert_sources(
+        db: sqlite3.Connection,
+        message_id: str,
+        sources: list[dict[str, Any]] | None,
+    ) -> None:
+        for source in sources or []:
+            db.execute(
+                """INSERT INTO message_sources
+                (message_id, citation_index, source_type, title, file_name, page,
+                 content_preview, relevance_score, knowledge_base_id,
+                 knowledge_base_name, url, domain)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    message_id,
+                    source.get("citation_index"),
+                    source.get("source_type") or "enterprise",
+                    source.get("title"),
+                    source.get("file_name"),
+                    source.get("page"),
+                    source.get("content_preview") or "",
+                    source.get("relevance_score"),
+                    source.get("knowledge_base_id"),
+                    source.get("knowledge_base_name"),
+                    source.get("url"),
+                    source.get("domain"),
+                ),
+            )
+
     def add_message(
         self,
         *,
@@ -226,33 +255,57 @@ class ConversationStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (message_id, conversation_id, role, content, status, trace_id, latency_ms, now),
             )
-            for source in sources or []:
-                db.execute(
-                    """INSERT INTO message_sources
-                    (message_id, citation_index, source_type, title, file_name, page,
-                     content_preview, relevance_score, knowledge_base_id,
-                     knowledge_base_name, url, domain)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        message_id,
-                        source.get("citation_index"),
-                        source.get("source_type") or "enterprise",
-                        source.get("title"),
-                        source.get("file_name"),
-                        source.get("page"),
-                        source.get("content_preview") or "",
-                        source.get("relevance_score"),
-                        source.get("knowledge_base_id"),
-                        source.get("knowledge_base_name"),
-                        source.get("url"),
-                        source.get("domain"),
-                    ),
-                )
+            self._insert_sources(db, message_id, sources)
             db.execute(
                 "UPDATE conversations SET updated_at = ? WHERE id = ?",
                 (now, conversation_id),
             )
         return self.get(conversation_id, username=username)["messages"][-1]
+
+    def replace_message(
+        self,
+        *,
+        conversation_id: str,
+        message_id: str,
+        username: str,
+        content: str,
+        status: str,
+        trace_id: str | None = None,
+        latency_ms: float | None = None,
+        sources: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Replace one persisted message in place, including all Citation rows.
+
+        Retry uses this method so a failed assistant turn keeps the same message id
+        and does not create a duplicate user/assistant pair in conversation history.
+        """
+        self.require_owner(conversation_id, username)
+        now = utc_now()
+        with self.connect() as db:
+            row = db.execute(
+                "SELECT id FROM messages WHERE id = ? AND conversation_id = ?",
+                (message_id, conversation_id),
+            ).fetchone()
+            if row is None:
+                raise KeyError("Message 不存在")
+            db.execute(
+                """UPDATE messages
+                   SET content = ?, status = ?, trace_id = ?, latency_ms = ?
+                   WHERE id = ? AND conversation_id = ?""",
+                (content, status, trace_id, latency_ms, message_id, conversation_id),
+            )
+            db.execute("DELETE FROM message_sources WHERE message_id = ?", (message_id,))
+            self._insert_sources(db, message_id, sources)
+            db.execute(
+                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                (now, conversation_id),
+            )
+
+        detail = self.get(conversation_id, username=username)
+        for message in detail["messages"]:
+            if message["id"] == message_id:
+                return message
+        raise KeyError("Message 不存在")
 
     def maybe_title_from_first_question(
         self, conversation_id: str, *, username: str, question: str

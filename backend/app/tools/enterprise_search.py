@@ -31,7 +31,7 @@ def execute_enterprise_search(arguments: dict[str, Any], context: ToolContext) -
     except (TypeError, ValueError):
         top_k = context.top_k
 
-    rows = retrieval_service.search(
+    rows, timings = retrieval_service.search_with_timings(
         query,
         top_k=top_k,
         mode="hybrid",
@@ -72,4 +72,5 @@ def execute_enterprise_search(arguments: dict[str, Any], context: ToolContext) -
         "knowledge_base_ids": knowledge_base_ids,
         "result_count": len(evidence),
         "evidence": evidence,
+        "timings": timings,
     }
