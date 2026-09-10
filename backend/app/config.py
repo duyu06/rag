@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     vector_weight: float = 0.70
     top_k: int = 5
     max_file_size_mb: int = 20
+    bm25_cache_ttl_seconds: int = Field(default=300, ge=0, le=3600)
+    retrieval_parallel_hybrid: bool = True
 
     jwt_secret: str = "change-me-before-production-yaoke-demo-secret"
     jwt_expire_hours: int = 8
