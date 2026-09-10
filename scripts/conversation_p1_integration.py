@@ -52,6 +52,9 @@ def main() -> int:
             return {"role": "assistant", "content": "已根据授权企业资料回答。[1]"}
         return {"role": "assistant", "content": "CI direct answer"}
 
+    def fail_chat(_messages: list[dict], _tools: list[dict]) -> dict:
+        raise RuntimeError("CI forced Ornith failure")
+
     with TestClient(app) as client:
         login = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
         require(login.status_code == 200, login.text)
@@ -85,6 +88,10 @@ def main() -> int:
             timings = first_data.get("timings") or {}
             require(timings.get("fast_path") is True, str(timings))
             require(timings.get("llm_calls") == 1, str(timings))
+            for key in ("vector_ms", "bm25_ms", "fusion_ms", "rerank_ms", "retrieval_total_ms", "llm_ms", "total_ms"):
+                require(key in timings, f"missing timing {key}: {timings}")
+            require("bm25_cache_hit" in timings, str(timings))
+            require("parallel_hybrid" in timings, str(timings))
             require("[1]" in str(first_data["message"].get("content") or ""), str(first_data))
 
             second = client.post(
@@ -107,12 +114,61 @@ def main() -> int:
         require(bool(fast_events), str(trace_data))
         require(fast_events[0].get("contextual_retrieval_query") is True, str(fast_events))
         require((trace_data.get("timings") or {}).get("llm_calls") == 1, str(trace_data))
+        require("vector_ms" in (trace_data.get("timings") or {}), str(trace_data))
         require(len(second_data["conversation"]["messages"]) == 4, str(second_data))
+
+        # Force the LLM boundary to fail after real authorized retrieval. The API
+        # must persist one failed assistant message next to the single user turn.
+        agent_module._ollama_chat = fail_chat
+        try:
+            failed = client.post(
+                f"/api/conversations/{conversation_id}/messages",
+                headers=headers(token),
+                json={"content": "再确认一下 X100 的质保。", "mode": "local", "knowledge_base_id": "kb_product"},
+            )
+        finally:
+            agent_module._ollama_chat = original
+        require(failed.status_code == 503, failed.text)
+
+        after_failure = client.get(
+            f"/api/conversations/{conversation_id}",
+            headers=headers(token),
+        )
+        require(after_failure.status_code == 200, after_failure.text)
+        failed_detail = after_failure.json()
+        require(len(failed_detail["messages"]) == 6, str(failed_detail))
+        failed_assistant = failed_detail["messages"][-1]
+        require(failed_assistant.get("role") == "assistant", str(failed_assistant))
+        require(failed_assistant.get("status") == "failed", str(failed_assistant))
+        failed_id = str(failed_assistant["id"])
+
+        # Retry must reuse that assistant message id and the existing user question.
+        # No duplicate user message or extra assistant row may be appended.
+        agent_module._ollama_chat = fake_chat
+        try:
+            retried = client.post(
+                f"/api/conversations/{conversation_id}/messages/{failed_id}/retry",
+                headers=headers(token),
+                json={"mode": "local", "knowledge_base_id": "kb_product", "top_k": 5, "rerank": False},
+            )
+        finally:
+            agent_module._ollama_chat = original
+        require(retried.status_code == 200, retried.text)
+        retry_data = retried.json()
+        retry_messages = retry_data["conversation"]["messages"]
+        require(len(retry_messages) == 6, str(retry_data))
+        require(str(retry_data["message"]["id"]) == failed_id, str(retry_data))
+        require(retry_data["message"].get("status") == "completed", str(retry_data))
+        require(bool(retry_data["message"].get("trace_id")), str(retry_data))
+        require(bool(retry_data["message"].get("sources")), str(retry_data))
+        require((retry_data.get("timings") or {}).get("fast_path") is True, str(retry_data))
 
         print("[OK] local fast path uses one LLM synthesis call")
         print("[OK] second turn receives prior user+assistant context")
         print("[OK] short follow-up retrieval is contextualized without another LLM")
-        print("[OK] fast-path timings are present in Agent Trace")
+        print("[OK] vector/BM25/fusion/rerank/LLM timings are exposed")
+        print("[OK] failed assistant retry keeps the same message id and message count")
+        print("[OK] retry rewrites Citation and Agent Trace on the existing assistant turn")
 
     db_path.unlink(missing_ok=True)
     print("Conversation P1 integration: PASS")
