@@ -11,6 +11,10 @@ class P17StreamingContractsTest(unittest.TestCase):
         self.assertIn("with httpx.stream(", native)
         self.assertIn('"tools": []', native)
         self.assertIn('message.get("content")', native)
+        self.assertIn("finished = False", native)
+        self.assertIn('chunk.get("done") is True', native)
+        self.assertIn("if not finished:", native)
+        self.assertIn("Ollama 流式响应提前结束", native)
         self.assertNotIn("range(0, len(answer), 14)", native)
 
     def test_local_fast_path_forwards_real_tokens_without_changing_retrieval(self):
