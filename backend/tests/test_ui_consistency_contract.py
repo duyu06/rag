@@ -12,7 +12,7 @@ class UiConsistencyContractsTest(unittest.TestCase):
         stale_ten_question_copy = "当前内置 " + "10 道"
         stale_demo_label = "P1." + "2 · 真实指标 + 审计"
 
-        self.assertIn("yaoke / Enterprise RAG", page)
+        self.assertIn("yaoke / Enterprise RAG P1.6", page)
         self.assertIn(
             '<ConversationChatPanel selectedKb={selectedKb} bases={bases} />',
             page,
