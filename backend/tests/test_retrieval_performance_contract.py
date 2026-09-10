@@ -47,6 +47,13 @@ class RetrievalPerformanceContractTests(unittest.TestCase):
         self.assertIn('"fusion": "rrf"', RETRIEVAL)
         self.assertNotIn("settings.vector_weight * vector_score", RETRIEVAL)
 
+    def test_vector_mode_uses_bge_query_instruction_without_prefixing_hybrid(self):
+        self.assertIn("retrieval_vector_query_instruction", CONFIG)
+        self.assertIn("def build_dense_query", RETRIEVAL)
+        self.assertIn('mode == "vector" and settings.retrieval_vector_query_instruction.strip()', RETRIEVAL)
+        self.assertIn("use_instruction=vector_instruction_enabled", RETRIEVAL)
+        self.assertIn('"vector_query_instruction": vector_instruction_enabled', RETRIEVAL)
+
     def test_heading_chunks_are_diversified_by_document_before_final_top_k(self):
         self.assertIn("def diversify_by_document", RETRIEVAL)
         self.assertIn("retrieval_max_chunks_per_document", CONFIG)
