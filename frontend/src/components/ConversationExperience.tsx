@@ -5,9 +5,9 @@ import { createPortal } from "react-dom";
 import ConversationChatPanel from "@/components/ConversationChatPanel";
 import { KnowledgeBase } from "@/lib/api";
 
-function readKnowledgeSelector(): { selectedKb: string; bases: KnowledgeBase[] } {
+function readKnowledgeSelector(): { selectedKb: string; bases: KnowledgeBase[]; signature: string } {
   const select = document.querySelector<HTMLSelectElement>(".kb-filter select");
-  if (!select) return { selectedKb: "all", bases: [] };
+  if (!select) return { selectedKb: "all", bases: [], signature: "missing" };
   const bases: KnowledgeBase[] = Array.from(select.options)
     .filter((option) => option.value && option.value !== "all")
     .map((option) => ({
@@ -16,7 +16,9 @@ function readKnowledgeSelector(): { selectedKb: string; bases: KnowledgeBase[] }
       description: "",
       department: "",
     }));
-  return { selectedKb: select.value || "all", bases };
+  const selectedKb = select.value || "all";
+  const signature = `${selectedKb}|${bases.map((item) => `${item.id}:${item.name}`).join("|")}`;
+  return { selectedKb, bases, signature };
 }
 
 export default function ConversationExperience() {
@@ -28,9 +30,12 @@ export default function ConversationExperience() {
     let currentOldChat: HTMLElement | null = null;
     let currentHost: HTMLElement | null = null;
     let currentSelect: HTMLSelectElement | null = null;
+    let selectorSignature = "";
 
     const syncSelector = () => {
       const value = readKnowledgeSelector();
+      if (value.signature === selectorSignature) return;
+      selectorSignature = value.signature;
       setSelectedKb(value.selectedKb);
       setBases(value.bases);
     };
@@ -43,6 +48,7 @@ export default function ConversationExperience() {
         currentSelect?.removeEventListener("change", syncSelector);
         currentSelect = select;
         currentSelect?.addEventListener("change", syncSelector);
+        selectorSignature = "";
       }
       syncSelector();
 
