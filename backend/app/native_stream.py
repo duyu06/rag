@@ -13,7 +13,9 @@ def ollama_chat_stream(messages: list[dict[str, Any]]) -> Iterator[str]:
 
     This helper is intentionally used only for final synthesis turns where tools
     are disabled. Tool-routing turns remain buffered so partial tool-call JSON is
-    never exposed to the client.
+    never exposed to the client. A stream is successful only after Ollama emits
+    `done: true`; otherwise the caller must persist the turn as failed rather than
+    accepting a truncated answer.
     """
     payload: dict[str, Any] = {
         "model": settings.ollama_model,
@@ -28,6 +30,7 @@ def ollama_chat_stream(messages: list[dict[str, Any]]) -> Iterator[str]:
         },
     }
 
+    finished = False
     with httpx.stream(
         "POST",
         settings.ollama_base_url.rstrip("/") + "/api/chat",
@@ -43,6 +46,9 @@ def ollama_chat_stream(messages: list[dict[str, Any]]) -> Iterator[str]:
             except json.JSONDecodeError as exc:
                 raise RuntimeError("Ollama 流式响应不是合法 JSON") from exc
 
+            if chunk.get("error"):
+                raise RuntimeError(f"Ollama 流式生成失败：{chunk['error']}")
+
             message = chunk.get("message")
             if isinstance(message, dict):
                 text = str(message.get("content") or "")
@@ -50,4 +56,8 @@ def ollama_chat_stream(messages: list[dict[str, Any]]) -> Iterator[str]:
                     yield text
 
             if chunk.get("done") is True:
+                finished = True
                 break
+
+    if not finished:
+        raise RuntimeError("Ollama 流式响应提前结束，未收到 done=true")
