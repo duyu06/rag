@@ -372,26 +372,41 @@ export const api = {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const frames = buffer.split("\n\n");
-      buffer = frames.pop() || "";
-      for (const frame of frames) {
-        const lines = frame.split("\n");
-        const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
-        const raw = lines.find((line) => line.startsWith("data:"))?.slice(5).trim();
-        if (!raw) continue;
-        const data = JSON.parse(raw);
-        if (event === "trace" && data.trace_id) {
-          agentModePreference.saveTraceId(String(data.trace_id));
-          handlers.onTrace?.(String(data.trace_id));
-        }
-        if (event === "sources") handlers.onSources(data.sources || []);
-        if (event === "token") handlers.onToken(String(data.text || ""));
-        if (event === "done") handlers.onDone();
+    let doneSignaled = false;
+
+    const consumeFrame = (frame: string) => {
+      const lines = frame.split("\n");
+      const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+      const raw = lines.find((line) => line.startsWith("data:"))?.slice(5).trim();
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (event === "trace" && data.trace_id) {
+        agentModePreference.saveTraceId(String(data.trace_id));
+        handlers.onTrace?.(String(data.trace_id));
       }
+      if (event === "sources") handlers.onSources(data.sources || []);
+      if (event === "token") handlers.onToken(String(data.text || ""));
+      if (event === "done" && !doneSignaled) {
+        doneSignaled = true;
+        handlers.onDone();
+      }
+    };
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() || "";
+        for (const frame of frames) consumeFrame(frame);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) consumeFrame(buffer);
+    } finally {
+      // A proxy/network interruption can close SSE without a final done frame.
+      // Always release the UI busy state exactly once.
+      if (!doneSignaled) handlers.onDone();
     }
   },
 
