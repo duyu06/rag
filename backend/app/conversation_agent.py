@@ -51,6 +51,13 @@ def _with_citation_indexes(evidence: list[dict[str, Any]]) -> list[dict[str, Any
     return rows
 
 
+def _timing_value(timings: dict[str, Any], key: str) -> Any:
+    value = timings.get(key)
+    if isinstance(value, (int, float)):
+        return round(float(value), 2)
+    return value
+
+
 def _local_fast_path(
     *,
     question: str,
@@ -134,6 +141,7 @@ def _local_fast_path(
             "status": exc.status,
             "error": str(exc),
             "evidence": [],
+            "timings": {},
         }
     except Exception as exc:
         status = "FAILED"
@@ -143,9 +151,11 @@ def _local_fast_path(
             "status": "FAILED",
             "error": f"{type(exc).__name__}: {exc}",
             "evidence": [],
+            "timings": {},
         }
 
     retrieval_ms = (time.perf_counter() - tool_started) * 1000
+    retrieval_breakdown = dict(result.get("timings") or {})
     evidence = _with_citation_indexes(list(result.get("evidence") or []))
     result = dict(result)
     result["evidence"] = evidence
@@ -158,6 +168,7 @@ def _local_fast_path(
             "status": status,
             "latency_ms": round(retrieval_ms, 2),
             "result_count": len(evidence),
+            "timings": retrieval_breakdown,
         }
     )
     record_event(
@@ -219,6 +230,13 @@ def _local_fast_path(
     total_ms = (time.perf_counter() - started) * 1000
     timings = {
         "retrieval_ms": round(retrieval_ms, 2),
+        "vector_ms": _timing_value(retrieval_breakdown, "vector_ms"),
+        "bm25_ms": _timing_value(retrieval_breakdown, "bm25_ms"),
+        "fusion_ms": _timing_value(retrieval_breakdown, "fusion_ms"),
+        "rerank_ms": _timing_value(retrieval_breakdown, "rerank_ms"),
+        "retrieval_total_ms": _timing_value(retrieval_breakdown, "total_ms"),
+        "bm25_cache_hit": retrieval_breakdown.get("bm25_cache_hit"),
+        "parallel_hybrid": retrieval_breakdown.get("parallel_hybrid"),
         "llm_ms": round(llm_ms, 2),
         "total_ms": round(total_ms, 2),
         "llm_calls": llm_calls,
