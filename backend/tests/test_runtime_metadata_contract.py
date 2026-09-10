@@ -5,13 +5,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RuntimeMetadataContractsTest(unittest.TestCase):
-    def test_p14_runtime_metadata_is_consistent(self):
+    def test_p15_runtime_metadata_is_consistent(self):
         entry = (ROOT / "backend/app/main_agent.py").read_text(encoding="utf-8")
         self.assertIn('app.title = "yaoke API"', entry)
-        self.assertIn('app.version = "0.4.0"', entry)
-        self.assertIn('"version": "0.4.0"', entry)
+        self.assertIn('app.version = "0.5.0"', entry)
+        self.assertIn('"version": "0.5.0"', entry)
+        self.assertIn('"phase": "P1.5"', entry)
 
-    def test_p14_health_reports_the_model_agent_actually_uses(self):
+    def test_p15_health_reports_the_model_agent_actually_uses(self):
         entry = (ROOT / "backend/app/main_agent.py").read_text(encoding="utf-8")
         rag = (ROOT / "backend/app/rag.py").read_text(encoding="utf-8")
 
