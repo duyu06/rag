@@ -17,15 +17,21 @@ from app.tools.registry import tool_registry
 ENTITY_PATTERN = re.compile(r"(?i)(?<![a-z0-9])[a-z]{1,12}[-_]?\d+[a-z0-9_-]*(?![a-z0-9])")
 
 
+def _entity_family(value: str) -> str:
+    """Return the alphabetic identifier family (X100 -> x, IP67 -> ip)."""
+    match = re.match(r"(?i)^([a-z]{1,12})[-_]?\d", value.strip())
+    return match.group(1).lower() if match else ""
+
+
 def _contextual_retrieval_query(
     question: str,
     history_messages: list[dict[str, str]],
 ) -> tuple[str, bool]:
     """Enrich short follow-ups from recent context without another LLM call.
 
-    If the current follow-up contains a new product/version entity (for example
-    X200 after an X100 question), replace the old entity in the previous topic so
-    dense/BM25 retrieval does not receive two competing product identifiers.
+    A new identifier only replaces a stale identifier from the same family. This
+    lets X200 replace X100 while preserving unrelated identifiers such as IP65,
+    and lets an IP67 follow-up replace IP65 without dropping the product entity.
     """
     current = question.strip()
     previous_user = next(
@@ -49,11 +55,26 @@ def _contextual_retrieval_query(
     current_entities = ENTITY_PATTERN.findall(current)
     previous_entities = ENTITY_PATTERN.findall(previous_user)
     if current_entities and previous_entities:
-        replacement = current_entities[0]
-        for old in previous_entities:
-            if old.lower() == replacement.lower():
+        for replacement in current_entities:
+            family = _entity_family(replacement)
+            if not family:
                 continue
-            context = re.sub(re.escape(old), replacement, context, flags=re.IGNORECASE)
+            stale = next(
+                (
+                    old
+                    for old in previous_entities
+                    if old.lower() != replacement.lower() and _entity_family(old) == family
+                ),
+                None,
+            )
+            if stale:
+                context = re.sub(
+                    re.escape(stale),
+                    replacement,
+                    context,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
 
     max_chars = max(80, int(settings.retrieval_query_context_max_chars))
     context = context[:max_chars].strip()
