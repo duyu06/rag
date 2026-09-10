@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import AdminQuickLinks from "@/components/AdminQuickLinks";
 import AgentModeToggle from "@/components/AgentModeToggle";
 import CitationActions from "@/components/CitationActions";
-import ConversationExperience from "@/components/ConversationExperience";
 import DashboardMetrics from "@/components/DashboardMetrics";
 import DemoTools from "@/components/DemoTools";
 import "./globals.css";
@@ -22,7 +21,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN">
       <body>
         {children}
-        <ConversationExperience />
         <AdminQuickLinks />
         <CitationActions />
         <DashboardMetrics />
