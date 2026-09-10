@@ -59,17 +59,18 @@ def _contextual_retrieval_query(
             family = _entity_family(replacement)
             if not family:
                 continue
-            stale = next(
+            old = next(
                 (
-                    old
-                    for old in previous_entities
-                    if old.lower() != replacement.lower() and _entity_family(old) == family
+                    candidate
+                    for candidate in previous_entities
+                    if candidate.lower() != replacement.lower()
+                    and _entity_family(candidate) == family
                 ),
                 None,
             )
-            if stale:
+            if old:
                 context = re.sub(
-                    re.escape(stale),
+                    re.escape(old),
                     replacement,
                     context,
                     count=1,
