@@ -29,6 +29,24 @@ class VersionHygieneContractsTest(unittest.TestCase):
 
         self.assertEqual(offenders, [], "stale version markers remain: " + "; ".join(offenders))
 
+    def test_active_release_entrypoints_are_p15_v050(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        demo_tools = (ROOT / "frontend/src/components/DemoTools.tsx").read_text(encoding="utf-8")
+        entry = (ROOT / "backend/app/main_agent.py").read_text(encoding="utf-8")
+
+        stale_current_line = "当前版本：**P1." + "4 / v0.4.0**"
+        stale_demo_line = "P1." + "4 / v0.4.0 · Agent + 真实指标 + 审计"
+        stale_runtime_version = 'app.version = "0.' + '4.0"'
+
+        self.assertIn("当前版本：**P1.5 / v0.5.0**", readme)
+        self.assertIn("P1.5 / v0.5.0 · Conversation + Agent", demo_tools)
+        self.assertIn('app.version = "0.5.0"', entry)
+        self.assertIn('"phase": "P1.5"', entry)
+
+        self.assertNotIn(stale_current_line, readme)
+        self.assertNotIn(stale_demo_line, demo_tools)
+        self.assertNotIn(stale_runtime_version, entry)
+
 
 if __name__ == "__main__":
     unittest.main()
