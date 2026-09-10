@@ -176,6 +176,13 @@ def rank_for(ids: list[str], row_map: dict[str, dict], expected_file: str) -> in
     return None
 
 
+def describe_ids(ids: list[str], row_map: dict[str, dict]) -> list[str]:
+    return [
+        f"{row_map[point_id].get('file_name', '')} :: {row_map[point_id].get('section_title') or '(document)'}"
+        for point_id in ids
+    ]
+
+
 def main() -> int:
     print(f"Loading real embedding model: {MODEL}")
     model = SentenceTransformer(MODEL)
@@ -214,6 +221,7 @@ def main() -> int:
         "p16_hybrid": ([], []),
     }
     embedding_latencies: list[float] = []
+    vector_debug: list[dict[str, object]] = []
 
     for item in dataset:
         question = item["question"]
@@ -227,8 +235,8 @@ def main() -> int:
         started = time.perf_counter()
         b_vector = vector_rank(client, BASELINE_COLLECTION, query_vector, kb_id, 12)
         elapsed = (time.perf_counter() - started) * 1000
-        ids = [point_id for point_id, _ in b_vector[:TOP_K]]
-        results["p15_vector"][0].append(rank_for(ids, baseline_map, expected))
+        b_vector_ids = [point_id for point_id, _ in b_vector[:TOP_K]]
+        results["p15_vector"][0].append(rank_for(b_vector_ids, baseline_map, expected))
         results["p15_vector"][1].append(elapsed)
 
         b_scoped, b_index = baseline_bm25[kb_id]
@@ -251,6 +259,14 @@ def main() -> int:
         elapsed = (time.perf_counter() - started) * 1000
         results["p16_vector"][0].append(rank_for(n_vector_ids, p16_map, expected))
         results["p16_vector"][1].append(elapsed)
+        vector_debug.append(
+            {
+                "question": question,
+                "expected": expected,
+                "p15_ids": b_vector_ids,
+                "p16_ids": n_vector_ids,
+            }
+        )
 
         n_scoped, n_index = p16_bm25[kb_id]
         started = time.perf_counter()
@@ -283,6 +299,19 @@ def main() -> int:
                 f"[DIAG] Hybrid rank regression: {item['question']} "
                 f"expected={item['expected_file']} P1.5={p15_rank} P1.6={p16_rank}"
             )
+
+        p15_vector_rank = results["p15_vector"][0][index]
+        p16_vector_rank = results["p16_vector"][0][index]
+        old_vector = p15_vector_rank if p15_vector_rank is not None else 99
+        new_vector = p16_vector_rank if p16_vector_rank is not None else 99
+        if new_vector > old_vector:
+            debug = vector_debug[index]
+            print(
+                f"[DIAG] Vector rank regression: {debug['question']} "
+                f"expected={debug['expected']} P1.5={p15_vector_rank} P1.6={p16_vector_rank}"
+            )
+            print(f"[DIAG] P1.5 Vector Top3: {describe_ids(debug['p15_ids'], baseline_map)}")
+            print(f"[DIAG] P1.6 Vector Top3: {describe_ids(debug['p16_ids'], p16_map)}")
 
     baseline_h = report["p15_hybrid"]
     candidate_h = report["p16_hybrid"]
