@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     retrieval_bm25_candidates: int = Field(default=30, ge=5, le=100)
     retrieval_rrf_k: int = Field(default=60, ge=1, le=200)
     retrieval_rerank_candidates: int = Field(default=12, ge=5, le=50)
+    # Prefer diverse documents in the final evidence set while still allowing a
+    # document to contribute multiple sections. Deferred chunks fill any shortage.
+    retrieval_max_chunks_per_document: int = Field(default=2, ge=1, le=10)
     retrieval_query_context_max_chars: int = Field(default=320, ge=80, le=1000)
 
     jwt_secret: str = "change-me-before-production-yaoke-demo-secret"
