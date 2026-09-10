@@ -55,14 +55,32 @@ class VectorStore:
         except Exception:
             return False
 
+    def collection_exists(self) -> bool:
+        return bool(
+            self.client.collection_exists(collection_name=settings.qdrant_collection)
+        )
+
     def ensure_collection(self) -> None:
-        try:
-            self.client.get_collection(settings.qdrant_collection)
-        except Exception:
-            self.client.create_collection(
-                collection_name=settings.qdrant_collection,
-                vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
-            )
+        if self.collection_exists():
+            return
+        self.client.create_collection(
+            collection_name=settings.qdrant_collection,
+            vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
+        )
+
+    @staticmethod
+    def _dimension_from_collection(info: Any) -> int | None:
+        params = getattr(getattr(info, "config", None), "params", None)
+        vectors = getattr(params, "vectors", None)
+        size = getattr(vectors, "size", None)
+        if size is not None:
+            return int(size)
+        if isinstance(vectors, dict) and vectors:
+            first = next(iter(vectors.values()))
+            size = getattr(first, "size", None)
+            if size is not None:
+                return int(size)
+        return None
 
     @staticmethod
     def _kb_filter(knowledge_base_ids: list[str] | None) -> Filter | None:
@@ -106,7 +124,10 @@ class VectorStore:
         limit: int = 12,
         knowledge_base_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        self.ensure_collection()
+        # A read against a brand-new workspace should be cheap. Collection creation
+        # and model loading happen only when data is actually ingested.
+        if not self.collection_exists():
+            return []
         vector = self.embedder.encode(query, normalize_embeddings=True).tolist()
         response = self.client.query_points(
             collection_name=settings.qdrant_collection,
@@ -131,7 +152,8 @@ class VectorStore:
         limit: int = 10000,
         knowledge_base_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        self.ensure_collection()
+        if not self.collection_exists():
+            return []
         points, _ = self.client.scroll(
             collection_name=settings.qdrant_collection,
             scroll_filter=self._kb_filter(knowledge_base_ids),
@@ -142,22 +164,40 @@ class VectorStore:
         return [{"id": str(point.id), **dict(point.payload or {})} for point in points]
 
     def stats(self, knowledge_base_ids: list[str] | None = None) -> dict[str, Any]:
-        self.ensure_collection()
+        if not self.collection_exists():
+            cached_dimension = (
+                int(self._embedder.get_sentence_embedding_dimension())
+                if self._embedder is not None
+                else None
+            )
+            return {
+                "total_chunks": 0,
+                "collection_name": settings.qdrant_collection,
+                "embedding_model": settings.embedding_model,
+                "embedding_dimension": cached_dimension,
+            }
+
+        info = self.client.get_collection(settings.qdrant_collection)
         if knowledge_base_ids:
             chunks = self.all_chunks(knowledge_base_ids=knowledge_base_ids)
             count = len(chunks)
         else:
-            info = self.client.get_collection(settings.qdrant_collection)
             count = int(info.points_count or 0)
+
+        dimension = self._dimension_from_collection(info)
+        if dimension is None and self._embedder is not None:
+            dimension = int(self._embedder.get_sentence_embedding_dimension())
+
         return {
             "total_chunks": count,
             "collection_name": settings.qdrant_collection,
             "embedding_model": settings.embedding_model,
-            "embedding_dimension": self.dimension,
+            "embedding_dimension": dimension,
         }
 
     def delete_file(self, file_name: str, knowledge_base_id: str | None = None) -> None:
-        self.ensure_collection()
+        if not self.collection_exists():
+            return
         must = [
             FieldCondition(
                 key="file_name",
