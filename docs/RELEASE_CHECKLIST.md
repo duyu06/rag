@@ -69,19 +69,39 @@
 
 ## P1.7 Native streaming gate
 
+Executable local gate:
+
+```bash
+python scripts/release_smoke.py --stream
+```
+
+This command uses the real local `ornith-1.5:9b` + Qdrant path and must pass before the interview. It checks incremental SSE delivery, same-message persistence, Citation, Trace and conversation reload consistency.
+
+Optional interview-machine TTFT SLA, after warming the model once:
+
+```bash
+python scripts/release_smoke.py --stream --max-ttft 8
+```
+
+`--max-ttft` is intentionally opt-in because GitHub CI and different local GPUs/CPUs are not comparable performance environments.
+
+- [ ] `python scripts/release_smoke.py --stream` → PASS
 - [ ] `backend/app/native_stream.py` sends Ollama `stream: true`
 - [ ] final Local Fast Path synthesis uses `tools=[]`; Tool Routing stays buffered
 - [ ] `/api/agent/query/stream` no longer slices a completed answer into fixed-size fake chunks
 - [ ] `POST /api/conversations/{conversation_id}/messages/stream` returns SSE
 - [ ] `POST /api/conversations/{conversation_id}/messages/{message_id}/retry/stream` returns SSE
 - [ ] new assistant turn is persisted as `generating` before token delivery
+- [ ] at least 2 non-empty token events are observed by the default smoke gate
 - [ ] first visible Local-mode token arrives before the final `done` event
 - [ ] token chunks append to one AI bubble rather than creating duplicate messages
 - [ ] `done` replaces the same persisted assistant id with `completed` answer + Citation + Trace
+- [ ] streamed answer text equals the final persisted assistant content
 - [ ] stream failure replaces that same assistant id with `failed`
 - [ ] Retry streaming keeps the original failed assistant id
 - [ ] refresh after completion restores the exact answer and Citation from SQLite
 - [ ] `timings.native_stream=true` on a successful Local Fast Path streamed synthesis
+- [ ] persisted Agent Trace also records `native_stream=true`
 - [ ] Auto/Web Tool Calling behavior is unchanged; SSE compatibility does not expose partial tool JSON
 
 Recommended manual demo query:
