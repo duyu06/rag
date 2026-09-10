@@ -94,14 +94,21 @@ function Ensure-EnvironmentFile {
     $text = [System.IO.File]::ReadAllText($EnvFile)
     if ($text -match '(?m)^JWT_SECRET=change-me-before-production-yaoke-demo-secret\s*$') {
         $bytes = New-Object byte[] 48
-        [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        try {
+            $rng.GetBytes($bytes)
+        }
+        finally {
+            $rng.Dispose()
+        }
         $secret = [Convert]::ToBase64String($bytes)
         $text = [regex]::Replace(
             $text,
             '(?m)^JWT_SECRET=change-me-before-production-yaoke-demo-secret\s*$',
             "JWT_SECRET=$secret"
         )
-        [System.IO.File]::WriteAllText($EnvFile, $text, (New-Object System.Text.UTF8Encoding($false)))
+        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($EnvFile, $text, $utf8NoBom)
         Write-Ok "Replaced demo JWT secret with a random local secret"
     }
 
@@ -156,12 +163,7 @@ function Ensure-OrnithModel {
     } | ConvertTo-Json -Depth 6
 
     try {
-        $null = Invoke-RestMethod \
-            -Uri "$OllamaApi/api/chat" \
-            -Method Post \
-            -ContentType "application/json" \
-            -Body $body \
-            -TimeoutSec 240
+        $null = Invoke-RestMethod -Uri "$OllamaApi/api/chat" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 240
         Write-Ok "$Model loaded successfully"
     }
     catch {
