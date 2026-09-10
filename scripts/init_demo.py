@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from urllib.request import Request, urlopen
 
-API = "http://localhost:8001/api"
+API = os.environ.get("YAOKE_API", "http://localhost:8001/api").rstrip("/")
 
 
 def post(path: str, body: dict, token: str | None = None):
