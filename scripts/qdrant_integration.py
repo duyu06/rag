@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import math
+import json
 import os
 import sys
 import time
@@ -124,6 +124,75 @@ def login(client, username: str, password: str) -> tuple[str, dict]:
     return str(data["access_token"]), dict(data["user"])
 
 
+def fake_ornith_chat(messages: list[dict], tools: list[dict]) -> dict:
+    """CI-only Ornith boundary stub.
+
+    It emits the same tool_calls shape expected from Ollama/Ornith, while every tool
+    execution after that boundary remains the real yaoke implementation and real Qdrant.
+    """
+    if messages and messages[-1].get("role") == "tool":
+        try:
+            tool_result = json.loads(str(messages[-1].get("content") or "{}"))
+        except json.JSONDecodeError:
+            tool_result = {}
+        if tool_result.get("status") == "DENIED":
+            return {
+                "role": "assistant",
+                "content": "当前账号无权访问该知识库，因此不能基于未授权资料回答。",
+            }
+        evidence = tool_result.get("evidence") or []
+        if evidence:
+            citation = int(evidence[0].get("citation_index") or 1)
+            return {
+                "role": "assistant",
+                "content": f"已根据授权企业资料完成回答。[{citation}]",
+            }
+        return {"role": "assistant", "content": "当前授权范围内没有足够证据。"}
+
+    user_question = next(
+        (str(item.get("content") or "") for item in reversed(messages) if item.get("role") == "user"),
+        "",
+    )
+    if "X100" in user_question:
+        arguments = {
+            "query": "X100 产品整机保修期",
+            "knowledge_base_id": "kb_product",
+            "top_k": 3,
+        }
+    elif "调薪" in user_question:
+        # Intentionally request an HR KB. The SALES test below must still be denied
+        # by backend authorization, proving that model-generated tool arguments do
+        # not become permissions.
+        arguments = {
+            "query": "公司年度调薪通常安排在几月",
+            "knowledge_base_id": "kb_hr",
+            "top_k": 3,
+        }
+    else:
+        return {"role": "assistant", "content": "CI direct answer"}
+
+    return {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+            {
+                "function": {
+                    "name": "enterprise_search",
+                    "arguments": arguments,
+                }
+            }
+        ],
+    }
+
+
+def trace_tool_statuses(trace: dict, tool_name: str) -> list[str]:
+    return [
+        str(event.get("status"))
+        for event in trace.get("events", [])
+        if event.get("type") == "tool_end" and event.get("tool") == tool_name
+    ]
+
+
 def main() -> int:
     wait_for_qdrant()
 
@@ -133,13 +202,14 @@ def main() -> int:
     os.environ["OLLAMA_BASE_URL"] = "http://127.0.0.1:1"
     os.environ["OLLAMA_MODEL"] = "ornith-1.5:9b"
     os.environ["WEB_SEARCH_ENABLED"] = "false"
-    os.environ["JWT_SECRET"] = "yaoke-ci-integration-secret"
+    os.environ["JWT_SECRET"] = "yaoke-ci-integration-secret-at-least-32-bytes"
 
     install_ci_stubs()
     os.chdir(BACKEND)
     sys.path.insert(0, str(BACKEND))
 
     from fastapi.testclient import TestClient
+    import app.agent as agent_module
     from app.config import settings
     from app.main_agent import app
     from app.store import vector_store
@@ -249,6 +319,71 @@ def main() -> int:
             require(report[mode].get("total") == 30, f"{mode} total != 30")
             require(len(report[mode].get("cases", [])) == 30, f"{mode} cases != 30")
         print("[OK] 30-question four-mode evaluation endpoint completed")
+
+        # The LLM boundary is stubbed, but the Agent loop, tool registry,
+        # authorization, retrieval and Qdrant below are the real application code.
+        original_ollama_chat = agent_module._ollama_chat
+        agent_module._ollama_chat = fake_ornith_chat
+        try:
+            admin_agent = client.post(
+                "/api/agent/query",
+                headers={**auth_headers(admin_token), "Content-Type": "application/json"},
+                json={
+                    "question": "X100 的标准整机质保多久？请依据企业资料回答。",
+                    "mode": "local",
+                    "knowledge_base_id": None,
+                    "top_k": 5,
+                    "rerank": False,
+                },
+            )
+            require(admin_agent.status_code == 200, f"Agent enterprise query failed: {admin_agent.text}")
+            admin_data = admin_agent.json()
+            admin_sources = admin_data.get("sources", [])
+            require(bool(admin_sources), "Agent enterprise query returned no evidence")
+            require(admin_sources[0].get("source_type") == "enterprise", f"unexpected source type: {admin_sources}")
+            require(admin_sources[0].get("knowledge_base_id") == "kb_product", f"Agent used wrong KB: {admin_sources}")
+            require(admin_sources[0].get("citation_index") == 1, f"Agent citation index mismatch: {admin_sources}")
+            require("[1]" in str(admin_data.get("answer") or ""), f"Agent final answer lost citation: {admin_data}")
+
+            admin_trace_id = str(admin_data.get("trace_id") or "")
+            admin_trace = client.get(
+                f"/api/agent/traces/{admin_trace_id}",
+                headers=auth_headers(admin_token),
+            )
+            require(admin_trace.status_code == 200, f"Agent trace unavailable: {admin_trace.text}")
+            require(
+                "SUCCESS" in trace_tool_statuses(admin_trace.json(), "enterprise_search"),
+                f"Agent enterprise_search did not succeed: {admin_trace.json()}",
+            )
+            print("[OK] Agent tool_call -> enterprise_search -> real Qdrant -> Citation -> final")
+
+            sales_agent = client.post(
+                "/api/agent/query",
+                headers={**auth_headers(sales_token), "Content-Type": "application/json"},
+                json={
+                    "question": "公司年度调薪通常安排在几月？请查询内部制度。",
+                    "mode": "local",
+                    "knowledge_base_id": None,
+                    "top_k": 5,
+                    "rerank": False,
+                },
+            )
+            require(sales_agent.status_code == 200, f"SALES denied Agent query failed unexpectedly: {sales_agent.text}")
+            sales_data = sales_agent.json()
+            require(not sales_data.get("sources"), f"SALES received HR evidence: {sales_data.get('sources')}")
+            sales_trace_id = str(sales_data.get("trace_id") or "")
+            sales_trace = client.get(
+                f"/api/agent/traces/{sales_trace_id}",
+                headers=auth_headers(sales_token),
+            )
+            require(sales_trace.status_code == 200, f"SALES Agent trace unavailable: {sales_trace.text}")
+            require(
+                "DENIED" in trace_tool_statuses(sales_trace.json(), "enterprise_search"),
+                f"Model-requested kb_hr was not denied for SALES: {sales_trace.json()}",
+            )
+            print("[OK] Agent model-requested SALES -> kb_hr is DENIED before evidence reaches LLM")
+        finally:
+            agent_module._ollama_chat = original_ollama_chat
 
         reset = client.post("/api/demo/reset", headers=auth_headers(admin_token), json={})
         require(reset.status_code == 200, f"Demo reset failed: {reset.text}")
