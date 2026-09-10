@@ -107,6 +107,8 @@ Qdrant metadata filter + Authorized BM25 corpus
 
 ## 最快启动
 
+推荐使用 Docker Compose：
+
 ```bash
 git clone https://github.com/duyu06/rag.git
 cd rag
@@ -114,6 +116,8 @@ cp backend/.env.example backend/.env
 ollama pull ornith-1.5:9b
 docker compose up --build
 ```
+
+`backend/.env.example` 面向**宿主机直跑**，因此默认 `OLLAMA_BASE_URL=http://localhost:11434`。Docker Compose 会为 backend 容器显式覆盖为 `http://host.docker.internal:11434`，无需手工改 `.env`。
 
 如需先验证模型：
 
@@ -128,15 +132,18 @@ ollama run ornith-1.5:9b
 - Qdrant：`http://localhost:6333/dashboard`
 - Agent Debugger：`http://localhost:3000/admin/agent`
 
-如果不通过 Docker 手工启动 backend，请使用：
+如果不通过 Docker、而是在宿主机手工启动 backend，请先进入 `backend/`，让 `.env`、`data/` 与 `../demo-data` 的相对路径保持正确：
 
 ```bash
+cd backend
 uvicorn app.main_agent:app --host 0.0.0.0 --port 8001
 ```
 
-`app.main` 仍保留旧 RAG 路由，但不会挂载 P1.4 Agent API。
+此模式要求宿主机上已有可访问的 Qdrant（默认 `localhost:6333`）和 Ollama（默认 `localhost:11434`）。`app.main` 仍保留旧 RAG 路由，但不会挂载 P1.4 Agent API。
 
 ## 初始化与基础检查
+
+启动后先跑无破坏性的 preflight：
 
 ```bash
 python scripts/check_demo.py
@@ -148,6 +155,8 @@ python scripts/demo_smoke.py
 ```bash
 python scripts/init_demo.py
 ```
+
+首次初始化会真正加载 Embedding 模型，若本机此前没有缓存模型，耗时会明显高于后续启动；仅打开 Dashboard / `/api/stats` 不会再触发模型下载。
 
 检索层权限严格检查：
 
@@ -280,9 +289,13 @@ npm run build
 - SALES → HR、HR → Sales/Product/Service 权限隔离
 - Qdrant query/scroll KB Filter
 - Authorized BM25 corpus
+- Vector / BM25 / Hybrid 运行路径隔离
+- 全新 Qdrant 环境的只读接口不隐式加载 Embedding
+- Ollama 配置模型 tag 精确健康检查
 - Tool Registry 与 Agent API
 - Local 模式禁止 Web Tool
 - Agent 最大 Tool Round
+- Agent SSE 异常 EOF 释放前端 busy 状态
 - Tool Audit / Trace
 - localhost / 私网 / metadata / file / ftp URL 拦截
 - Demo corpus / evaluation assets 一致性

@@ -52,33 +52,43 @@ class RetrievalService:
         rerank: bool = False,
         knowledge_base_ids: list[str] | None = None,
     ) -> list[dict[str, Any]]:
+        if mode not in {"vector", "bm25", "hybrid"}:
+            raise ValueError("无效检索模式")
+
         query = clean_question(query)
         top_k = top_k or settings.top_k
         candidate_k = max(top_k * 4, 12)
 
-        vector_rows = vector_store.vector_search(
-            query,
-            candidate_k,
-            knowledge_base_ids=knowledge_base_ids,
-        )
-        vector_map = {row["id"]: row for row in vector_rows}
-        raw_vector = [float(row.get("vector_raw_score", 0.0)) for row in vector_rows]
-        vector_norm = {
-            row["id"]: score
-            for row, score in zip(vector_rows, normalize(raw_vector))
-        }
-
-        all_rows = vector_store.all_chunks(knowledge_base_ids=knowledge_base_ids)
-        all_map = {row["id"]: row for row in all_rows}
-        bm25_norm: dict[str, float] = {}
-        if all_rows:
-            corpus = [tokenize(str(row.get("content", ""))) for row in all_rows]
-            bm25 = BM25Okapi(corpus)
-            raw_bm25 = [float(value) for value in bm25.get_scores(tokenize(query))]
-            bm25_norm = {
+        vector_rows: list[dict[str, Any]] = []
+        vector_map: dict[str, dict[str, Any]] = {}
+        vector_norm: dict[str, float] = {}
+        if mode in {"vector", "hybrid"}:
+            vector_rows = vector_store.vector_search(
+                query,
+                candidate_k,
+                knowledge_base_ids=knowledge_base_ids,
+            )
+            vector_map = {row["id"]: row for row in vector_rows}
+            raw_vector = [float(row.get("vector_raw_score", 0.0)) for row in vector_rows]
+            vector_norm = {
                 row["id"]: score
-                for row, score in zip(all_rows, normalize(raw_bm25))
+                for row, score in zip(vector_rows, normalize(raw_vector))
             }
+
+        all_rows: list[dict[str, Any]] = []
+        all_map: dict[str, dict[str, Any]] = {}
+        bm25_norm: dict[str, float] = {}
+        if mode in {"bm25", "hybrid"}:
+            all_rows = vector_store.all_chunks(knowledge_base_ids=knowledge_base_ids)
+            all_map = {row["id"]: row for row in all_rows}
+            if all_rows:
+                corpus = [tokenize(str(row.get("content", ""))) for row in all_rows]
+                bm25 = BM25Okapi(corpus)
+                raw_bm25 = [float(value) for value in bm25.get_scores(tokenize(query))]
+                bm25_norm = {
+                    row["id"]: score
+                    for row, score in zip(all_rows, normalize(raw_bm25))
+                }
 
         if mode == "vector":
             candidate_ids = list(vector_map.keys())
