@@ -17,12 +17,19 @@ jobs:
       - run: python -m compileall -q backend/app scripts
       - run: python scripts/validate_demo_assets.py
       - run: python -m unittest discover -s backend/tests -p 'test_*.py' -v
+      - name: Validate Docker Compose configuration
+        run: |
+          cp backend/.env.example backend/.env
+          docker compose config >/dev/null
+      - name: Validate Windows deployment script syntax
+        shell: pwsh
+        run: '[scriptblock]::Create((Get-Content -Raw scripts/deploy.ps1)) | Out-Null'
 
   backend-integration:
     runs-on: ubuntu-latest
     services:
       qdrant:
-        image: qdrant/qdrant:latest
+        image: qdrant/qdrant:v1.19.1
         ports:
           - 6333:6333
     steps:
