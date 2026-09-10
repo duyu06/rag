@@ -53,6 +53,22 @@ class RuntimeUsabilityContractsTest(unittest.TestCase):
         self.assertIn('"host.docker.internal:host-gateway"', compose)
         self.assertIn("cd backend\nuvicorn app.main_agent:app", readme)
 
+    def test_model_backed_smokes_require_real_demo_data_and_evidence(self):
+        demo_smoke = (ROOT / "scripts/demo_smoke.py").read_text(encoding="utf-8")
+        agent_smoke = (ROOT / "scripts/agent_smoke.py").read_text(encoding="utf-8")
+
+        self.assertIn("if args.retrieval:", demo_smoke)
+        self.assertIn("if not ready:", demo_smoke)
+        self.assertIn("nonempty = bool(rows)", demo_smoke)
+        self.assertIn("passed = nonempty and not leaked", demo_smoke)
+
+        self.assertIn("if args.agent:", agent_smoke)
+        self.assertIn("if not demo_ready(demo):", agent_smoke)
+        self.assertIn('item.get("knowledge_base_id") == "kb_product"', agent_smoke)
+        self.assertIn("citation_indexes_are_contiguous", agent_smoke)
+        self.assertIn('trace_has_tool_status(sales_trace, "enterprise_search", "DENIED")', agent_smoke)
+        self.assertIn('trace_has_tool_status(hr_trace, "enterprise_search", "DENIED")', agent_smoke)
+
 
 if __name__ == "__main__":
     unittest.main()
