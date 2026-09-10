@@ -46,6 +46,8 @@ jobs:
         run: python scripts/qdrant_integration.py
       - name: Verify conversation persistence + ownership + Citation
         run: python scripts/conversation_integration.py
+      - name: Verify multi-turn context + Local Fast Path
+        run: python scripts/conversation_p1_integration.py
       - name: Verify warm BM25 cache against real Qdrant
         run: python scripts/retrieval_cache_integration.py
 
