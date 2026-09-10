@@ -1,0 +1,29 @@
+name: Apply chat persistence patch
+
+on:
+  push:
+    branches: [yaoke-chat-persistence]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: yaoke-chat-persistence
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/_patch_chat_persistence.py
+      - name: Commit source patch and remove helper
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm scripts/_patch_chat_persistence.py .github/workflows/_apply-chat-persistence.yml
+          git add frontend/src/app/page.tsx
+          git commit -m "fix: preserve AI assistant state across page switches [skip ci]"
+          git push origin HEAD:yaoke-chat-persistence
