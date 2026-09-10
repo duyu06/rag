@@ -6,8 +6,9 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
-from app.agent import run_agent
 from app.auth import CurrentUser, require_user
+from app.config import settings
+from app.conversation_agent import run_conversation_agent
 from app.conversation_store import conversation_store
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -41,6 +42,20 @@ def _translate_store_error(exc: Exception) -> HTTPException:
     if isinstance(exc, KeyError):
         return HTTPException(status_code=404, detail=str(exc).strip("'"))
     return HTTPException(status_code=500, detail=f"Conversation 存储失败：{type(exc).__name__}: {exc}")
+
+
+def _recent_completed_history(conversation: dict) -> list[dict]:
+    limit = max(0, int(settings.agent_history_max_messages))
+    if limit == 0:
+        return []
+    messages = [
+        item
+        for item in conversation.get("messages", [])
+        if item.get("role") in {"user", "assistant"}
+        and item.get("status") == "completed"
+        and str(item.get("content") or "").strip()
+    ]
+    return messages[-limit:]
 
 
 @router.get("")
@@ -122,6 +137,9 @@ def create_message(
     if selected_kb is None:
         selected_kb = conversation.get("knowledge_base_id")
 
+    # Capture history before storing the current user turn so the current question
+    # remains a separate final user message in the model input.
+    history = _recent_completed_history(conversation)
     question = request.content.strip()
     conversation_store.add_message(
         conversation_id=conversation_id,
@@ -144,13 +162,14 @@ def create_message(
 
     started = time.perf_counter()
     try:
-        result = run_agent(
+        result = run_conversation_agent(
             question=question,
             user=user,
             mode=mode,
             knowledge_base_id=selected_kb,
             top_k=request.top_k,
             rerank=request.rerank,
+            history=history,
         )
     except ValueError as exc:
         conversation_store.add_message(
@@ -190,4 +209,6 @@ def create_message(
         "message": assistant_message,
         "trace_id": result.get("trace_id"),
         "model_used": result.get("model_used"),
+        "context_messages": result.get("context_messages", len(history)),
+        "timings": result.get("timings"),
     }
