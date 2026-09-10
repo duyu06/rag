@@ -44,6 +44,8 @@ jobs:
           "numpy>=1.26,<3"
       - name: Run real Qdrant API/RBAC/retrieval integration
         run: python scripts/qdrant_integration.py
+      - name: Verify warm BM25 cache against real Qdrant
+        run: python scripts/retrieval_cache_integration.py
 
   frontend-build:
     runs-on: ubuntu-latest
