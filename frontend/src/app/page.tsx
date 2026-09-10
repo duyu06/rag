@@ -186,7 +186,9 @@ export default function Home() {
               onNavigate={setView}
             />
           )}
-          {view === "chat" && <ChatPanel selectedKb={selectedKb} bases={bases} />}
+          <div hidden={view !== "chat"}>
+            <ChatPanel selectedKb={selectedKb} bases={bases} />
+          </div>
           {view === "knowledge" && (
             <KnowledgePanel
               docs={docs}
