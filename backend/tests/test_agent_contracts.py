@@ -19,10 +19,21 @@ class AgentContractsTest(unittest.TestCase):
         self.assertIn("agent_max_tool_rounds: int = Field(default=3, ge=1, le=3)", config)
         self.assertIn("for round_index in range(1, max_rounds + 1)", agent)
         self.assertIn("Tool-call limit reached", agent)
-        self.assertIn('"think": True', agent)
+        self.assertIn('"think": bool(think)', agent)
         self.assertIn("messages.append(message)", agent)
         self.assertNotIn("reasoning_content", trace)
         self.assertNotIn('"thinking"', trace)
+
+    def test_p16_ollama_keeps_model_warm_and_bounds_synthesis(self):
+        agent = (ROOT / "backend/app/agent.py").read_text(encoding="utf-8")
+        config = (ROOT / "backend/app/config.py").read_text(encoding="utf-8")
+        self.assertIn('ollama_keep_alive: str = "30m"', config)
+        self.assertIn("agent_think_tool_routing: bool = True", config)
+        self.assertIn("agent_think_synthesis: bool = False", config)
+        self.assertIn("agent_num_predict_synthesis", config)
+        self.assertIn('"keep_alive": settings.ollama_keep_alive', agent)
+        self.assertIn('"num_predict": int(num_predict)', agent)
+        self.assertIn("routing_turn = bool(tools)", agent)
 
     def test_agent_routes_and_tools_endpoint_exist(self):
         routes = (ROOT / "backend/app/agent_routes.py").read_text(encoding="utf-8")
@@ -53,6 +64,14 @@ class AgentContractsTest(unittest.TestCase):
         self.assertIn('"llm_calls": llm_calls', conversation_agent)
         self.assertIn("tool_registry.execute", conversation_agent)
         self.assertIn("selected_knowledge_base_id=knowledge_base_id", conversation_agent)
+
+    def test_short_followup_query_replaces_stale_product_entity(self):
+        conversation_agent = (ROOT / "backend/app/conversation_agent.py").read_text(encoding="utf-8")
+        self.assertIn("ENTITY_PATTERN", conversation_agent)
+        self.assertIn("current_entities", conversation_agent)
+        self.assertIn("previous_entities", conversation_agent)
+        self.assertIn("re.sub(re.escape(old), replacement", conversation_agent)
+        self.assertIn("retrieval_query_context_max_chars", conversation_agent)
 
 
 if __name__ == "__main__":
