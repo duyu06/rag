@@ -11,6 +11,7 @@ from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder
 
 from app.config import settings
+from app.retrieval_text import build_retrieval_text
 from app.store import vector_store
 from app.web_search import clean_question
 
@@ -32,6 +33,20 @@ def normalize(values: list[float]) -> list[float]:
     if high - low < 1e-9:
         return [1.0 if high > 0 else 0.0 for _ in values]
     return [(value - low) / (high - low) for value in values]
+
+
+def reciprocal_rank_fusion(
+    vector_ids: list[str],
+    bm25_ids: list[str],
+    *,
+    k: int,
+) -> dict[str, float]:
+    """Fuse independent rankings without assuming their raw scores are comparable."""
+    scores: dict[str, float] = {}
+    for ranking in (vector_ids, bm25_ids):
+        for rank, point_id in enumerate(ranking, start=1):
+            scores[point_id] = scores.get(point_id, 0.0) + 1.0 / (k + rank)
+    return scores
 
 
 @dataclass(slots=True)
@@ -90,7 +105,7 @@ class RetrievalService:
 
         rows = vector_store.all_chunks(knowledge_base_ids=knowledge_base_ids)
         row_map = {row["id"]: row for row in rows}
-        corpus = [tokenize(str(row.get("content", ""))) for row in rows]
+        corpus = [tokenize(build_retrieval_text(row)) for row in rows]
         index = BM25Okapi(corpus) if corpus else None
         entry = _BM25CacheEntry(
             revision=revision,
@@ -166,7 +181,8 @@ class RetrievalService:
         total_started = time.perf_counter()
         query = clean_question(query)
         top_k = top_k or settings.top_k
-        candidate_k = max(top_k * 4, 12)
+        vector_candidate_k = max(top_k, int(settings.retrieval_vector_candidates))
+        bm25_candidate_k = max(top_k, int(settings.retrieval_bm25_candidates))
 
         vector_rows: list[dict[str, Any]] = []
         all_rows: list[dict[str, Any]] = []
@@ -181,7 +197,7 @@ class RetrievalService:
                 vector_future = executor.submit(
                     self._timed_vector_search,
                     query,
-                    candidate_k,
+                    vector_candidate_k,
                     knowledge_base_ids,
                 )
                 bm25_future = executor.submit(
@@ -195,7 +211,7 @@ class RetrievalService:
             if mode in {"vector", "hybrid"}:
                 vector_rows, vector_ms = self._timed_vector_search(
                     query,
-                    candidate_k,
+                    vector_candidate_k,
                     knowledge_base_ids,
                 )
             if mode in {"bm25", "hybrid"}:
@@ -206,21 +222,37 @@ class RetrievalService:
 
         fusion_started = time.perf_counter()
         vector_map = {row["id"]: row for row in vector_rows}
+        vector_ids = [row["id"] for row in vector_rows[:vector_candidate_k]]
         raw_vector = [float(row.get("vector_raw_score", 0.0)) for row in vector_rows]
         vector_norm = {
             row["id"]: score
             for row, score in zip(vector_rows, normalize(raw_vector))
         }
 
+        bm25_ids = [
+            point_id
+            for point_id in sorted(bm25_norm, key=bm25_norm.get, reverse=True)
+            if bm25_norm.get(point_id, 0.0) > 0
+        ][:bm25_candidate_k]
+
+        rrf_raw: dict[str, float] = {}
+        rrf_norm: dict[str, float] = {}
         if mode == "vector":
-            candidate_ids = list(vector_map.keys())
+            candidate_ids = vector_ids
         elif mode == "bm25":
-            candidate_ids = sorted(bm25_norm, key=bm25_norm.get, reverse=True)[:candidate_k]
+            candidate_ids = bm25_ids
         else:
-            candidate_ids = list(vector_map.keys())
-            for point_id in sorted(bm25_norm, key=bm25_norm.get, reverse=True)[:candidate_k]:
-                if point_id not in candidate_ids:
-                    candidate_ids.append(point_id)
+            rrf_raw = reciprocal_rank_fusion(
+                vector_ids,
+                bm25_ids,
+                k=int(settings.retrieval_rrf_k),
+            )
+            candidate_ids = sorted(rrf_raw, key=rrf_raw.get, reverse=True)
+            normalized_rrf = normalize([rrf_raw[point_id] for point_id in candidate_ids])
+            rrf_norm = {
+                point_id: score
+                for point_id, score in zip(candidate_ids, normalized_rrf)
+            }
 
         rows: list[dict[str, Any]] = []
         for point_id in candidate_ids:
@@ -232,16 +264,14 @@ class RetrievalService:
             elif mode == "bm25":
                 final_score = bm25_score
             else:
-                final_score = (
-                    settings.vector_weight * vector_score
-                    + (1 - settings.vector_weight) * bm25_score
-                )
+                final_score = rrf_norm.get(point_id, 0.0)
 
             rows.append(
                 {
                     **source,
                     "vector_score": round(vector_score, 6),
                     "bm25_score": round(bm25_score, 6),
+                    "rrf_score": round(rrf_raw.get(point_id, 0.0), 8) if mode == "hybrid" else None,
                     "hybrid_score": round(final_score, 6),
                     "rerank_score": None,
                     "bm25_cache_hit": bm25_cache_hit if mode in {"bm25", "hybrid"} else None,
@@ -249,11 +279,12 @@ class RetrievalService:
             )
 
         rows.sort(key=lambda item: item["hybrid_score"], reverse=True)
-        rows = rows[:candidate_k]
         fusion_ms = (time.perf_counter() - fusion_started) * 1000
 
         rerank_ms = 0.0
         if rerank and rows:
+            rerank_pool_size = max(top_k, int(settings.retrieval_rerank_candidates))
+            rows = rows[:rerank_pool_size]
             rerank_started = time.perf_counter()
             pairs = [[query, str(row.get("content", ""))] for row in rows]
             raw_scores = [float(value) for value in self.reranker.predict(pairs)]
@@ -271,6 +302,10 @@ class RetrievalService:
             "total_ms": round(total_ms, 2),
             "bm25_cache_hit": bm25_cache_hit if mode in {"bm25", "hybrid"} else None,
             "parallel_hybrid": bool(mode == "hybrid" and settings.retrieval_parallel_hybrid),
+            "fusion": "rrf" if mode == "hybrid" else mode,
+            "vector_candidates": len(vector_ids) if mode in {"vector", "hybrid"} else 0,
+            "bm25_candidates": len(bm25_ids) if mode in {"bm25", "hybrid"} else 0,
+            "rerank_candidates": min(len(rows), max(top_k, int(settings.retrieval_rerank_candidates))) if rerank else 0,
         }
         return rows[:top_k], timings
 
