@@ -55,37 +55,47 @@ def diversify_by_document(
     top_k: int,
     max_per_document: int,
 ) -> list[dict[str, Any]]:
-    """Prefer document diversity without reducing the requested result count.
+    """Prefer broad document coverage before taking extra chunks from one file.
 
-    Heading-aware indexing creates several useful chunks per file. Without a diversity
-    pass, one document can occupy every top-k slot and hide a second relevant source.
-    We first cap each document, then fill any shortage from deferred rows in original
-    rank order. A workspace containing only one document therefore still returns all
-    requested chunks.
+    Heading-aware indexing creates several useful chunks per file. The first pass takes
+    only the best-ranked chunk from each document; later passes may take a second (or
+    further configured) chunk. If there are not enough distinct documents/chunks, the
+    remaining rows are filled in original rank order so single-document workspaces still
+    return the requested number of evidence chunks.
     """
     if top_k <= 0:
         return []
+
     cap = max(1, int(max_per_document))
     selected: list[dict[str, Any]] = []
-    deferred: list[dict[str, Any]] = []
+    selected_indexes: set[int] = set()
     counts: dict[tuple[str, str], int] = {}
 
-    for row in rows:
+    def document_key(row: dict[str, Any], index: int) -> tuple[str, str]:
         file_name = str(row.get("file_name") or "").strip()
         kb_id = str(row.get("knowledge_base_id") or "").strip()
         if file_name:
-            key = (kb_id, file_name)
-        else:
-            key = ("__point__", str(row.get("id") or id(row)))
-        if counts.get(key, 0) < cap:
+            return kb_id, file_name
+        return "__point__", str(row.get("id") or index)
+
+    # Pass 1 maximizes source coverage; later passes admit additional chunks per file.
+    for pass_number in range(1, cap + 1):
+        for index, row in enumerate(rows):
+            if index in selected_indexes:
+                continue
+            key = document_key(row, index)
+            if counts.get(key, 0) >= pass_number:
+                continue
             selected.append(row)
+            selected_indexes.add(index)
             counts[key] = counts.get(key, 0) + 1
             if len(selected) >= top_k:
                 return selected[:top_k]
-        else:
-            deferred.append(row)
 
-    for row in deferred:
+    # Preserve result count even when the scope has fewer documents than top_k.
+    for index, row in enumerate(rows):
+        if index in selected_indexes:
+            continue
         selected.append(row)
         if len(selected) >= top_k:
             break
