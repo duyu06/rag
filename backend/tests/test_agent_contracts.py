@@ -65,12 +65,14 @@ class AgentContractsTest(unittest.TestCase):
         self.assertIn("tool_registry.execute", conversation_agent)
         self.assertIn("selected_knowledge_base_id=knowledge_base_id", conversation_agent)
 
-    def test_short_followup_query_replaces_stale_product_entity(self):
+    def test_short_followup_query_replaces_stale_entity_within_same_family(self):
         conversation_agent = (ROOT / "backend/app/conversation_agent.py").read_text(encoding="utf-8")
         self.assertIn("ENTITY_PATTERN", conversation_agent)
+        self.assertIn("def _entity_family", conversation_agent)
         self.assertIn("current_entities", conversation_agent)
         self.assertIn("previous_entities", conversation_agent)
-        self.assertIn("re.sub(re.escape(old), replacement", conversation_agent)
+        self.assertIn("_entity_family(candidate) == family", conversation_agent)
+        self.assertIn("re.escape(old)", conversation_agent)
         self.assertIn("retrieval_query_context_max_chars", conversation_agent)
 
 
