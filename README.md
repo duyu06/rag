@@ -6,10 +6,24 @@
 
 基于 **Next.js + FastAPI + Qdrant + BGE Embedding + BM25 + Hybrid Search + Cross-Encoder Rerank + Ornith Tool Calling** 的企业 RAG / Agent 演示项目。
 
-当前版本：**P1.6 / v0.6.0**  
+当前版本：**P1.7 / v0.7.0**  
 默认本地 LLM：**`ornith-1.5:9b`（Ollama）**。
 
-## P1.6 重点
+## P1.7 重点
+
+P1.7 在 P1.6 Retrieval Quality 基线上升级 **真实 Conversation Streaming**，不改变原有 Retrieval / RBAC / Citation 权限语义：
+
+- Local Fast Path 最终 synthesis 使用 Ollama 原生 `stream: true`
+- 使用 `httpx.stream` 直接消费 Ollama NDJSON `message.content`，不再对完整答案固定字符切块
+- Tool Routing / Tool arguments 继续 buffered，避免 partial tool-call JSON 暴露给客户端
+- 新增 Conversation SSE send / retry endpoint
+- assistant turn 先以 `generating` 持久化，流结束后在**同一 message id** 原地写入 completed answer + Citation + Trace
+- Retry 同样复用原 failed assistant message id，并支持增量出字
+- Conversation UI 使用 `sendStream` / `retryStream`，收到一个 token chunk 就立即追加到当前 AI 气泡
+- `auto` / `web` 保留现有 Tool Calling 语义，通过 SSE 兼容传输最终 buffered answer；`local` + Local Fast Path 才是本轮 native token streaming 主链
+- P1.6 real-BGE 质量门禁继续作为 Retrieval regression gate
+
+## P1.6 Retrieval 基线
 
 P1.6 在 P1.5 Conversation / Local Fast Path / Retry / Trace 基础上，重点收敛 **检索质量与可回归性**：
 
@@ -17,8 +31,8 @@ P1.6 在 P1.5 Conversation / Local Fast Path / Retry / Trace 基础上，重点�
 - 短追问 Query Enrichment 按 identifier family 更新实体，避免 `X100 + IP65 → IP67` 时丢掉产品实体
 - BM25 小语料 / 同质语料中，即使原始或归一化分数非正，也保留真实词法匹配候选
 - Hybrid 使用结构化 Chunk metadata + RRF 融合，继续保留可选 Rerank
-- 检索 schema 升级为 `p16-metadata-rrf-v2`，Demo 会按新结构重新索引
-- CI 新增真实 `BAAI/bge-small-zh-v1.5` + Qdrant quality gate，不只依赖 stub
+- 检索 schema 为 `p16-metadata-rrf-v2`，Demo 会按新结构重新索引
+- CI 使用真实 `BAAI/bge-small-zh-v1.5` + Qdrant quality gate，不只依赖 stub
 - 30 道 Demo 评测题的稳定基线：**P1.6 Hybrid Hit@1 = 0.9000 / Hit@3 = 1.0000 / MRR = 0.9500**
 
 P1.5 的会话能力继续保留：
@@ -76,7 +90,11 @@ Agent mode: local | auto | web
  │   ↓
  │ Local Fast Path
  │   ↓
- │ enterprise_search → authorized retrieval → one LLM synthesis
+ │ enterprise_search → authorized retrieval
+ │   ↓
+ │ Ollama final synthesis (stream: true, tools=[])
+ │   ↓
+ │ Conversation SSE → incremental AI bubble
  │
  └─ auto / web
      ↓
@@ -85,21 +103,21 @@ Agent mode: local | auto | web
    Tool Registry
    ├─ enterprise_search
    └─ web_search
+     ↓
+   buffered final answer over SSE compatibility path
  ↓
 Evidence + citation_index
- ↓
-Final Answer
  ↓
 SQLite Conversation + Citation + Audit + Agent Trace
 ```
 
 ## Agent 三种模式
 
-| 模式 | 企业检索 | Web Search | 用途 |
-|---|---|---|---|
-| `本地 / local` | ✅ | ❌ | 内部制度、敏感企业问题；优先走 Local Fast Path |
-| `自动 / auto` | ✅ | ✅ 由 Ornith 决定 | 默认 Agent 模式 |
-| `联网 / web` | ✅ | ✅ | 最新公开新闻、行业趋势、外部资料 |
+| 模式 | 企业检索 | Web Search | 输出方式 | 用途 |
+|---|---|---|---|---|
+| `本地 / local` | ✅ | ❌ | Local Fast Path 原生 token streaming | 内部制度、敏感企业问题 |
+| `自动 / auto` | ✅ | ✅ 由 Ornith 决定 | Tool Calling buffered + SSE compatibility | 默认 Agent 模式 |
+| `联网 / web` | ✅ | ✅ | Tool Calling buffered + SSE compatibility | 最新公开新闻、行业趋势、外部资料 |
 
 涉及内部客户、报价、员工、人事或未公开业务信息时，应使用 **本地模式**，避免 Query 发送到公共搜索服务。
 
@@ -209,7 +227,7 @@ python scripts/agent_smoke.py --agent
 python scripts/agent_smoke.py --agent --web
 ```
 
-P1.6 发布前真实主链检查：
+P1.7 发布前真实主链检查：
 
 ```bash
 python scripts/release_smoke.py --agent
@@ -226,7 +244,9 @@ GET    /api/conversations/{conversation_id}
 PATCH  /api/conversations/{conversation_id}
 DELETE /api/conversations/{conversation_id}
 POST   /api/conversations/{conversation_id}/messages
+POST   /api/conversations/{conversation_id}/messages/stream
 POST   /api/conversations/{conversation_id}/messages/{message_id}/retry
+POST   /api/conversations/{conversation_id}/messages/{message_id}/retry/stream
 
 GET  /api/tools?mode=auto
 POST /api/agent/query
@@ -234,7 +254,7 @@ POST /api/agent/query/stream
 GET  /api/agent/traces/{trace_id}
 ```
 
-Agent Stream 当前是服务端完成推理后分块输出，**不是模型原生 token-by-token streaming**。
+P1.7 的 `local` + Local Fast Path 使用 Ollama 原生 token streaming。Conversation SSE 会先持久化 `generating` assistant turn，再逐 chunk 推送可见文本，结束后原地写入完整 Answer、Citation、Trace 与 timings。`auto` / `web` 为保护 Tool Calling JSON 边界，当前仍先完成 Tool loop，再通过 SSE compatibility path 输出最终答案。
 
 ## Citation、Audit 与 Trace
 
@@ -280,12 +300,14 @@ Hybrid + Rerank
 
 输出 Hit@1 / Hit@3 / MRR / elapsed_ms，不写死指标。
 
-P1.6 CI 额外使用真实 `BAAI/bge-small-zh-v1.5` 做 P1.5 / P1.6 A/B。当前稳定结果：
+P1.6 CI 使用真实 `BAAI/bge-small-zh-v1.5` 做 P1.5 / P1.6 A/B；P1.7 继续复用同一质量门禁作为 Retrieval regression gate。当前稳定结果：
 
 | Pipeline | Hit@1 | Hit@3 | MRR |
 |---|---:|---:|---:|
 | P1.5 Hybrid | 0.8333 | 1.0000 | 0.9167 |
 | **P1.6 Hybrid** | **0.9000** | **1.0000** | **0.9500** |
+
+这些指标属于 P1.6 Retrieval baseline，不代表 streaming 本身提升了检索精度。
 
 ## CI 验收
 
@@ -315,31 +337,33 @@ frontend-build
 - Retry 后 Citation / Trace 重写
 - BM25 warm cache
 - P1.6 heading hierarchy / BM25 边界 / query enrichment 回归
+- P1.7 native Ollama streaming / Conversation SSE / same-message persistence contract
 - 真实 BGE recall quality gate
 - Next.js production build
 
-CI 的 Agent 模型边界仍可使用确定性 stub，因此 **CI 绿灯不等于用户机器上的 `ornith-1.5:9b` 已被真实加载成功**；最终发布仍以 `release_smoke.py --agent` 为准。
+CI 的 Agent 模型边界仍可使用确定性 stub，因此 **CI 绿灯不等于用户机器上的 `ornith-1.5:9b` 已被真实加载成功**；最终发布仍以 `release_smoke.py --agent` 为准。P1.7 native token 行为还应在本机 Ollama 环境实际观察一次首 token 输出。
 
 ## 5 分钟面试演示
 
 推荐顺序：
 
 1. Admin 展示 5 个知识域 / 20 份资料
-2. 本地模式问企业问题，展示 Local Fast Path + Citation
+2. 切到本地模式问 `X200 能在零下 20 度工作吗？`，展示 Local Fast Path **真实逐步出字** + Citation
 3. 连续追问，展示多轮上下文与 P1.6 Query Enrichment
-4. SALES 问 HR 信息，展示候选生成前的 RBAC 拒绝
-5. 四路 RAG Evaluation + real-BGE 指标
-6. 打开 Agent Debugger，展示检索 timings 与 Trace
-7. 自动/联网模式演示 `web_search`（网络稳定时再做）
-8. Audit 收尾
+4. 刷新页面，证明完整回答已持久化；失败回答可在同一 message id 原地 Retry
+5. SALES 问 HR 信息，展示候选生成前的 RBAC 拒绝
+6. 四路 RAG Evaluation + real-BGE Retrieval baseline
+7. 打开 Agent Debugger，展示检索 timings 与 Trace
+8. 自动/联网模式演示 `web_search`（网络稳定时再做），最后用 Audit 收尾
 
 相关文档：
 
+- [`docs/P1_7_STREAMING.md`](docs/P1_7_STREAMING.md)：P1.7 原生 Streaming / SSE / 持久化语义
 - [`docs/P1_6_RELEASE.md`](docs/P1_6_RELEASE.md)：P1.6 Retrieval / real-BGE 质量基线
 - [`docs/P1_5_CONVERSATIONS.md`](docs/P1_5_CONVERSATIONS.md)：P1.5 Conversation / Runtime 验收
 - [`docs/AGENT_P1_4.md`](docs/AGENT_P1_4.md)：P1.4 Tool Calling 架构背景
-- [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：P1.6 五分钟面试脚本
-- [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)：P1.6 发布前检查
+- [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：五分钟面试演示脚本
+- [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)：发布前检查
 
 ## 当前明确不做
 
@@ -355,7 +379,7 @@ GraphRAG
 Kubernetes
 ```
 
-P1.6 的目标不是继续堆功能，而是把 **企业 Agent 的检索质量、权限边界、来源可追溯、会话可恢复、失败可重试和执行可观测** 做成有真实评测基线、可持续回归的稳定演示主线。
+P1.7 的目标不是继续堆功能，而是在 **P1.6 可回归 Retrieval + RBAC + Citation** 的稳定基础上，把本地企业问答做成真正可感知的流式会话，同时保持持久化、Retry、Trace 和权限边界不退化。
 
 ## License
 

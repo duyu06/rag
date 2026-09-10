@@ -144,19 +144,43 @@ export default function ConversationChatPanel({
         created_at: now,
         sources: [],
       };
+      const optimisticAssistantId = optimisticAssistant.id;
       setConversation({
         ...active,
         messages: [...active.messages, optimisticUser, optimisticAssistant],
       });
       setSelectedMessageId(optimisticAssistant.id);
 
-      const result = await conversationApi.send(active.id, question, {
-        knowledgeBaseId: selectedKb,
-        rerank,
-      });
+      const result = await conversationApi.sendStream(
+        active.id,
+        question,
+        {
+          knowledgeBaseId: selectedKb,
+          rerank,
+        },
+        {
+          onToken: (text) => {
+            setConversation((current) => current ? {
+              ...current,
+              messages: current.messages.map((item) =>
+                item.id === optimisticAssistantId
+                  ? { ...item, content: item.content + text }
+                  : item,
+              ),
+            } : current);
+          },
+          onSources: (sources) => {
+            setConversation((current) => current ? {
+              ...current,
+              messages: current.messages.map((item) =>
+                item.id === optimisticAssistantId ? { ...item, sources } : item,
+              ),
+            } : current);
+          },
+        },
+      );
       setConversation(result.conversation);
-      const last = latestAssistant(result.conversation.messages);
-      setSelectedMessageId(last?.id || "");
+      setSelectedMessageId(result.message.id);
       await reloadList();
     } catch (e) {
       setError(e instanceof Error ? e.message : "请求失败");
@@ -189,10 +213,32 @@ export default function ConversationChatPanel({
     });
 
     try {
-      const result = await conversationApi.retry(active.id, message.id, {
-        knowledgeBaseId: selectedKb,
-        rerank,
-      });
+      const result = await conversationApi.retryStream(
+        active.id,
+        message.id,
+        {
+          knowledgeBaseId: selectedKb,
+          rerank,
+        },
+        {
+          onToken: (text) => {
+            setConversation((current) => current ? {
+              ...current,
+              messages: current.messages.map((item) =>
+                item.id === message.id ? { ...item, content: item.content + text } : item,
+              ),
+            } : current);
+          },
+          onSources: (sources) => {
+            setConversation((current) => current ? {
+              ...current,
+              messages: current.messages.map((item) =>
+                item.id === message.id ? { ...item, sources } : item,
+              ),
+            } : current);
+          },
+        },
+      );
       setConversation(result.conversation);
       setSelectedMessageId(result.message.id);
       await reloadList();
@@ -286,7 +332,7 @@ export default function ConversationChatPanel({
             <span className="assistant-logo">AI</span>
             <div>
               <h3>{conversation?.title || "企业知识助手"}</h3>
-              <p>检索范围：{selectedName} · 历史已持久化</p>
+              <p>检索范围：{selectedName} · 历史已持久化 · Local 模式支持原生流式</p>
             </div>
           </div>
           <label className="switch-label">
@@ -318,11 +364,9 @@ export default function ConversationChatPanel({
                     outline: message.id === selectedMessageId ? "2px solid rgba(21,112,239,.18)" : "none",
                   }}
                 >
-                  {message.status === "generating" ? (
-                    <span className="typing">正在执行权限过滤与知识检索…</span>
-                  ) : (
-                    message.content
-                  )}
+                  {message.status === "generating"
+                    ? (message.content || <span className="typing">正在执行权限过滤与知识检索…</span>)
+                    : message.content}
                   {message.status === "failed" && (
                     <div className="conversation-retry">
                       <small>本条回答生成失败。</small>
@@ -358,7 +402,7 @@ export default function ConversationChatPanel({
             placeholder="输入问题；Enter 发送，Shift+Enter 换行"
           />
           <button className="primary" disabled={running || !input.trim()} onClick={() => void send()}>
-            {running ? "处理中" : "发送"}
+            {running ? "生成中" : "发送"}
           </button>
         </div>
       </div>

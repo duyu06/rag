@@ -29,20 +29,20 @@ class VersionHygieneContractsTest(unittest.TestCase):
 
         self.assertEqual(offenders, [], "stale version markers remain: " + "; ".join(offenders))
 
-    def test_active_release_entrypoints_are_p16_v060(self):
+    def test_active_release_entrypoints_are_p17_v070(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         demo_tools = (ROOT / "frontend/src/components/DemoTools.tsx").read_text(encoding="utf-8")
         entry = (ROOT / "backend/app/main_agent.py").read_text(encoding="utf-8")
 
-        stale_current_line = "当前版本：**P1." + "5 / v0.5.0**"
-        stale_demo_line = "P1." + "5 / v0.5.0 · Conversation + Agent"
-        stale_runtime_version = 'app.version = "0.' + '5.0"'
-        stale_runtime_phase = '"phase": "P1.' + '5"'
+        stale_current_line = "当前版本：**P1." + "6 / v0.6.0**"
+        stale_demo_line = "P1." + "6 / v0.6.0 · Retrieval + Conversation + Agent"
+        stale_runtime_version = 'app.version = "0.' + '6.0"'
+        stale_runtime_phase = '"phase": "P1.' + '6"'
 
-        self.assertIn("当前版本：**P1.6 / v0.6.0**", readme)
-        self.assertIn("P1.6 / v0.6.0", demo_tools)
-        self.assertIn('app.version = "0.6.0"', entry)
-        self.assertIn('"phase": "P1.6"', entry)
+        self.assertIn("当前版本：**P1.7 / v0.7.0**", readme)
+        self.assertIn("P1.7 / v0.7.0", demo_tools)
+        self.assertIn('app.version = "0.7.0"', entry)
+        self.assertIn('"phase": "P1.7"', entry)
 
         self.assertNotIn(stale_current_line, readme)
         self.assertNotIn(stale_demo_line, demo_tools)

@@ -1,11 +1,11 @@
-# Demo Release Checklist · P1.6
+# Demo Release Checklist · P1.7
 
 ## CI gate
 
 - [ ] `backend-contracts` → success
   - [ ] `python -m compileall -q backend/app scripts`
   - [ ] `python scripts/validate_demo_assets.py` passes
-  - [ ] backend unittest suite passes
+  - [ ] backend unittest suite passes, including P1.7 streaming contracts
   - [ ] Docker Compose configuration validates
   - [ ] Windows deployment script syntax validates
 - [ ] `backend-integration` → success
@@ -16,7 +16,7 @@
   - [ ] P1.6 metadata / RRF / query-enrichment / Ollama policy passes
 - [ ] `backend-quality` → success
   - [ ] real `BAAI/bge-small-zh-v1.5` loads successfully
-  - [ ] P1.6 real-BGE recall quality gate passes
+  - [ ] P1.6 real-BGE recall quality gate passes unchanged
   - [ ] P1.6 Hybrid Hit@3 remains `1.0000` on the bundled 30-question evaluation set
 - [ ] `frontend-build` → success
   - [ ] `npm install`
@@ -67,6 +67,31 @@
 - [ ] P1.6 Hybrid Hit@1 / Hit@3 / MRR are reviewed before release
 - [ ] known single-query vector rank movement is treated as diagnostic, not tuned at the expense of overall recall
 
+## P1.7 Native streaming gate
+
+- [ ] `backend/app/native_stream.py` sends Ollama `stream: true`
+- [ ] final Local Fast Path synthesis uses `tools=[]`; Tool Routing stays buffered
+- [ ] `/api/agent/query/stream` no longer slices a completed answer into fixed-size fake chunks
+- [ ] `POST /api/conversations/{conversation_id}/messages/stream` returns SSE
+- [ ] `POST /api/conversations/{conversation_id}/messages/{message_id}/retry/stream` returns SSE
+- [ ] new assistant turn is persisted as `generating` before token delivery
+- [ ] first visible Local-mode token arrives before the final `done` event
+- [ ] token chunks append to one AI bubble rather than creating duplicate messages
+- [ ] `done` replaces the same persisted assistant id with `completed` answer + Citation + Trace
+- [ ] stream failure replaces that same assistant id with `failed`
+- [ ] Retry streaming keeps the original failed assistant id
+- [ ] refresh after completion restores the exact answer and Citation from SQLite
+- [ ] `timings.native_stream=true` on a successful Local Fast Path streamed synthesis
+- [ ] Auto/Web Tool Calling behavior is unchanged; SSE compatibility does not expose partial tool JSON
+
+Recommended manual demo query:
+
+```text
+X200 能在零下 20 度工作吗？
+```
+
+Expected: Local mode retrieves the authorized X200 evidence first, then the AI bubble visibly grows while Ollama is still generating. After `done`, Citation / Trace are available and a page refresh keeps the answer.
+
 ## External Web gate
 
 Only run when the machine has normal outbound internet access:
@@ -85,7 +110,8 @@ Only run when the machine has normal outbound internet access:
 - [ ] model-provided KB arguments cannot widen user-selected KB scope
 - [ ] model never acts as the authorization component
 - [ ] Citation source access re-checks KB ACL
+- [ ] streaming sends only visible `message.content`, never hidden reasoning
 
 ## Interview freeze rule
 
-After these gates pass, freeze features before the interview. Only fix blockers, retrieval regressions, copy, visual defects or reproducibility issues. Do not add ERP/CRM writes, MCP, Multi-Agent, GraphRAG, complex Workflow, multi-tenant SaaS or unrelated infrastructure before the demo.
+After these gates pass, freeze features before the interview. Only fix blockers, retrieval regressions, streaming defects, copy, visual defects or reproducibility issues. Do not add ERP/CRM writes, MCP, Multi-Agent, GraphRAG, complex Workflow, multi-tenant SaaS or unrelated infrastructure before the demo.

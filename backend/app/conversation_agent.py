@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable
 from typing import Any
 
 import app.agent as agent_module
@@ -11,6 +12,7 @@ from app.audit import record_event
 from app.auth import CurrentUser
 from app.config import settings
 from app.knowledge import allowed_ids, visible_bases
+from app.native_stream import ollama_chat_stream
 from app.tools.base import AgentMode, ToolContext, ToolExecutionError
 from app.tools.registry import tool_registry
 
@@ -108,6 +110,7 @@ def _local_fast_path(
     top_k: int,
     rerank: bool,
     history: list[dict[str, Any]] | None,
+    token_sink: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     trace_id = new_trace_id()
     started = time.perf_counter()
@@ -226,6 +229,7 @@ def _local_fast_path(
 
     llm_ms = 0.0
     llm_calls = 0
+    native_stream = False
     if status == "DENIED":
         final_answer = "当前账号无权访问该知识库，因此不能基于未授权资料回答。"
     elif status != "SUCCESS":
@@ -256,9 +260,17 @@ def _local_fast_path(
         ]
         llm_started = time.perf_counter()
         llm_calls = 1
-        message = agent_module._ollama_chat(messages, [])
+        if token_sink is None:
+            message = agent_module._ollama_chat(messages, [])
+            final_answer = str(message.get("content") or "").strip()
+        else:
+            native_stream = True
+            chunks: list[str] = []
+            for text in ollama_chat_stream(messages):
+                chunks.append(text)
+                token_sink(text)
+            final_answer = "".join(chunks).strip()
         llm_ms = (time.perf_counter() - llm_started) * 1000
-        final_answer = str(message.get("content") or "").strip()
         if not final_answer:
             final_answer = "当前没有获得足够证据生成可靠答案。"
 
@@ -267,6 +279,7 @@ def _local_fast_path(
             "type": "final",
             "timestamp": utc_now(),
             "answer_preview": final_answer[:400],
+            "native_stream": native_stream,
         }
     )
     total_ms = (time.perf_counter() - started) * 1000
@@ -287,6 +300,7 @@ def _local_fast_path(
         "llm_calls": llm_calls,
         "tool_calls": 1,
         "fast_path": True,
+        "native_stream": native_stream,
     }
     trace = {
         "trace_id": trace_id,
@@ -337,6 +351,7 @@ def run_conversation_agent(
     top_k: int,
     rerank: bool,
     history: list[dict[str, Any]] | None,
+    token_sink: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     if mode == "local" and settings.agent_local_fast_path:
         return _local_fast_path(
@@ -346,6 +361,7 @@ def run_conversation_agent(
             top_k=top_k,
             rerank=rerank,
             history=history,
+            token_sink=token_sink,
         )
 
     started = time.perf_counter()
@@ -360,8 +376,13 @@ def run_conversation_agent(
     )
     total_ms = (time.perf_counter() - started) * 1000
     result = dict(result)
+    if token_sink is not None:
+        buffered_answer = str(result.get("answer") or "")
+        if buffered_answer:
+            token_sink(buffered_answer)
     result["timings"] = {
         "total_ms": round(total_ms, 2),
         "fast_path": False,
+        "native_stream": False,
     }
     return result
