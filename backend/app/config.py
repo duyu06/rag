@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     retrieval_bm25_candidates: int = Field(default=30, ge=5, le=100)
     retrieval_rrf_k: int = Field(default=60, ge=1, le=200)
     retrieval_rerank_candidates: int = Field(default=12, ge=5, le=50)
+    # BGE's short-query retrieval instruction improves pure dense Top-3 recall on
+    # the real-BGE gate. Hybrid keeps the raw query because it measured better with RRF.
+    retrieval_vector_query_instruction: str = "为这个句子生成表示以用于检索相关文章："
     # Prefer diverse documents in the final evidence set while still allowing a
     # document to contribute multiple sections. Deferred chunks fill any shortage.
     retrieval_max_chunks_per_document: int = Field(default=2, ge=1, le=10)
