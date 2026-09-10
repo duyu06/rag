@@ -20,7 +20,8 @@ from sentence_transformers import SentenceTransformer
 
 from app.demo import DEMO_MANIFEST
 from app.ingestion import chunk_markdown, chunk_text
-from app.retrieval import normalize, reciprocal_rank_fusion, tokenize
+from app.knowledge import get_base
+from app.retrieval import diversify_by_document, normalize, reciprocal_rank_fusion, tokenize
 from app.retrieval_text import build_retrieval_text
 
 MODEL = "BAAI/bge-small-zh-v1.5"
@@ -29,6 +30,7 @@ P16_COLLECTION = "yaoke_p16_real_bge_ab"
 DATASET = BACKEND / "eval_dataset.json"
 DEMO_DATA = ROOT / "demo-data"
 TOP_K = 3
+P16_MAX_CHUNKS_PER_DOCUMENT = 2
 
 
 def percentile(values: list[float], p: float) -> float:
@@ -45,6 +47,7 @@ def build_rows() -> tuple[list[dict], list[dict]]:
     for item in DEMO_MANIFEST:
         file_name = item["file_name"]
         kb_id = item["knowledge_base_id"]
+        kb_name = str(get_base(kb_id)["name"])
         path = DEMO_DATA / file_name
         text = path.read_text(encoding="utf-8")
 
@@ -67,7 +70,7 @@ def build_rows() -> tuple[list[dict], list[dict]]:
                     "file_name": file_name,
                     "document_title": path.stem,
                     "knowledge_base_id": kb_id,
-                    "knowledge_base_name": kb_id,
+                    "knowledge_base_name": kb_name,
                 }
             )
     return baseline, p16
@@ -135,10 +138,21 @@ def baseline_hybrid(vector_rows: list[tuple[str, float]], bm25_norm: dict[str, f
     return sorted(candidate_ids, key=scores.get, reverse=True)[:TOP_K]
 
 
-def p16_hybrid(vector_rows: list[tuple[str, float]], bm25_ranked: list[str]) -> list[str]:
+def diversify_ids(ids: list[str], row_map: dict[str, dict]) -> list[str]:
+    rows = [{**row_map[point_id], "id": point_id} for point_id in ids]
+    diversified = diversify_by_document(
+        rows,
+        top_k=TOP_K,
+        max_per_document=P16_MAX_CHUNKS_PER_DOCUMENT,
+    )
+    return [str(row["id"]) for row in diversified]
+
+
+def p16_hybrid(vector_rows: list[tuple[str, float]], bm25_ranked: list[str], row_map: dict[str, dict]) -> list[str]:
     vector_ids = [point_id for point_id, _ in vector_rows[:30]]
     scores = reciprocal_rank_fusion(vector_ids, bm25_ranked[:30], k=60)
-    return sorted(scores, key=scores.get, reverse=True)[:TOP_K]
+    ranked = sorted(scores, key=scores.get, reverse=True)
+    return diversify_ids(ranked, row_map)
 
 
 def metrics(ranks: list[int | None], latencies: list[float]) -> dict[str, float]:
@@ -230,23 +244,24 @@ def main() -> int:
         results["p15_hybrid"][0].append(rank_for(b_hybrid, baseline_map, expected))
         results["p15_hybrid"][1].append(elapsed)
 
-        # P1.6 candidate.
+        # P1.6 candidate. Retrieval latency includes the very small diversity pass.
         started = time.perf_counter()
         n_vector = vector_rank(client, P16_COLLECTION, query_vector, kb_id, 30)
+        n_vector_ids = diversify_ids([point_id for point_id, _ in n_vector], p16_map)
         elapsed = (time.perf_counter() - started) * 1000
-        ids = [point_id for point_id, _ in n_vector[:TOP_K]]
-        results["p16_vector"][0].append(rank_for(ids, p16_map, expected))
+        results["p16_vector"][0].append(rank_for(n_vector_ids, p16_map, expected))
         results["p16_vector"][1].append(elapsed)
 
         n_scoped, n_index = p16_bm25[kb_id]
         started = time.perf_counter()
-        n_norm, n_ranked = bm25_scores(question, n_scoped, n_index)
+        _n_norm, n_ranked = bm25_scores(question, n_scoped, n_index)
+        n_bm25_ids = diversify_ids(n_ranked, p16_map)
         elapsed = (time.perf_counter() - started) * 1000
-        results["p16_bm25"][0].append(rank_for(n_ranked[:TOP_K], p16_map, expected))
+        results["p16_bm25"][0].append(rank_for(n_bm25_ids, p16_map, expected))
         results["p16_bm25"][1].append(elapsed)
 
         started = time.perf_counter()
-        n_hybrid = p16_hybrid(n_vector, n_ranked)
+        n_hybrid = p16_hybrid(n_vector, n_ranked, p16_map)
         elapsed = (time.perf_counter() - started) * 1000
         results["p16_hybrid"][0].append(rank_for(n_hybrid, p16_map, expected))
         results["p16_hybrid"][1].append(elapsed)
@@ -257,6 +272,17 @@ def main() -> int:
         "latency_p95_ms": round(percentile(embedding_latencies, 0.95), 2),
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))
+
+    for index, item in enumerate(dataset):
+        p15_rank = results["p15_hybrid"][0][index]
+        p16_rank = results["p16_hybrid"][0][index]
+        old = p15_rank if p15_rank is not None else 99
+        new = p16_rank if p16_rank is not None else 99
+        if new > old:
+            print(
+                f"[DIAG] Hybrid rank regression: {item['question']} "
+                f"expected={item['expected_file']} P1.5={p15_rank} P1.6={p16_rank}"
+            )
 
     baseline_h = report["p15_hybrid"]
     candidate_h = report["p16_hybrid"]
