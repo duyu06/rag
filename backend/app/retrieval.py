@@ -49,6 +49,49 @@ def reciprocal_rank_fusion(
     return scores
 
 
+def diversify_by_document(
+    rows: list[dict[str, Any]],
+    *,
+    top_k: int,
+    max_per_document: int,
+) -> list[dict[str, Any]]:
+    """Prefer document diversity without reducing the requested result count.
+
+    Heading-aware indexing creates several useful chunks per file. Without a diversity
+    pass, one document can occupy every top-k slot and hide a second relevant source.
+    We first cap each document, then fill any shortage from deferred rows in original
+    rank order. A workspace containing only one document therefore still returns all
+    requested chunks.
+    """
+    if top_k <= 0:
+        return []
+    cap = max(1, int(max_per_document))
+    selected: list[dict[str, Any]] = []
+    deferred: list[dict[str, Any]] = []
+    counts: dict[tuple[str, str], int] = {}
+
+    for row in rows:
+        file_name = str(row.get("file_name") or "").strip()
+        kb_id = str(row.get("knowledge_base_id") or "").strip()
+        if file_name:
+            key = (kb_id, file_name)
+        else:
+            key = ("__point__", str(row.get("id") or id(row)))
+        if counts.get(key, 0) < cap:
+            selected.append(row)
+            counts[key] = counts.get(key, 0) + 1
+            if len(selected) >= top_k:
+                return selected[:top_k]
+        else:
+            deferred.append(row)
+
+    for row in deferred:
+        selected.append(row)
+        if len(selected) >= top_k:
+            break
+    return selected[:top_k]
+
+
 @dataclass(slots=True)
 class _BM25CacheEntry:
     revision: int
@@ -293,12 +336,20 @@ class RetrievalService:
             rows.sort(key=lambda item: item["rerank_score"] or 0.0, reverse=True)
             rerank_ms = (time.perf_counter() - rerank_started) * 1000
 
+        diversity_started = time.perf_counter()
+        final_rows = diversify_by_document(
+            rows,
+            top_k=top_k,
+            max_per_document=int(settings.retrieval_max_chunks_per_document),
+        )
+        diversity_ms = (time.perf_counter() - diversity_started) * 1000
         total_ms = (time.perf_counter() - total_started) * 1000
         timings = {
             "vector_ms": round(vector_ms, 2),
             "bm25_ms": round(bm25_ms, 2),
             "fusion_ms": round(fusion_ms, 2),
             "rerank_ms": round(rerank_ms, 2),
+            "diversity_ms": round(diversity_ms, 2),
             "total_ms": round(total_ms, 2),
             "bm25_cache_hit": bm25_cache_hit if mode in {"bm25", "hybrid"} else None,
             "parallel_hybrid": bool(mode == "hybrid" and settings.retrieval_parallel_hybrid),
@@ -306,8 +357,16 @@ class RetrievalService:
             "vector_candidates": len(vector_ids) if mode in {"vector", "hybrid"} else 0,
             "bm25_candidates": len(bm25_ids) if mode in {"bm25", "hybrid"} else 0,
             "rerank_candidates": min(len(rows), max(top_k, int(settings.retrieval_rerank_candidates))) if rerank else 0,
+            "max_chunks_per_document": int(settings.retrieval_max_chunks_per_document),
+            "returned_documents": len(
+                {
+                    (str(row.get("knowledge_base_id") or ""), str(row.get("file_name") or ""))
+                    for row in final_rows
+                    if row.get("file_name")
+                }
+            ),
         }
-        return rows[:top_k], timings
+        return final_rows, timings
 
     def search(
         self,
