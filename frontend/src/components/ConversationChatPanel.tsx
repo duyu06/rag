@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, KnowledgeBase, Source } from "@/lib/api";
 import {
   activeConversationPreference,
@@ -48,6 +48,7 @@ export default function ConversationChatPanel({
   const [rerank, setRerank] = useState(false);
   const [error, setError] = useState("");
   const [selectedMessageId, setSelectedMessageId] = useState("");
+  const initialSelectedKb = useRef(selectedKb);
 
   const selectedName = selectedKb === "all"
     ? "全部可访问知识库"
@@ -90,7 +91,12 @@ export default function ConversationChatPanel({
         if (candidate) {
           await openConversation(candidate);
         } else {
-          await createConversation();
+          const created = await conversationApi.create(initialSelectedKb.current);
+          if (cancelled) return;
+          setConversation(created);
+          activeConversationPreference.set(created.id);
+          setSelectedMessageId("");
+          await reloadList();
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "会话加载失败");
@@ -100,7 +106,7 @@ export default function ConversationChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [createConversation, openConversation, reloadList]);
+  }, [openConversation, reloadList]);
 
   const selectedSources: Source[] = useMemo(() => {
     if (!conversation) return [];
