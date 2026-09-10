@@ -53,8 +53,6 @@ class ConversationStoreTests(unittest.TestCase):
             )
             self.assertEqual(assistant["sources"][0]["citation_index"], 1)
 
-            # Re-open using a new store instance to prove data is persisted on disk,
-            # rather than surviving only in an in-memory object.
             reopened = ConversationStore(str(path))
             detail = reopened.get(conversation_id, username="admin")
             self.assertEqual(len(detail["messages"]), 2)
@@ -79,6 +77,56 @@ class ConversationStoreTests(unittest.TestCase):
             store.create(username="sales01", title="Sales chat")
             self.assertEqual([row["title"] for row in store.list("admin")], ["Admin chat"])
             self.assertEqual([row["title"] for row in store.list("sales01")], ["Sales chat"])
+
+    def test_replace_message_keeps_id_and_replaces_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = ConversationStore(str(Path(directory) / "conversations.db"))
+            conversation = store.create(username="admin", mode="local")
+            conversation_id = conversation["id"]
+            store.add_message(
+                conversation_id=conversation_id,
+                username="admin",
+                role="user",
+                content="X100 质保多久？",
+            )
+            failed = store.add_message(
+                conversation_id=conversation_id,
+                username="admin",
+                role="assistant",
+                content="Agent 服务不可用",
+                status="failed",
+                sources=[],
+            )
+
+            replaced = store.replace_message(
+                conversation_id=conversation_id,
+                message_id=failed["id"],
+                username="admin",
+                content="X100 整机质保 24 个月。[1]",
+                status="completed",
+                trace_id="trace-retry",
+                latency_ms=25.0,
+                sources=[
+                    {
+                        "citation_index": 1,
+                        "source_type": "enterprise",
+                        "file_name": "03-X100产品说明书.md",
+                        "title": "03-X100产品说明书.md",
+                        "knowledge_base_id": "kb_product",
+                        "knowledge_base_name": "产品知识库",
+                        "content_preview": "整机质保 24 个月",
+                    }
+                ],
+            )
+
+            detail = store.get(conversation_id, username="admin")
+            self.assertEqual(len(detail["messages"]), 2)
+            self.assertEqual(replaced["id"], failed["id"])
+            self.assertEqual(replaced["status"], "completed")
+            self.assertEqual(replaced["trace_id"], "trace-retry")
+            self.assertEqual(len(replaced["sources"]), 1)
+            self.assertEqual(replaced["sources"][0]["citation_index"], 1)
+            self.assertEqual(detail["messages"][1]["id"], failed["id"])
 
 
 if __name__ == "__main__":
