@@ -39,6 +39,21 @@ class AgentContractsTest(unittest.TestCase):
         self.assertIn('status="DENIED"', enterprise)
         self.assertIn("selected_knowledge_base_id", enterprise)
 
+    def test_conversation_context_is_bounded_and_local_mode_has_fast_path(self):
+        agent = (ROOT / "backend/app/agent.py").read_text(encoding="utf-8")
+        conversation_agent = (ROOT / "backend/app/conversation_agent.py").read_text(encoding="utf-8")
+        routes = (ROOT / "backend/app/conversation_routes.py").read_text(encoding="utf-8")
+        config = (ROOT / "backend/app/config.py").read_text(encoding="utf-8")
+        self.assertIn("agent_history_max_messages: int = Field(default=8, ge=0, le=20)", config)
+        self.assertIn("agent_local_fast_path: bool = True", config)
+        self.assertIn("return normalized[-limit:]", agent)
+        self.assertIn("history=history", routes)
+        self.assertIn('mode == "local" and settings.agent_local_fast_path', conversation_agent)
+        self.assertIn('"fast_path": True', conversation_agent)
+        self.assertIn('"llm_calls": llm_calls', conversation_agent)
+        self.assertIn("tool_registry.execute", conversation_agent)
+        self.assertIn("selected_knowledge_base_id=knowledge_base_id", conversation_agent)
+
 
 if __name__ == "__main__":
     unittest.main()
