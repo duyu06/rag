@@ -153,7 +153,7 @@ export default function DemoTools() {
       {open && (
         <div style={panel}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <div><strong style={{ fontSize: 14 }}>Demo 工具 / 运行态</strong><div style={{ marginTop: 3, fontSize: 10, color: "#98a2b3" }}>P1.5 / v0.5.0 · Conversation + Agent + 真实指标 + 审计</div></div>
+            <div><strong style={{ fontSize: 14 }}>Demo 工具 / 运行态</strong><div style={{ marginTop: 3, fontSize: 10, color: "#98a2b3" }}>P1.6 / v0.6.0 · Retrieval + Conversation + Agent + 真实指标 + 审计</div></div>
             <span style={{ fontSize: 10, color: status?.ready ? "#6ce9a6" : "#fdb022" }}>
               {status ? `${status.ready_count}/${status.total} ready` : "checking"}
             </span>

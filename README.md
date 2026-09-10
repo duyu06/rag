@@ -6,23 +6,33 @@
 
 基于 **Next.js + FastAPI + Qdrant + BGE Embedding + BM25 + Hybrid Search + Cross-Encoder Rerank + Ornith Tool Calling** 的企业 RAG / Agent 演示项目。
 
-当前版本：**P1.5 / v0.5.0**  
+当前版本：**P1.6 / v0.6.0**  
 默认本地 LLM：**`ornith-1.5:9b`（Ollama）**。
 
-## P1.5 重点
+## P1.6 重点
 
-P1.5 在 P1.4 Agent 能力之上，把单轮问答收敛成可持续演示的企业会话体验：
+P1.6 在 P1.5 Conversation / Local Fast Path / Retry / Trace 基础上，重点收敛 **检索质量与可回归性**：
+
+- Markdown Chunk 保留父子 heading hierarchy，避免相邻标题生成 heading-only 空证据
+- 短追问 Query Enrichment 按 identifier family 更新实体，避免 `X100 + IP65 → IP67` 时丢掉产品实体
+- BM25 小语料 / 同质语料中，即使原始或归一化分数非正，也保留真实词法匹配候选
+- Hybrid 使用结构化 Chunk metadata + RRF 融合，继续保留可选 Rerank
+- 检索 schema 升级为 `p16-metadata-rrf-v2`，Demo 会按新结构重新索引
+- CI 新增真实 `BAAI/bge-small-zh-v1.5` + Qdrant quality gate，不只依赖 stub
+- 30 道 Demo 评测题的稳定基线：**P1.6 Hybrid Hit@1 = 0.9000 / Hit@3 = 1.0000 / MRR = 0.9500**
+
+P1.5 的会话能力继续保留：
 
 - 持久化 Conversation：会话与消息写入 SQLite，可恢复、重命名、删除
-- 多轮上下文：后续问题可带最近对话上下文，不把整个历史无限塞入模型
+- 多轮上下文：后续问题只带有限长度上下文，不把整个历史无限塞入模型
 - **Local Fast Path**：本地企业问答直接走授权检索 + 一次 LLM 综合，避免额外 Tool Routing 调用
 - 失败回答可原地 Retry：不新增第二条用户消息，不更换 assistant message id
 - Retry 成功后覆盖失败状态，并重新写入 Citation 与 Agent Trace
 - 检索阶段可观测：Vector / BM25 / Fusion / Rerank / Retrieval / LLM / Total timings
 - BM25 按权限 scope 缓存，Hybrid 可并行执行 Vector + BM25
-- 正式响应式 Conversation UI：桌面三栏，窄屏自动重排
+- 响应式 Conversation UI：桌面三栏，窄屏自动重排
 - Agent Debugger 展示可公开执行事件与性能分解，不保存或展示 hidden reasoning / chain-of-thought
-- 新增 `scripts/release_smoke.py`：默认做安全 preflight；`--agent` 才验证真实 Ornith → Qdrant → Citation → Trace
+- `scripts/release_smoke.py`：默认做安全 preflight；`--agent` 才验证真实 Ornith → Qdrant → Citation → Trace
 
 P1.4 的 Tool Calling 继续保留：`enterprise_search` / `web_search`、本地/自动/联网三种模式、RBAC 二次校验、统一 Citation、Tool Audit 与 Agent Trace。
 
@@ -199,7 +209,7 @@ python scripts/agent_smoke.py --agent
 python scripts/agent_smoke.py --agent --web
 ```
 
-P1.5 发布前真实主链检查：
+P1.6 发布前真实主链检查：
 
 ```bash
 python scripts/release_smoke.py --agent
@@ -270,20 +280,29 @@ Hybrid + Rerank
 
 输出 Hit@1 / Hit@3 / MRR / elapsed_ms，不写死指标。
 
+P1.6 CI 额外使用真实 `BAAI/bge-small-zh-v1.5` 做 P1.5 / P1.6 A/B。当前稳定结果：
+
+| Pipeline | Hit@1 | Hit@3 | MRR |
+|---|---:|---:|---:|
+| P1.5 Hybrid | 0.8333 | 1.0000 | 0.9167 |
+| **P1.6 Hybrid** | **0.9000** | **1.0000** | **0.9500** |
+
 ## CI 验收
 
-GitHub Actions 包括：
+GitHub Actions 当前包括四路门禁：
 
 ```text
-python -m compileall -q backend/app scripts
-python scripts/validate_demo_assets.py
-python -m unittest discover -s backend/tests -p 'test_*.py' -v
-npm install
-npm run build
+backend-contracts
+backend-integration
+backend-quality
+frontend-build
 ```
 
-真实 Qdrant integration 额外验证：
+主要覆盖：
 
+- Python compileall / Demo assets / unittest
+- Docker Compose 与 Windows 部署脚本语法
+- 真实 Qdrant integration
 - 20/20 Demo 文档索引
 - API 与 Citation ACL
 - Vector / BM25 / Hybrid / Rerank
@@ -292,13 +311,14 @@ npm run build
 - SALES → HR 越权拒绝
 - Conversation SQLite 持久化与 ownership
 - 多轮上下文与 Local Fast Path
-- Vector / BM25 / Fusion / Rerank / LLM timings
 - failed assistant 原地 Retry，message id 与 message count 不变
 - Retry 后 Citation / Trace 重写
 - BM25 warm cache
+- P1.6 heading hierarchy / BM25 边界 / query enrichment 回归
+- 真实 BGE recall quality gate
 - Next.js production build
 
-CI 的模型边界使用确定性 stub，因此 **CI 绿灯不等于用户机器上的 `ornith-1.5:9b` 已被真实加载成功**；最终发布仍以 `release_smoke.py --agent` 为准。
+CI 的 Agent 模型边界仍可使用确定性 stub，因此 **CI 绿灯不等于用户机器上的 `ornith-1.5:9b` 已被真实加载成功**；最终发布仍以 `release_smoke.py --agent` 为准。
 
 ## 5 分钟面试演示
 
@@ -306,19 +326,20 @@ CI 的模型边界使用确定性 stub，因此 **CI 绿灯不等于用户机器
 
 1. Admin 展示 5 个知识域 / 20 份资料
 2. 本地模式问企业问题，展示 Local Fast Path + Citation
-3. 连续追问一次，展示多轮上下文
-4. 打开 Agent Debugger，展示检索阶段 timings 与 Trace
-5. SALES 问 HR 信息，展示 RBAC 拒绝
-6. 故意演示失败回答后 Retry（如方便），说明同一 assistant turn 原地恢复
-7. 四路 RAG Evaluation
-8. 自动/联网模式演示 `web_search`（网络稳定时再做）
+3. 连续追问，展示多轮上下文与 P1.6 Query Enrichment
+4. SALES 问 HR 信息，展示候选生成前的 RBAC 拒绝
+5. 四路 RAG Evaluation + real-BGE 指标
+6. 打开 Agent Debugger，展示检索 timings 与 Trace
+7. 自动/联网模式演示 `web_search`（网络稳定时再做）
+8. Audit 收尾
 
 相关文档：
 
+- [`docs/P1_6_RELEASE.md`](docs/P1_6_RELEASE.md)：P1.6 Retrieval / real-BGE 质量基线
 - [`docs/P1_5_CONVERSATIONS.md`](docs/P1_5_CONVERSATIONS.md)：P1.5 Conversation / Runtime 验收
 - [`docs/AGENT_P1_4.md`](docs/AGENT_P1_4.md)：P1.4 Tool Calling 架构背景
-- [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：演示脚本
-- [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)：发布前检查
+- [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)：P1.6 五分钟面试脚本
+- [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)：P1.6 发布前检查
 
 ## 当前明确不做
 
@@ -334,7 +355,7 @@ GraphRAG
 Kubernetes
 ```
 
-P1.5 的目标不是继续堆功能，而是把 **企业 Agent 的检索质量、权限边界、来源可追溯、会话可恢复、失败可重试和执行可观测** 做成稳定可演示主线。
+P1.6 的目标不是继续堆功能，而是把 **企业 Agent 的检索质量、权限边界、来源可追溯、会话可恢复、失败可重试和执行可观测** 做成有真实评测基线、可持续回归的稳定演示主线。
 
 ## License
 
