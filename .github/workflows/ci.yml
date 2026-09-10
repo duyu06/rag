@@ -18,6 +18,33 @@ jobs:
       - run: python scripts/validate_demo_assets.py
       - run: python -m unittest discover -s backend/tests -p 'test_*.py' -v
 
+  backend-integration:
+    runs-on: ubuntu-latest
+    services:
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install lightweight integration dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "fastapi>=0.115,<1"
+          "pydantic>=2.8,<3"
+          "pydantic-settings>=2.4,<3"
+          "python-multipart>=0.0.9"
+          "qdrant-client>=1.12,<2"
+          "rank-bm25>=0.2.2"
+          "httpx>=0.27,<1"
+          "PyJWT>=2.9,<3"
+          "numpy>=1.26,<3"
+      - name: Run real Qdrant API/RBAC/retrieval integration
+        run: python scripts/qdrant_integration.py
+
   frontend-build:
     runs-on: ubuntu-latest
     defaults:
