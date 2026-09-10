@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ConversationChatPanel from "@/components/ConversationChatPanel";
 import {
   api,
   DebugResult,
   DocumentItem,
   KnowledgeBase,
   session,
-  Source,
   User,
 } from "@/lib/api";
 
@@ -187,7 +187,7 @@ export default function Home() {
             />
           )}
           <div hidden={view !== "chat"}>
-            <ChatPanel selectedKb={selectedKb} bases={bases} />
+            <ConversationChatPanel selectedKb={selectedKb} bases={bases} />
           </div>
           {view === "knowledge" && (
             <KnowledgePanel
@@ -300,7 +300,7 @@ function Dashboard({
     <>
       <section className="hero-card">
         <div>
-          <span className="eyebrow">yaoke / Enterprise RAG P1.4</span>
+          <span className="eyebrow">yaoke / Enterprise RAG P1.5</span>
           <h2>把“能问答”升级为“有权限边界的企业知识系统”</h2>
           <p>当前用户的角色会在检索前转换为 Qdrant metadata filter；无权限 Chunk 不会进入 Vector、BM25 或 LLM Context。</p>
         </div>
@@ -342,90 +342,6 @@ function Dashboard({
         {docs.length === 0 && <Empty text="管理员可在知识库页面上传 demo-data 中的资料" />}
       </section>
     </>
-  );
-}
-
-function ChatPanel({ selectedKb, bases }: { selectedKb: string; bases: KnowledgeBase[] }) {
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [sources, setSources] = useState<Source[]>([]);
-  const [running, setRunning] = useState(false);
-  const [rerank, setRerank] = useState(false);
-
-  const selectedName = selectedKb === "all"
-    ? "全部可访问知识库"
-    : bases.find((item) => item.id === selectedKb)?.name || selectedKb;
-
-  const ask = async (value?: string) => {
-    const q = (value ?? question).trim();
-    if (!q || running) return;
-    setQuestion(q);
-    setAnswer("");
-    setSources([]);
-    setRunning(true);
-    try {
-      await api.queryStream(q, rerank, selectedKb, {
-        onSources: setSources,
-        onToken: (text) => setAnswer((old) => old + text),
-        onDone: () => setRunning(false),
-      });
-    } catch (error) {
-      setAnswer(error instanceof Error ? error.message : "请求失败");
-      setRunning(false);
-    }
-  };
-
-  return (
-    <section className="chat-layout">
-      <div className="chat-main panel">
-        <div className="chat-title">
-          <div><span className="assistant-logo">AI</span><div><h3>企业知识助手</h3><p>检索范围：{selectedName}</p></div></div>
-          <label className="switch-label"><input type="checkbox" checked={rerank} onChange={(e) => setRerank(e.target.checked)} />启用 Rerank</label>
-        </div>
-
-        {!answer && !running && (
-          <div className="chat-empty">
-            <img className="large-mark" src="/yaoke-logo.webp" alt="yaoke" style={{ objectFit: "contain", background: "#fff" }} />
-            <h2>今天想查什么企业知识？</h2>
-            <p>系统只会从当前账号有权访问的知识库中召回证据。</p>
-            <div className="suggestions">{suggestions.map((item) => <button key={item} onClick={() => void ask(item)}>{item}</button>)}</div>
-          </div>
-        )}
-
-        {(answer || running) && (
-          <div className="conversation">
-            <div className="message user-message">{question}</div>
-            <div className="message ai-message">{answer || <span className="typing">正在执行权限过滤与知识检索…</span>}</div>
-          </div>
-        )}
-
-        <div className="composer">
-          <textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void ask(); } }}
-            placeholder="输入问题，例如：退款超过 500 元需要谁审批？"
-          />
-          <button className="primary" disabled={running} onClick={() => void ask()}>{running ? "处理中" : "发送"}</button>
-        </div>
-      </div>
-
-      <aside className="source-panel panel">
-        <div className="panel-head"><div><h3>引用来源</h3><p>{sources.length ? `${sources.length} 个授权 Chunk` : "回答依据将在这里展示"}</p></div></div>
-        {sources.map((source, index) => (
-          <article className="source-card" key={`${source.file_name}-${index}`}>
-            <div className="source-number">{index + 1}</div>
-            <div>
-              <strong>{source.file_name}</strong>
-              <span className="kb-tag">{source.knowledge_base_name || "知识库"}</span>
-              <span>{source.page ? `第 ${source.page} 页 · ` : ""}匹配度 {source.relevance_score == null ? "—" : `${Math.round(source.relevance_score * 100)}%`}</span>
-              <p>{source.content_preview}</p>
-            </div>
-          </article>
-        ))}
-        {sources.length === 0 && <Empty text="暂无引用" />}
-      </aside>
-    </section>
   );
 }
 
