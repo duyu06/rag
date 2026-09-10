@@ -43,6 +43,14 @@ def expect_denied(path: str, token: str) -> bool:
     return False
 
 
+def demo_ready(status: dict | None) -> bool:
+    if not isinstance(status, dict):
+        return False
+    ready_count = int(status.get("ready_count", 0) or 0)
+    total = int(status.get("total", 0) or 0)
+    return bool(status.get("ready")) and total > 0 and ready_count == total
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="yaoke runtime RBAC smoke test")
     parser.add_argument("--retrieval", action="store_true", help="also run model-backed retrieval ACL checks")
@@ -74,9 +82,14 @@ def main() -> int:
         print(f"{'[OK]' if denied_hr else '[FAIL]'} HR -> SALES direct access denied")
 
         _, status = request("GET", "/demo/status", token=tokens["ADMIN"])
+        ready = demo_ready(status)
         print(f"[INFO] Demo corpus: {status.get('ready_count', 0)}/{status.get('total', 0)} indexed")
 
         if args.retrieval:
+            if not ready:
+                print("[FAIL] Retrieval smoke requires a fully initialized Demo corpus. Run Demo 初始化 / scripts/init_demo.py first.")
+                return 1
+
             checks = [
                 ("SALES", "公司年度调薪通常安排在几月？", "kb_hr"),
                 ("HR", "合同金额超过100万需要谁审批？", "kb_sales"),
@@ -88,12 +101,15 @@ def main() -> int:
                     {"query": query, "mode": "hybrid", "top_k": 8, "rerank": False},
                     tokens[role],
                 )
-                leaked = [row for row in result.get("results", []) if row.get("knowledge_base_id") == forbidden_kb]
-                passed = not leaked
+                rows = list(result.get("results", []))
+                leaked = [row for row in rows if row.get("knowledge_base_id") == forbidden_kb]
+                nonempty = bool(rows)
+                passed = nonempty and not leaked
                 ok &= passed
-                print(f"{'[OK]' if passed else '[FAIL]'} {role} retrieval excludes {forbidden_kb}")
+                print(f"{'[OK]' if nonempty else '[FAIL]'} {role} retrieval returned authorized candidates")
+                print(f"{'[OK]' if not leaked else '[FAIL]'} {role} retrieval excludes {forbidden_kb}")
 
-    except (HTTPError, URLError, OSError, KeyError, ValueError) as exc:
+    except (HTTPError, URLError, OSError, KeyError, ValueError, TypeError) as exc:
         print(f"[FAIL] Smoke test aborted: {exc}")
         return 1
 
