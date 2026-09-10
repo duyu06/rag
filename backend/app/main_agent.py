@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.agent_routes import router as agent_router
 from app.config import settings
 from app.conversation_routes import router as conversation_router
+from app.conversation_stream_routes import router as conversation_stream_router
 from app.main import app
 from app.rag import current_model_name, probe_llm, probe_ollama
 from app.store import vector_store
@@ -70,3 +71,4 @@ def yaoke_health():
 
 app.include_router(agent_router)
 app.include_router(conversation_router)
+app.include_router(conversation_stream_router)
