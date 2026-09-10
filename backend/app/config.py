@@ -27,10 +27,15 @@ class Settings(BaseSettings):
     web_search_max_results: int = 5
     web_search_timeout_seconds: int = 8
 
-    # P1.4 Ornith Agent. Three rounds is a hard product/safety ceiling, not only a default.
+    # Ornith Agent.
     agent_mode_default: str = "auto"
     agent_max_tool_rounds: int = Field(default=3, ge=1, le=3)
     agent_llm_timeout_seconds: int = 120
+    # Only the most recent completed conversation messages are sent back to the model.
+    agent_history_max_messages: int = Field(default=8, ge=0, le=20)
+    # Local mode is an explicit enterprise-only mode, so it can safely skip the
+    # first model tool-decision round and execute authorized enterprise_search directly.
+    agent_local_fast_path: bool = True
 
     chunk_size: int = 800
     chunk_overlap: int = 120

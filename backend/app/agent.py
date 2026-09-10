@@ -102,6 +102,24 @@ def _public_source(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _conversation_history(history: list[dict[str, Any]] | None) -> list[dict[str, str]]:
+    limit = max(0, int(settings.agent_history_max_messages))
+    if limit == 0 or not history:
+        return []
+    normalized: list[dict[str, str]] = []
+    for item in history:
+        role = str(item.get("role") or "")
+        if role not in {"user", "assistant"}:
+            continue
+        if item.get("status") not in {None, "completed"}:
+            continue
+        content = str(item.get("content") or "").strip()
+        if not content:
+            continue
+        normalized.append({"role": role, "content": content[:4000]})
+    return normalized[-limit:]
+
+
 def run_agent(
     *,
     question: str,
@@ -110,6 +128,7 @@ def run_agent(
     knowledge_base_id: str | None = None,
     top_k: int = 5,
     rerank: bool = False,
+    history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if mode not in {"local", "auto", "web"}:
         raise ValueError("无效 Agent 模式")
@@ -118,15 +137,18 @@ def run_agent(
     started = time.perf_counter()
     allowed = allowed_ids(user.role)
     visible = ", ".join(f"{item['id']}={item['name']}" for item in visible_bases(user.role))
+    history_messages = _conversation_history(history)
     system = (
         AGENT_SYSTEM_PROMPT
         + "\n"
         + _mode_prompt(mode)
         + f"\nCurrent role={user.role}; backend-authorized KBs: {visible}."
         + " Do not assume any KB outside this list is accessible."
+        + (" Use recent conversation messages only to resolve follow-up references; current tool evidence remains authoritative." if history_messages else "")
     )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": system},
+        *history_messages,
         {"role": "user", "content": question.strip()},
     ]
     schemas = tool_registry.schemas(mode)
@@ -137,6 +159,7 @@ def run_agent(
             "mode": mode,
             "question_preview": question[:240],
             "allowed_knowledge_base_ids": allowed,
+            "context_messages": len(history_messages),
         }
     ]
     evidence: list[dict[str, Any]] = []
@@ -296,6 +319,7 @@ def run_agent(
         "mode": mode,
         "model": settings.ollama_model,
         "max_tool_rounds": max_rounds,
+        "context_messages": len(history_messages),
         "events": events,
         "evidence_count": len(evidence),
         "elapsed_ms": round(elapsed_ms, 2),
@@ -321,4 +345,5 @@ def run_agent(
         "num_sources": len(evidence),
         "model_used": settings.ollama_model,
         "max_tool_rounds": max_rounds,
+        "context_messages": len(history_messages),
     }
