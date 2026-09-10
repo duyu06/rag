@@ -25,6 +25,7 @@ from app.retrieval import diversify_by_document, normalize, reciprocal_rank_fusi
 from app.retrieval_text import build_retrieval_text
 
 MODEL = "BAAI/bge-small-zh-v1.5"
+BGE_QUERY_INSTRUCTION = "为这个句子生成表示以用于检索相关文章："
 BASELINE_COLLECTION = "yaoke_p15_real_bge_ab"
 P16_COLLECTION = "yaoke_p16_real_bge_ab"
 DATASET = BACKEND / "eval_dataset.json"
@@ -227,13 +228,20 @@ def main() -> int:
         question = item["question"]
         kb_id = item["knowledge_base_id"]
         expected = item["expected_file"]
+
+        # Preserve the P1.5 baseline exactly. P1.6 evaluates BGE's documented
+        # short-query retrieval instruction while passages remain unchanged.
+        baseline_query_vector = model.encode(question, normalize_embeddings=True)
         started = time.perf_counter()
-        query_vector = model.encode(question, normalize_embeddings=True)
+        p16_query_vector = model.encode(
+            BGE_QUERY_INSTRUCTION + question,
+            normalize_embeddings=True,
+        )
         embedding_latencies.append((time.perf_counter() - started) * 1000)
 
         # P1.5 baseline.
         started = time.perf_counter()
-        b_vector = vector_rank(client, BASELINE_COLLECTION, query_vector, kb_id, 12)
+        b_vector = vector_rank(client, BASELINE_COLLECTION, baseline_query_vector, kb_id, 12)
         elapsed = (time.perf_counter() - started) * 1000
         b_vector_ids = [point_id for point_id, _ in b_vector[:TOP_K]]
         results["p15_vector"][0].append(rank_for(b_vector_ids, baseline_map, expected))
@@ -254,7 +262,7 @@ def main() -> int:
 
         # P1.6 candidate. Retrieval latency includes the very small diversity pass.
         started = time.perf_counter()
-        n_vector = vector_rank(client, P16_COLLECTION, query_vector, kb_id, 30)
+        n_vector = vector_rank(client, P16_COLLECTION, p16_query_vector, kb_id, 30)
         n_vector_ids = diversify_ids([point_id for point_id, _ in n_vector], p16_map)
         elapsed = (time.perf_counter() - started) * 1000
         results["p16_vector"][0].append(rank_for(n_vector_ids, p16_map, expected))
