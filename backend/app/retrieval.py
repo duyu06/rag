@@ -49,6 +49,19 @@ def reciprocal_rank_fusion(
     return scores
 
 
+def build_dense_query(query: str, *, use_instruction: bool) -> str:
+    """Apply the BGE retrieval instruction only where it measured better.
+
+    Pure dense retrieval benefits from the short-query instruction on the real-BGE
+    evaluation set. Hybrid + RRF measured better with the raw query, so the hybrid
+    vector branch intentionally remains unprefixed.
+    """
+    instruction = settings.retrieval_vector_query_instruction.strip()
+    if use_instruction and instruction:
+        return f"{instruction}{query}"
+    return query
+
+
 def diversify_by_document(
     rows: list[dict[str, Any]],
     *,
@@ -236,6 +249,13 @@ class RetrievalService:
         top_k = top_k or settings.top_k
         vector_candidate_k = max(top_k, int(settings.retrieval_vector_candidates))
         bm25_candidate_k = max(top_k, int(settings.retrieval_bm25_candidates))
+        vector_instruction_enabled = bool(
+            mode == "vector" and settings.retrieval_vector_query_instruction.strip()
+        )
+        vector_query = build_dense_query(
+            query,
+            use_instruction=vector_instruction_enabled,
+        )
 
         vector_rows: list[dict[str, Any]] = []
         all_rows: list[dict[str, Any]] = []
@@ -249,7 +269,7 @@ class RetrievalService:
             with ThreadPoolExecutor(max_workers=2, thread_name_prefix="yaoke-retrieval") as executor:
                 vector_future = executor.submit(
                     self._timed_vector_search,
-                    query,
+                    vector_query,
                     vector_candidate_k,
                     knowledge_base_ids,
                 )
@@ -263,7 +283,7 @@ class RetrievalService:
         else:
             if mode in {"vector", "hybrid"}:
                 vector_rows, vector_ms = self._timed_vector_search(
-                    query,
+                    vector_query,
                     vector_candidate_k,
                     knowledge_base_ids,
                 )
@@ -364,6 +384,7 @@ class RetrievalService:
             "bm25_cache_hit": bm25_cache_hit if mode in {"bm25", "hybrid"} else None,
             "parallel_hybrid": bool(mode == "hybrid" and settings.retrieval_parallel_hybrid),
             "fusion": "rrf" if mode == "hybrid" else mode,
+            "vector_query_instruction": vector_instruction_enabled,
             "vector_candidates": len(vector_ids) if mode in {"vector", "hybrid"} else 0,
             "bm25_candidates": len(bm25_ids) if mode in {"bm25", "hybrid"} else 0,
             "rerank_candidates": min(len(rows), max(top_k, int(settings.retrieval_rerank_candidates))) if rerank else 0,
