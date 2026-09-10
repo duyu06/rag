@@ -26,6 +26,8 @@ class VectorStore:
         self._client: QdrantClient | None = None
         self._embedder: SentenceTransformer | None = None
         self._model_lock = Lock()
+        self._revision_lock = Lock()
+        self._data_revision = 0
 
     @property
     def client(self) -> QdrantClient:
@@ -47,6 +49,19 @@ class VectorStore:
     @property
     def dimension(self) -> int:
         return int(self.embedder.get_sentence_embedding_dimension())
+
+    @property
+    def data_revision(self) -> int:
+        """Process-local mutation counter used to invalidate retrieval caches.
+
+        A short TTL still protects against mutations performed by another backend process.
+        """
+        with self._revision_lock:
+            return self._data_revision
+
+    def _bump_data_revision(self) -> None:
+        with self._revision_lock:
+            self._data_revision += 1
 
     def ping(self) -> bool:
         try:
@@ -116,6 +131,7 @@ class VectorStore:
             points=points,
             wait=True,
         )
+        self._bump_data_revision()
         return len(points)
 
     def vector_search(
@@ -216,6 +232,7 @@ class VectorStore:
             points_selector=FilterSelector(filter=Filter(must=must)),
             wait=True,
         )
+        self._bump_data_revision()
 
 
 vector_store = VectorStore()
