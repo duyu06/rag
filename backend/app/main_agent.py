@@ -7,12 +7,12 @@ from app.main import app
 from app.rag import current_model_name, probe_llm, probe_ollama
 from app.store import vector_store
 
-# P1.4 runtime metadata for the yaoke Agent entrypoint.
+# P1.5 runtime metadata for the yaoke Agent entrypoint.
 app.title = "yaoke API"
-app.version = "0.4.0"
+app.version = "0.5.0"
 app.description = "yaoke enterprise AI knowledge and tool-calling agent API"
 
-# Replace base RAG product/health routes with P1.4 Agent semantics.
+# Replace base RAG product/health routes with P1.5 Agent + Conversation semantics.
 # Legacy app.main remains independently usable when imported directly.
 for route in list(app.router.routes):
     path = getattr(route, "path", None)
@@ -26,7 +26,8 @@ def yaoke_root():
     return {
         "name": "yaoke",
         "product": "Enterprise AI Knowledge & Agent Platform",
-        "version": "0.4.0",
+        "version": "0.5.0",
+        "phase": "P1.5",
         "docs": "/docs",
         "health": "/api/health",
         "ready": "/api/ready",
@@ -46,8 +47,8 @@ def yaoke_health():
         legacy_provider = "ollama"
 
     return {
-        # P1.4 frontend and preflight use these compatibility fields. They must
-        # describe the provider run_agent() actually calls.
+        # Frontend and preflight use these compatibility fields. They must
+        # describe the provider run_agent() / conversation agent actually calls.
         "status": "healthy" if (qdrant_ok and agent_ok) else "degraded",
         "vector_db_connected": qdrant_ok,
         "llm_connected": agent_ok,
