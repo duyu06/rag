@@ -50,7 +50,8 @@ class RetrievalPerformanceContractTests(unittest.TestCase):
     def test_heading_chunks_are_diversified_by_document_before_final_top_k(self):
         self.assertIn("def diversify_by_document", RETRIEVAL)
         self.assertIn("retrieval_max_chunks_per_document", CONFIG)
-        self.assertIn("deferred", RETRIEVAL)
+        self.assertIn("for pass_number in range(1, cap + 1)", RETRIEVAL)
+        self.assertIn("selected_indexes", RETRIEVAL)
         self.assertIn("final_rows = diversify_by_document", RETRIEVAL)
         self.assertIn('"max_chunks_per_document"', RETRIEVAL)
         self.assertIn('"returned_documents"', RETRIEVAL)
