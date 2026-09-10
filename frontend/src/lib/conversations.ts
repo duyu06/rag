@@ -32,6 +32,15 @@ export type Conversation = Omit<ConversationSummary, "message_count" | "last_mes
   messages: ConversationMessage[];
 };
 
+export type ConversationTurnResponse = {
+  conversation: Conversation;
+  message: ConversationMessage;
+  trace_id?: string | null;
+  model_used?: string | null;
+  context_messages?: number;
+  timings?: Record<string, unknown> | null;
+};
+
 function authHeaders(extra?: Record<string, string>) {
   const value = typeof window === "undefined" ? "" : localStorage.getItem(TOKEN_KEY) || "";
   return {
@@ -47,6 +56,17 @@ async function parseError(response: Response, fallback: string) {
   } catch {
     return fallback;
   }
+}
+
+function normalizeKnowledgeBaseId(value?: string | null) {
+  return !value || value === "all" ? null : value;
+}
+
+async function parseTurnResponse(response: Response, fallback: string): Promise<ConversationTurnResponse> {
+  if (!response.ok) throw new Error(await parseError(response, fallback));
+  const data = await response.json();
+  if (data.trace_id) agentModePreference.saveTraceId(String(data.trace_id));
+  return data;
 }
 
 export const activeConversationPreference = {
@@ -78,7 +98,7 @@ export const conversationApi = {
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         mode: agentModePreference.get(),
-        knowledge_base_id: !knowledgeBaseId || knowledgeBaseId === "all" ? null : knowledgeBaseId,
+        knowledge_base_id: normalizeKnowledgeBaseId(knowledgeBaseId),
       }),
     });
     if (!response.ok) throw new Error(await parseError(response, "新建会话失败"));
@@ -116,24 +136,39 @@ export const conversationApi = {
     id: string,
     content: string,
     options: { knowledgeBaseId?: string | null; rerank?: boolean },
-  ): Promise<{ conversation: Conversation; message: ConversationMessage; trace_id?: string | null }> {
+  ): Promise<ConversationTurnResponse> {
     const response = await fetch(`${API_BASE_URL}/conversations/${encodeURIComponent(id)}/messages`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         content,
         mode: agentModePreference.get(),
-        knowledge_base_id:
-          !options.knowledgeBaseId || options.knowledgeBaseId === "all"
-            ? null
-            : options.knowledgeBaseId,
+        knowledge_base_id: normalizeKnowledgeBaseId(options.knowledgeBaseId),
         top_k: 5,
         rerank: Boolean(options.rerank),
       }),
     });
-    if (!response.ok) throw new Error(await parseError(response, "会话问答失败"));
-    const data = await response.json();
-    if (data.trace_id) agentModePreference.saveTraceId(String(data.trace_id));
-    return data;
+    return parseTurnResponse(response, "会话问答失败");
+  },
+
+  async retry(
+    conversationId: string,
+    messageId: string,
+    options: { knowledgeBaseId?: string | null; rerank?: boolean },
+  ): Promise<ConversationTurnResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/retry`,
+      {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          mode: agentModePreference.get(),
+          knowledge_base_id: normalizeKnowledgeBaseId(options.knowledgeBaseId),
+          top_k: 5,
+          rerank: Boolean(options.rerank),
+        }),
+      },
+    );
+    return parseTurnResponse(response, "重试失败");
   },
 };
