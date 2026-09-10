@@ -43,6 +43,16 @@ class RuntimeUsabilityContractsTest(unittest.TestCase):
         self.assertIn("finally {", api)
         self.assertIn("if (!doneSignaled) handlers.onDone();", api)
 
+    def test_host_and_docker_ollama_addresses_are_not_conflated(self):
+        env_example = (ROOT / "backend/.env.example").read_text(encoding="utf-8")
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("OLLAMA_BASE_URL=http://localhost:11434", env_example)
+        self.assertIn("OLLAMA_BASE_URL: http://host.docker.internal:11434", compose)
+        self.assertIn('"host.docker.internal:host-gateway"', compose)
+        self.assertIn("cd backend\nuvicorn app.main_agent:app", readme)
+
 
 if __name__ == "__main__":
     unittest.main()
