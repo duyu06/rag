@@ -6,8 +6,22 @@
 
 基于 **Next.js + FastAPI + Qdrant + BGE Embedding + BM25 + Hybrid Search + Cross-Encoder Rerank + Ornith Tool Calling** 的企业 RAG / Agent 演示项目。
 
-当前版本：**P1.7 / v0.7.0**  
+当前版本：**P1.8 / v0.8.0**  
 默认本地 LLM：**`ornith-1.5:9b`（Ollama）**。
+
+## P1.8 重点
+
+P1.8 在 P1.7 原生 Conversation Streaming 基础上增加 **Interview Readiness / Demo Observability**，目标是让演示环境是否可用在一屏内可判断：
+
+- 管理员工作台新增 Interview Readiness 面板，实时聚合 API、Qdrant、Ornith、Demo Corpus 与 Tool Registry
+- readiness 总状态只有全部关键检查通过时才显示 `READY`，否则显示 `DEGRADED`
+- Demo Corpus 必须达到完整 ready 状态（内置数据为 20/20）
+- Local Tool Policy 必须严格只有 `enterprise_search`
+- Auto Tool Policy 必须严格为 `enterprise_search + web_search`
+- Backend health 明确暴露 `P1.8 / v0.8.0 / native_streaming=true`，前端不靠写死文案判断流式能力
+- readiness 同屏展示文档、Chunks、今日问答、平均耗时和拒绝访问次数
+- 面板提供“系统状态 / RAG 评测 / 开始演示”直达入口
+- P1.7 `release_smoke.py --stream` 继续作为本机真实 Ornith SSE/TTFT/持久化验收，不用浏览器状态面板替代真实模型 smoke
 
 ## P1.7 重点
 
@@ -227,13 +241,14 @@ python scripts/agent_smoke.py --agent
 python scripts/agent_smoke.py --agent --web
 ```
 
-P1.7 发布前真实主链检查：
+P1.8 发布前真实主链检查：
 
 ```bash
 python scripts/release_smoke.py --agent
+python scripts/release_smoke.py --stream
 ```
 
-`--agent` 会要求本机 Ornith、Qdrant、已初始化 Demo 数据、Citation 与 Trace 均可用。Web Search 依赖当前网络和公共搜索服务；Web 失败不代表本地企业 RAG 已失效。
+`--agent` 验证真实 Ornith → Qdrant → Citation → Trace；`--stream` 进一步验证 Conversation SSE、多个 token 事件、同一 message id 持久化、Citation/Trace 刷新后仍可恢复。面试机如需设首 token SLA，可使用 `python scripts/release_smoke.py --stream --max-ttft 8`。Web Search 依赖当前网络和公共搜索服务；Web 失败不代表本地企业 RAG 已失效。
 
 ## Conversation 与 Agent API
 
@@ -338,6 +353,7 @@ frontend-build
 - BM25 warm cache
 - P1.6 heading hierarchy / BM25 边界 / query enrichment 回归
 - P1.7 native Ollama streaming / Conversation SSE / same-message persistence contract
+- P1.8 Interview Readiness live health / Demo / Tool Policy contract
 - 真实 BGE recall quality gate
 - Next.js production build
 
@@ -347,17 +363,19 @@ CI 的 Agent 模型边界仍可使用确定性 stub，因此 **CI 绿灯不等�
 
 推荐顺序：
 
-1. Admin 展示 5 个知识域 / 20 份资料
-2. 切到本地模式问 `X200 能在零下 20 度工作吗？`，展示 Local Fast Path **真实逐步出字** + Citation
-3. 连续追问，展示多轮上下文与 P1.6 Query Enrichment
-4. 刷新页面，证明完整回答已持久化；失败回答可在同一 message id 原地 Retry
-5. SALES 问 HR 信息，展示候选生成前的 RBAC 拒绝
-6. 四路 RAG Evaluation + real-BGE Retrieval baseline
-7. 打开 Agent Debugger，展示检索 timings 与 Trace
-8. 自动/联网模式演示 `web_search`（网络稳定时再做），最后用 Audit 收尾
+1. Admin 打开工作台 Interview Readiness，先展示 API / Qdrant / Ornith / 20/20 / Tool Policy / Native Streaming 全部 PASS
+2. 展示 5 个知识域 / 20 份资料
+3. 切到本地模式问 `X200 能在零下 20 度工作吗？`，展示 Local Fast Path **真实逐步出字** + Citation
+4. 连续追问，展示多轮上下文与 P1.6 Query Enrichment
+5. 刷新页面，证明完整回答已持久化；失败回答可在同一 message id 原地 Retry
+6. SALES 问 HR 信息，展示候选生成前的 RBAC 拒绝
+7. 四路 RAG Evaluation + real-BGE Retrieval baseline
+8. 打开 Agent Debugger，展示检索 timings 与 Trace
+9. 自动/联网模式演示 `web_search`（网络稳定时再做），最后用 Audit 收尾
 
 相关文档：
 
+- [`docs/P1_8_READINESS.md`](docs/P1_8_READINESS.md)：P1.8 Interview Readiness / Demo Observability
 - [`docs/P1_7_STREAMING.md`](docs/P1_7_STREAMING.md)：P1.7 原生 Streaming / SSE / 持久化语义
 - [`docs/P1_6_RELEASE.md`](docs/P1_6_RELEASE.md)：P1.6 Retrieval / real-BGE 质量基线
 - [`docs/P1_5_CONVERSATIONS.md`](docs/P1_5_CONVERSATIONS.md)：P1.5 Conversation / Runtime 验收
@@ -379,7 +397,7 @@ GraphRAG
 Kubernetes
 ```
 
-P1.7 的目标不是继续堆功能，而是在 **P1.6 可回归 Retrieval + RBAC + Citation** 的稳定基础上，把本地企业问答做成真正可感知的流式会话，同时保持持久化、Retry、Trace 和权限边界不退化。
+P1.8 的目标不是继续堆功能，而是把 **P1.6 Retrieval quality + P1.7 real streaming** 变成一套面试现场可快速验收、可解释、可恢复的稳定演示系统；Readiness 负责环境可见性，真实 Ornith streaming 仍由本机 release smoke 最终验收。
 
 ## License
 
