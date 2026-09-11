@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConversationChatPanel from "@/components/ConversationChatPanel";
+import DemoReadiness from "@/components/DemoReadiness";
 import {
   api,
   DebugResult,
@@ -300,7 +301,7 @@ function Dashboard({
     <>
       <section className="hero-card">
         <div>
-          <span className="eyebrow">yaoke / Enterprise RAG P1.6</span>
+          <span className="eyebrow">yaoke / P1.8 Interview Readiness</span>
           <h2>把“能问答”升级为“有权限边界的企业知识系统”</h2>
           <p>当前用户的角色会在检索前转换为 Qdrant metadata filter；无权限 Chunk 不会进入 Vector、BM25 或 LLM Context。</p>
         </div>
@@ -310,6 +311,8 @@ function Dashboard({
       <section className="metric-grid">
         {cards.map(([label, value, desc]) => <div className="metric-card" key={label}><span>{label}</span><strong>{value}</strong><small>{desc}</small></div>)}
       </section>
+
+      {user.role === "ADMIN" && <DemoReadiness onNavigate={onNavigate} />}
 
       <section className="two-col">
         <div className="panel">
