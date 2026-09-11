@@ -1,4 +1,4 @@
-# yaoke · P1.7 五分钟面试演示脚本
+# yaoke · P1.8 五分钟面试演示脚本
 
 目标：用 5 分钟证明 yaoke 不只是“知识库聊天”，而是一个具备 **真实 Streaming、Hybrid Retrieval、真实评测基线、RBAC、Conversation、Local Fast Path、Ornith Tool Calling、联网检索、Citation、Audit 和 Agent Trace** 的企业 AI 知识中台。
 
@@ -22,7 +22,7 @@ python scripts/release_smoke.py --agent
 python scripts/agent_smoke.py --agent --web
 ```
 
-管理员登录后确认 Demo 工具显示 `20/20 ready`。建议提前让 `ornith-1.5:9b` 和 Reranker 各运行一次，避免首次加载影响演示节奏。
+管理员登录后先确认工作台 Interview Readiness = READY，并核对 Demo Corpus 为 `20/20 ready`。建议提前让 `ornith-1.5:9b` 和 Reranker 各运行一次，避免首次加载影响演示节奏。
 
 P1.6 Retrieval schema 继续作为 P1.7 的检索基线：
 
@@ -39,11 +39,11 @@ Hit@3 = 1.0000
 MRR   = 0.9500
 ```
 
-P1.7 的新增价值不在“提高检索分数”，而在于把 Local Fast Path 最终 synthesis 改为 Ollama 原生 token streaming，并保持同一 assistant message 的持久化、Citation 与 Trace 语义。
+P1.8 的新增价值不在“提高检索分数”，而是把 P1.6 Retrieval 与 P1.7 Native Streaming 的运行状态做成一屏可验证的 Interview Readiness。
 
 ---
 
-## 00:00–00:35｜工作台：一句话定位
+## 00:00–00:35｜工作台：Interview Readiness + 一句话定位
 
 登录：
 
@@ -55,7 +55,7 @@ admin / admin123
 
 > yaoke 是我做的企业 RAG / Agent 演示系统。它不是把文档直接丢给模型，而是先由 JWT 和 RBAC 确定数据边界，再经过 Vector、BM25、Hybrid 和可选 Rerank 找证据；Ornith-1.5:9b 负责最终回答和需要时的 Tool Calling。模型可以选 Tool，但不能决定自己有什么权限。
 
-快速指一下：5 个知识域、20 份资料、Chunks、运行指标。
+先指一下 Interview Readiness 的 API、Qdrant、Ornith、Demo Corpus、Local/Auto Tool Policy 与 Native Streaming；全部 PASS 时总状态为 READY。然后快速指一下：5 个知识域、20 份资料、Chunks、运行指标。
 
 如果面试官问版本差异：
 
