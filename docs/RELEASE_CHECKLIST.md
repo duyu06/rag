@@ -1,11 +1,11 @@
-# Demo Release Checklist · P1.7
+# Demo Release Checklist · P1.8
 
 ## CI gate
 
 - [ ] `backend-contracts` → success
   - [ ] `python -m compileall -q backend/app scripts`
   - [ ] `python scripts/validate_demo_assets.py` passes
-  - [ ] backend unittest suite passes, including P1.7 streaming contracts
+  - [ ] backend unittest suite passes, including P1.7 streaming + P1.8 readiness contracts
   - [ ] Docker Compose configuration validates
   - [ ] Windows deployment script syntax validates
 - [ ] `backend-integration` → success
@@ -66,6 +66,19 @@
 - [ ] Vector / BM25 / Hybrid / Hybrid+Rerank all return valid results on the bundled evaluation set
 - [ ] P1.6 Hybrid Hit@1 / Hit@3 / MRR are reviewed before release
 - [ ] known single-query vector rank movement is treated as diagnostic, not tuned at the expense of overall recall
+
+## P1.8 Interview Readiness gate
+
+- [ ] Backend health reports `version=0.8.0`, `phase=P1.8`, `native_streaming=true`
+- [ ] Admin dashboard shows Interview Readiness panel
+- [ ] API Runtime / Qdrant / Ornith are PASS
+- [ ] Demo Corpus is fully ready (expected 20/20 for bundled demo data)
+- [ ] Local Tool Policy exposes only `enterprise_search`
+- [ ] Auto Tool Policy exposes exactly `enterprise_search + web_search`
+- [ ] Native Streaming capability is PASS
+- [ ] Overall status is `READY` only when every critical readiness check passes
+- [ ] Readiness panel also exposes documents / chunks / today queries / average latency / denied access
+- [ ] Browser readiness does not replace `python scripts/release_smoke.py --stream`
 
 ## P1.7 Native streaming gate
 
