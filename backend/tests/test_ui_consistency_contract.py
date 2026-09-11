@@ -5,17 +5,18 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class UiConsistencyContractsTest(unittest.TestCase):
-    def test_main_ui_matches_p17_streaming_and_p16_retrieval_baseline(self):
+    def test_main_ui_matches_p18_readiness_p17_streaming_and_p16_retrieval_baseline(self):
         page = (ROOT / "frontend/src/app/page.tsx").read_text(encoding="utf-8")
+        readiness = (ROOT / "frontend/src/components/DemoReadiness.tsx").read_text(encoding="utf-8")
         chat = (ROOT / "frontend/src/components/ConversationChatPanel.tsx").read_text(encoding="utf-8")
         demo_tools = (ROOT / "frontend/src/components/DemoTools.tsx").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stale_ten_question_copy = "当前内置 " + "10 道"
         stale_demo_label = "P1." + "2 · 真实指标 + 审计"
 
-        # The dashboard badge intentionally names the retrieval baseline. P1.7 is
-        # the conversation transport/UX release layered on top of P1.6 retrieval.
-        self.assertIn("yaoke / Enterprise RAG P1.6", page)
+        self.assertIn("yaoke / P1.8 Interview Readiness", page)
+        self.assertIn('import DemoReadiness from "@/components/DemoReadiness";', page)
+        self.assertIn('user.role === "ADMIN" && <DemoReadiness onNavigate={onNavigate} />', page)
         self.assertIn(
             '<ConversationChatPanel selectedKb={selectedKb} bases={bases} />',
             page,
@@ -29,12 +30,20 @@ class UiConsistencyContractsTest(unittest.TestCase):
         self.assertNotIn(stale_demo_label, page)
         self.assertNotIn("function ChatPanel(", page)
 
+        self.assertIn("Interview Readiness", readiness)
+        self.assertIn('api.agentTools("local")', readiness)
+        self.assertIn('api.agentTools("auto")', readiness)
+        self.assertIn("native_streaming", readiness)
+        self.assertIn("Local Tool Policy", readiness)
+        self.assertIn("Auto Tool Policy", readiness)
+
         self.assertIn("Local 模式支持原生流式", chat)
         self.assertIn("conversationApi.sendStream(", chat)
-        self.assertIn("P1.7 / v0.7.0", demo_tools)
-        self.assertIn("Real Streaming", demo_tools)
-        self.assertIn("当前版本：**P1.7 / v0.7.0**", readme)
-        self.assertIn("scripts/release_smoke.py --agent", readme)
+        self.assertIn("P1.8 / v0.8.0", demo_tools)
+        self.assertIn("Interview Readiness", demo_tools)
+        self.assertIn("当前版本：**P1.8 / v0.8.0**", readme)
+        self.assertIn("scripts/release_smoke.py --stream", readme)
+        self.assertIn("docs/P1_8_READINESS.md", readme)
         self.assertIn("docs/P1_7_STREAMING.md", readme)
         self.assertIn("docs/P1_6_RELEASE.md", readme)
         self.assertIn("docs/P1_5_CONVERSATIONS.md", readme)
