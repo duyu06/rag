@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     rate_limit_requests_per_minute: int = Field(default=120, ge=1, le=10000)
     rate_limit_login_per_minute: int = Field(default=20, ge=1, le=1000)
 
+
+    # Conversation persistence: SQLite for standalone demo, PostgreSQL for HA production.
+    conversation_store_backend: str = "sqlite"
+    conversation_db_path: str = "data/conversations.db"
+    postgres_dsn: SecretStr = SecretStr("")
+    postgres_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
+
     # Authentication. Demo auth is intentionally forbidden by production validation.
     auth_mode: str = "demo"
     oidc_issuer: str = ""
