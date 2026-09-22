@@ -11,7 +11,7 @@ from typing import Literal
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.audit import recent_events, record_event, today_summary, verify_audit_chain
@@ -19,6 +19,7 @@ from app.auth import CurrentUser, authenticate, issue_token, require_admin, requ
 from app.config import settings
 from app.conversation_store import conversation_store
 from app.demo import demo_status, initialize_demo, reset_demo
+from app.document_store import document_store
 from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_file
 from app.knowledge import get_base, resolve_requested, visible_bases
 from app.llm_provider import current_provider_name
@@ -302,10 +303,15 @@ async def ingest(
     path.write_bytes(content)
     try:
         chunk_count = ingest_file(path, knowledge_base_id)
+        document_store.put(knowledge_base_id, safe_name, content)
     except Exception as exc:
-        path.unlink(missing_ok=True)
+        if str(settings.document_store_backend).lower() == "s3":
+            path.unlink(missing_ok=True)
         _audit(user, "INGEST", status="FAILED", knowledge_base_id=knowledge_base_id, detail=str(exc))
         raise HTTPException(status_code=500, detail=f"文档处理失败：{exc}") from exc
+    finally:
+        if str(settings.document_store_backend).lower() == "s3":
+            path.unlink(missing_ok=True)
 
     _audit(
         user,
@@ -342,32 +348,30 @@ def documents(
     )
 
     result = []
-    for kb_id in kb_ids:
-        base = get_base(kb_id)
-        directory = DOC_DIR / kb_id
-        if not directory.exists():
-            continue
-        for path in sorted(directory.glob("*"), key=lambda item: item.stat().st_mtime, reverse=True):
-            if not path.is_file():
-                continue
-            stat = path.stat()
-            result.append(
-                {
-                    "file_name": path.name,
-                    "file_type": path.suffix.lower().lstrip("."),
-                    "file_size_kb": round(stat.st_size / 1024, 2),
-                    "upload_date": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    "chunk_count": counts.get((kb_id, path.name), 0),
-                    "knowledge_base_id": kb_id,
-                    "knowledge_base_name": base["name"],
-                }
-            )
+    try:
+        for kb_id in kb_ids:
+            base = get_base(kb_id)
+            for item in document_store.list(kb_id):
+                result.append(
+                    {
+                        "file_name": item.file_name,
+                        "file_type": Path(item.file_name).suffix.lower().lstrip("."),
+                        "file_size_kb": round(item.size_bytes / 1024, 2),
+                        "upload_date": item.last_modified,
+                        "chunk_count": counts.get((kb_id, item.file_name), 0),
+                        "knowledge_base_id": kb_id,
+                        "knowledge_base_name": base["name"],
+                    }
+                )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"文档存储不可用：{type(exc).__name__}") from exc
 
-    result.sort(key=lambda item: item["upload_date"], reverse=True)
+    result.sort(key=lambda item: str(item.get("upload_date") or ""), reverse=True)
     return {
         "documents": result,
         "total_documents": len(result),
         "total_chunks": sum(counts.values()),
+        "storage_backend": str(settings.document_store_backend),
     }
 
 
@@ -379,12 +383,19 @@ def source_document(
 ):
     _allowed_ids(user, knowledge_base_id)
     safe_name = Path(file_name).name
-    path = document_path(knowledge_base_id, safe_name)
-    if not path.exists() or not path.is_file():
-        raise HTTPException(status_code=404, detail="来源文件不存在")
-    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    try:
+        content = document_store.get(knowledge_base_id, safe_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="来源文件不存在") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="文档存储暂不可用") from exc
+    media_type = mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
     _audit(user, "SOURCE_VIEW", knowledge_base_id=knowledge_base_id, detail=safe_name)
-    return FileResponse(path, media_type=media_type)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{safe_name}"'},
+    )
 
 
 @app.delete("/api/documents/{file_name}")
@@ -406,6 +417,11 @@ def delete_document(
         _audit(user, "DELETE", status="FAILED", knowledge_base_id=knowledge_base_id, detail=str(exc))
         raise HTTPException(status_code=503, detail=f"删除向量失败：{exc}") from exc
 
+    try:
+        document_store.delete(knowledge_base_id, safe_name)
+    except Exception as exc:
+        _audit(user, "DELETE", status="FAILED", knowledge_base_id=knowledge_base_id, detail=f"storage:{type(exc).__name__}")
+        raise HTTPException(status_code=503, detail="文档存储删除失败") from exc
     document_path(knowledge_base_id, safe_name).unlink(missing_ok=True)
     _audit(user, "DELETE", knowledge_base_id=knowledge_base_id, detail=safe_name)
     return {"success": True, "message": "文档已删除"}
