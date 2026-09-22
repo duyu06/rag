@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     postgres_dsn: SecretStr = SecretStr("")
     postgres_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
 
+
+    # Prometheus observability.
+    metrics_enabled: bool = True
+    metrics_bearer_token: SecretStr = SecretStr("")
+
     # Authentication. Demo auth is intentionally forbidden by production validation.
     auth_mode: str = "demo"
     oidc_issuer: str = ""
