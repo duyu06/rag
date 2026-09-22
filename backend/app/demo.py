@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.config import settings
+from app.document_store import document_store
 from app.ingestion import document_path, ingest_file
 from app.knowledge import get_base
 from app.store import vector_store
@@ -70,7 +71,7 @@ def demo_status() -> dict:
         state = inventory.get((kb_id, file_name))
         chunks = int((state or {}).get("count", 0) or 0)
         index_current = _is_current_index(state)
-        ready = document_path(kb_id, file_name).exists() and chunks > 0 and index_current
+        ready = document_store.exists(kb_id, file_name) and chunks > 0 and index_current
         if ready:
             ready_count += 1
         items.append(
@@ -107,9 +108,11 @@ def initialize_demo(force: bool = False) -> dict:
         source_bytes = source.read_bytes()
         state = inventory.get((kb_id, file_name))
         chunks = int((state or {}).get("count", 0) or 0)
+        stored_bytes = None
+        if document_store.exists(kb_id, file_name):
+            stored_bytes = document_store.get(kb_id, file_name)
         unchanged = (
-            target.exists()
-            and target.read_bytes() == source_bytes
+            stored_bytes == source_bytes
             and chunks > 0
             and _is_current_index(state)
         )
@@ -126,7 +129,12 @@ def initialize_demo(force: bool = False) -> dict:
             continue
 
         target.write_bytes(source_bytes)
-        chunk_count = ingest_file(target, kb_id)
+        try:
+            chunk_count = ingest_file(target, kb_id)
+            document_store.put(kb_id, file_name, source_bytes)
+        finally:
+            if str(settings.document_store_backend).lower() == "s3":
+                target.unlink(missing_ok=True)
         results.append(
             {
                 **item,
@@ -150,6 +158,7 @@ def reset_demo() -> dict:
         kb_id = item["knowledge_base_id"]
         file_name = item["file_name"]
         vector_store.delete_file(file_name, kb_id)
+        document_store.delete(kb_id, file_name)
         document_path(kb_id, file_name).unlink(missing_ok=True)
     result = initialize_demo(force=True)
     result["message"] = "Demo 数据已重置并重新索引"
