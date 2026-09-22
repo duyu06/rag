@@ -22,6 +22,7 @@ from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_fil
 from app.knowledge import get_base, resolve_requested, visible_bases
 from app.llm_provider import current_provider_name
 from app.rag import current_model_name, generate_answer, probe_llm
+from app.rate_limit import rate_limit_middleware
 from app.retrieval import retrieval_service
 from app.security import cors_origins, security_headers_middleware, trusted_hosts, validate_production_security
 from app.store import vector_store
@@ -43,6 +44,7 @@ app.add_middleware(
     allowed_hosts=trusted_hosts() or ["localhost", "127.0.0.1"],
 )
 app.middleware("http")(security_headers_middleware)
+app.middleware("http")(rate_limit_middleware)
 app.add_event_handler("startup", validate_production_security)
 
 
