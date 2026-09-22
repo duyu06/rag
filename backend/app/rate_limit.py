@@ -49,6 +49,16 @@ def _policy(request: Request) -> tuple[str, int] | None:
     return "api", int(settings.rate_limit_requests_per_minute)
 
 
+def rate_limit_ready() -> tuple[bool, str]:
+    if not settings.rate_limit_enabled:
+        return True, "disabled"
+    try:
+        ok = bool(_client().ping())
+        return ok, "redis=ok" if ok else "redis=not_ready"
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+
+
 async def rate_limit_middleware(request: Request, call_next):
     if not settings.rate_limit_enabled:
         return await call_next(request)
