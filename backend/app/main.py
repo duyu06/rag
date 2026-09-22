@@ -19,6 +19,7 @@ from app.config import settings
 from app.demo import demo_status, initialize_demo, reset_demo
 from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_file
 from app.knowledge import get_base, resolve_requested, visible_bases
+from app.llm_provider import current_provider_name
 from app.rag import current_model_name, generate_answer, probe_llm
 from app.retrieval import retrieval_service
 from app.store import vector_store
@@ -148,7 +149,10 @@ def ready():
 def health():
     qdrant_ok = vector_store.ping()
     llm_ok, llm_detail = probe_llm()
-    provider = "openai-compatible" if settings.openai_api_key else "ollama"
+    try:
+        provider = current_provider_name()
+    except Exception:
+        provider = str(settings.llm_provider or "auto")
     return {
         "status": "healthy" if (qdrant_ok and llm_ok) else "degraded",
         "vector_db_connected": qdrant_ok,
