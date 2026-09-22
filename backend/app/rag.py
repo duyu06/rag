@@ -3,12 +3,13 @@ from __future__ import annotations
 import httpx
 
 from app.config import settings
+from app.knowledge import evidence_knowledge_base_ids, sensitivity_for_ids
 from app.llm_provider import (
-    chat_message,
     current_model_name as provider_current_model_name,
     probe_llm as provider_probe_llm,
     probe_ollama as provider_probe_ollama,
 )
+from app.llm_router import RouteContext, routed_chat_message
 from app.web_search import clean_question, search_web, wants_web_search
 
 SYSTEM_PROMPT = """你是 yaoke 企业知识助手。
@@ -117,12 +118,19 @@ def generate_answer(question: str, rows: list[dict]) -> str:
 请给出答案，并对关键结论标注引用编号。"""
 
     try:
-        message = chat_message(
+        sensitivity = sensitivity_for_ids(evidence_knowledge_base_ids(rows))
+        message = routed_chat_message(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.1,
+            context=RouteContext(
+                sensitivity=sensitivity,
+                requires_tools=False,
+                requires_reasoning=False,
+                mode="rag",
+            ),
         )
         answer = str(message.get("content") or "")
 
