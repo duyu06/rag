@@ -45,7 +45,7 @@ app.add_middleware(
 )
 app.middleware("http")(security_headers_middleware)
 app.middleware("http")(rate_limit_middleware)
-app.add_event_handler("startup", validate_production_security)
+validate_production_security()
 
 
 class LoginRequest(BaseModel):
