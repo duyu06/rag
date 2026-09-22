@@ -5,22 +5,22 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class P17StreamingContractsTest(unittest.TestCase):
-    def test_ollama_synthesis_uses_native_streaming(self):
+    def test_synthesis_uses_enterprise_stream_router(self):
         native = (ROOT / "backend/app/native_stream.py").read_text(encoding="utf-8")
-        self.assertIn('"stream": True', native)
-        self.assertIn("with httpx.stream(", native)
-        self.assertIn('"tools": []', native)
-        self.assertIn('message.get("content")', native)
-        self.assertIn("finished = False", native)
-        self.assertIn('chunk.get("done") is True', native)
-        self.assertIn("if not finished:", native)
-        self.assertIn("Ollama 流式响应提前结束", native)
+        router = (ROOT / "backend/app/llm_router.py").read_text(encoding="utf-8")
+        provider = (ROOT / "backend/app/llm_provider.py").read_text(encoding="utf-8")
+        self.assertIn("routed_stream_chat(", native)
+        self.assertIn("Fail over only before the first visible token", router)
+        self.assertIn("stream_chat(", router)
+        self.assertIn("with httpx.stream(", provider)
+        self.assertIn('"stream": True', provider)
         self.assertNotIn("range(0, len(answer), 14)", native)
+
 
     def test_local_fast_path_forwards_real_tokens_without_changing_retrieval(self):
         agent = (ROOT / "backend/app/conversation_agent.py").read_text(encoding="utf-8")
         self.assertIn("token_sink: Callable[[str], None] | None = None", agent)
-        self.assertIn("for text in ollama_chat_stream(messages):", agent)
+        self.assertIn("for text in ollama_chat_stream(messages, sensitivity=sensitivity):", agent)
         self.assertIn("token_sink(text)", agent)
         self.assertIn('"native_stream": native_stream', agent)
         self.assertIn('tool_registry.execute(\n            "enterprise_search"', agent)
