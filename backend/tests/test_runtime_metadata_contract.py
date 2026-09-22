@@ -25,7 +25,7 @@ class RuntimeMetadataContractsTest(unittest.TestCase):
         self.assertIn('"llm_connected": agent_ok', entry)
         self.assertIn('"llm_provider": provider', entry)
         self.assertIn('"llm_model": model', entry)
-        self.assertIn('"legacy_rag_connected": legacy_ok', entry)
+        self.assertIn('"legacy_rag_connected": agent_ok', entry)
         self.assertIn('"legacy_rag_provider": provider', entry)
         self.assertIn("def probe_ollama", rag)
         self.assertIn("def probe_llm", rag)
