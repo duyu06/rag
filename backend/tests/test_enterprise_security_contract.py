@@ -37,6 +37,17 @@ class EnterpriseSecurityContractsTest(unittest.TestCase):
         self.assertIn('response.headers["X-Content-Type-Options"] = "nosniff"', security)
         self.assertIn('response.headers["X-Frame-Options"] = "DENY"', security)
 
+    def test_production_requires_fail_closed_distributed_rate_limit(self):
+        security = (ROOT / "backend/app/security.py").read_text(encoding="utf-8")
+        limiter = (ROOT / "backend/app/rate_limit.py").read_text(encoding="utf-8")
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        self.assertIn("RATE_LIMIT_ENABLED must be true", security)
+        self.assertIn("RATE_LIMIT_FAIL_OPEN must be false", security)
+        self.assertIn("Redis.from_url", limiter)
+        self.assertIn("status_code=429", limiter)
+        self.assertIn("status_code=503", limiter)
+        self.assertIn("image: redis:7-alpine", compose)
+
     def test_audit_redacts_secrets_and_supports_integrity_verification(self):
         audit = (ROOT / "backend/app/audit.py").read_text(encoding="utf-8")
         config = (ROOT / "backend/app/config.py").read_text(encoding="utf-8")
