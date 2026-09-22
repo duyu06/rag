@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import time
+
+import httpx  # compatibility hook for existing integration stubs
 from typing import Any, Literal
 
 from app.agent_trace import new_trace_id, public_args, save_trace, utc_now
