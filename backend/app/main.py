@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from app.audit import recent_events, record_event, today_summary, verify_audit_chain
 from app.auth import CurrentUser, authenticate, issue_token, require_admin, require_user
 from app.config import settings
+from app.conversation_store import conversation_store
 from app.demo import demo_status, initialize_demo, reset_demo
 from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_file
 from app.knowledge import get_base, resolve_requested, visible_bases
@@ -151,12 +152,14 @@ def root():
 def ready():
     qdrant_ok = vector_store.ping()
     redis_ok, redis_detail = rate_limit_ready()
-    if not qdrant_ok or not redis_ok:
+    conversation_ok = bool(conversation_store.ping())
+    if not qdrant_ok or not redis_ok or not conversation_ok:
         raise HTTPException(
             status_code=503,
             detail={
                 "qdrant": "ready" if qdrant_ok else "not_ready",
                 "rate_limit": redis_detail,
+                "conversation_store": "ready" if conversation_ok else "not_ready",
             },
         )
     return {
@@ -164,6 +167,8 @@ def ready():
         "vector_db_connected": True,
         "rate_limit_ready": redis_ok,
         "rate_limit_detail": redis_detail,
+        "conversation_store_ready": conversation_ok,
+        "conversation_store_backend": str(settings.conversation_store_backend),
     }
 
 
