@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # Runtime / perimeter security.
     app_env: str = "development"
     cors_allowed_origins: str = "http://localhost:3000"
-    trusted_hosts: str = "localhost,127.0.0.1"
+    trusted_hosts: str = "localhost,127.0.0.1,testserver"
     security_headers_enabled: bool = True
 
 
