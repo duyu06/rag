@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: yaoke
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaoke-dev-only}
+      POSTGRES_DB: yaoke
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yaoke -d yaoke"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -36,6 +51,7 @@ services:
     environment:
       QDRANT_URL: http://qdrant:6333
       REDIS_URL: redis://redis:6379/0
+      POSTGRES_DSN: postgresql://yaoke:${POSTGRES_PASSWORD:-yaoke-dev-only}@postgres:5432/yaoke
       OLLAMA_BASE_URL: http://host.docker.internal:11434
       DEMO_DATA_DIR: /app/demo-data
     extra_hosts:
@@ -50,6 +66,8 @@ services:
       qdrant:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8001/api/ready"]
@@ -82,4 +100,5 @@ services:
 volumes:
   qdrant_data:
   redis_data:
+  postgres_data:
   hf_cache:
