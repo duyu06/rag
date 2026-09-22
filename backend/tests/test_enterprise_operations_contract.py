@@ -40,7 +40,7 @@ class EnterpriseOperationsContractsTest(unittest.TestCase):
         self.assertIn("class PostgresConversationStore", store)
         self.assertIn("psycopg.connect(", store)
         self.assertIn("ON DELETE CASCADE", store)
-        self.assertIn('conversation_store_backend or "sqlite"', factory)
+        self.assertIn('os.getenv("CONVERSATION_STORE_BACKEND", "sqlite")', factory)
         self.assertIn("PostgresConversationStore()", factory)
         self.assertIn("image: postgres:16-alpine", compose)
         self.assertIn("postgres_data:", compose)
