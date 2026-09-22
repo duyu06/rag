@@ -20,6 +20,18 @@ class EnterpriseOperationsContractsTest(unittest.TestCase):
         self.assertIn('priority": "snapshot"', restore)
         self.assertIn("safe_extract", restore)
 
+    def test_postgres_conversation_store_supports_multi_instance_backend(self):
+        store = (ROOT / "backend/app/postgres_conversation_store.py").read_text(encoding="utf-8")
+        factory = (ROOT / "backend/app/conversation_store.py").read_text(encoding="utf-8")
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        self.assertIn("class PostgresConversationStore", store)
+        self.assertIn("psycopg.connect(", store)
+        self.assertIn("ON DELETE CASCADE", store)
+        self.assertIn('conversation_store_backend or "sqlite"', factory)
+        self.assertIn("PostgresConversationStore()", factory)
+        self.assertIn("image: postgres:16-alpine", compose)
+        self.assertIn("postgres_data:", compose)
+
     def test_admin_readiness_aggregates_security_and_critical_dependencies(self):
         routes = (ROOT / "backend/app/enterprise_routes.py").read_text(encoding="utf-8")
         entry = (ROOT / "backend/app/main_agent.py").read_text(encoding="utf-8")
