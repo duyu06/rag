@@ -48,6 +48,7 @@ jobs:
           "rank-bm25>=0.2.2"
           "httpx>=0.27,<1"
           "PyJWT>=2.9,<3"
+          "redis>=5,<7"
           "numpy>=1.26,<3"
       - name: Run real Qdrant API/RBAC/retrieval integration
         run: python scripts/qdrant_integration.py
