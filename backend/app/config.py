@@ -12,6 +12,14 @@ class Settings(BaseSettings):
     trusted_hosts: str = "localhost,127.0.0.1"
     security_headers_enabled: bool = True
 
+
+    # Distributed API rate limiting. Production validation requires this enabled.
+    redis_url: str = "redis://localhost:6379/0"
+    rate_limit_enabled: bool = False
+    rate_limit_fail_open: bool = False
+    rate_limit_requests_per_minute: int = Field(default=120, ge=1, le=10000)
+    rate_limit_login_per_minute: int = Field(default=20, ge=1, le=1000)
+
     # Authentication. Demo auth is intentionally forbidden by production validation.
     auth_mode: str = "demo"
     oidc_issuer: str = ""
