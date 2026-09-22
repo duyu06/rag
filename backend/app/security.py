@@ -64,6 +64,9 @@ def validate_production_security() -> None:
     if not _secret(settings.postgres_dsn):
         errors.append("POSTGRES_DSN is required")
 
+    if settings.metrics_enabled and not _secret(settings.metrics_bearer_token):
+        errors.append("METRICS_BEARER_TOKEN is required when metrics are enabled")
+
     if errors:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 
