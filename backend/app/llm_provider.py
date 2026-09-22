@@ -32,33 +32,13 @@ def _secret_value(value: SecretStr | str | None) -> str:
     return str(value or "").strip()
 
 
-def resolve_llm_config() -> LLMRuntimeConfig:
-    """Resolve the active generation provider without exposing credentials.
+def _normalized_provider(value: str | None) -> str:
+    return str(value or "").strip().lower().replace("_", "-")
 
-    New LLM_* settings take precedence. Existing OPENAI_* settings remain a
-    backwards-compatible fallback, and Ollama remains the zero-key default.
-    """
-    requested_provider = str(settings.llm_provider or "auto").strip().lower().replace("_", "-")
-    provider = requested_provider
-    generic_key = _secret_value(settings.llm_api_key)
-    generic_base = str(settings.llm_base_url or "").strip()
-    generic_model = str(settings.llm_model or "").strip()
-    generic_configured = bool(generic_key or generic_base or generic_model)
 
-    if provider in {"", "auto"}:
-        if generic_configured:
-            provider = "openai-compatible"
-        elif str(settings.openai_api_key or "").strip():
-            return LLMRuntimeConfig(
-                provider="openai-compatible",
-                base_url=settings.openai_base_url.rstrip("/"),
-                api_key=str(settings.openai_api_key).strip(),
-                model=settings.openai_model,
-                is_ollama=False,
-            )
-        else:
-            provider = "ollama"
-
+def _explicit_provider_config(provider: str) -> LLMRuntimeConfig:
+    """Resolve one named provider without borrowing another provider's secret."""
+    provider = _normalized_provider(provider)
     if provider == "ollama":
         return LLMRuntimeConfig(
             provider="ollama",
@@ -68,24 +48,112 @@ def resolve_llm_config() -> LLMRuntimeConfig:
             is_ollama=True,
         )
 
+    if provider == "deepseek":
+        api_key = _secret_value(settings.deepseek_api_key)
+        if not api_key:
+            raise RuntimeError("DeepSeek fallback requires DEEPSEEK_API_KEY")
+        return LLMRuntimeConfig(
+            provider="deepseek",
+            base_url=str(settings.deepseek_base_url).rstrip("/"),
+            api_key=api_key,
+            model=str(settings.deepseek_model),
+            is_ollama=False,
+        )
+
+    if provider == "qwen":
+        api_key = _secret_value(settings.qwen_api_key)
+        if not api_key:
+            raise RuntimeError("Qwen fallback requires QWEN_API_KEY")
+        return LLMRuntimeConfig(
+            provider="qwen",
+            base_url=str(settings.qwen_base_url).rstrip("/"),
+            api_key=api_key,
+            model=str(settings.qwen_model),
+            is_ollama=False,
+        )
+
+    if provider == "openai":
+        api_key = _secret_value(settings.openai_api_key)
+        if not api_key:
+            raise RuntimeError("OpenAI provider requires OPENAI_API_KEY")
+        return LLMRuntimeConfig(
+            provider="openai",
+            base_url=str(settings.openai_base_url).rstrip("/"),
+            api_key=api_key,
+            model=str(settings.openai_model),
+            is_ollama=False,
+        )
+
+    raise RuntimeError(f"Named provider '{provider}' has no dedicated fallback credentials")
+
+
+def resolve_llm_config(provider_name: str | None = None) -> LLMRuntimeConfig:
+    """Resolve the primary provider or an explicitly named fallback.
+
+    LLM_* controls the primary model. Dedicated provider credentials are used for
+    fallbacks so a secret configured for one provider is never sent to another.
+    """
+    requested_provider = _normalized_provider(settings.llm_provider or "auto")
+    generic_key = _secret_value(settings.llm_api_key)
+    generic_base = str(settings.llm_base_url or "").strip()
+    generic_model = str(settings.llm_model or "").strip()
+    generic_configured = bool(generic_key or generic_base or generic_model)
+
+    if provider_name:
+        target = _normalized_provider(provider_name)
+        # The explicitly selected primary is allowed to use generic LLM_* settings.
+        if target == requested_provider and requested_provider not in {"", "auto"} and generic_configured:
+            if target == "ollama":
+                return _explicit_provider_config("ollama")
+            defaults = _PROVIDER_DEFAULTS.get(target)
+            base_url = generic_base or (defaults[0] if defaults else "")
+            model = generic_model or (defaults[1] if defaults else "")
+            if not generic_key:
+                raise RuntimeError(f"LLM provider '{target}' requires LLM_API_KEY")
+            if not base_url or not model:
+                raise RuntimeError(f"LLM provider '{target}' requires LLM_BASE_URL and LLM_MODEL")
+            return LLMRuntimeConfig(
+                provider=target,
+                base_url=base_url.rstrip("/"),
+                api_key=generic_key,
+                model=model,
+                is_ollama=False,
+            )
+        return _explicit_provider_config(target)
+
+    provider = requested_provider
+    if provider in {"", "auto"}:
+        if generic_configured:
+            provider = "openai-compatible"
+        elif _secret_value(settings.openai_api_key):
+            return LLMRuntimeConfig(
+                provider="openai-compatible",
+                base_url=settings.openai_base_url.rstrip("/"),
+                api_key=_secret_value(settings.openai_api_key),
+                model=settings.openai_model,
+                is_ollama=False,
+            )
+        else:
+            return _explicit_provider_config("ollama")
+
+    if provider == "ollama":
+        return _explicit_provider_config("ollama")
+
     defaults = _PROVIDER_DEFAULTS.get(provider)
     base_url = generic_base or (defaults[0] if defaults else "")
     model = generic_model or (defaults[1] if defaults else "")
-    api_key = generic_key
-
     if not base_url:
         raise RuntimeError(
             f"LLM provider '{provider}' requires LLM_BASE_URL (or a built-in provider alias)"
         )
-    if not api_key:
+    if not generic_key:
         raise RuntimeError(f"LLM provider '{provider}' requires LLM_API_KEY")
     if not model:
         raise RuntimeError(f"LLM provider '{provider}' requires LLM_MODEL")
-
     return LLMRuntimeConfig(
         provider=provider,
         base_url=base_url.rstrip("/"),
-        api_key=api_key,
+        api_key=generic_key,
         model=model,
         is_ollama=False,
     )
@@ -97,6 +165,16 @@ def current_provider_name() -> str:
 
 def current_model_name() -> str:
     return resolve_llm_config().model
+
+
+def public_runtime_config(cfg: LLMRuntimeConfig) -> dict[str, Any]:
+    """Safe metadata for traces/admin APIs. Never include credentials."""
+    return {
+        "provider": cfg.provider,
+        "model": cfg.model,
+        "base_url": cfg.base_url,
+        "external": not cfg.is_ollama,
+    }
 
 
 def _ollama_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -128,8 +206,9 @@ def chat_message(
     temperature: float = 0.2,
     max_tokens: int | None = None,
     think: bool = False,
+    runtime_config: LLMRuntimeConfig | None = None,
 ) -> dict[str, Any]:
-    cfg = resolve_llm_config()
+    cfg = runtime_config or resolve_llm_config()
     tools = tools or []
 
     if cfg.is_ollama:
@@ -150,12 +229,20 @@ def chat_message(
             timeout=settings.llm_timeout_seconds,
         )
         response.raise_for_status()
-        message = response.json().get("message")
+        body = response.json()
+        message = body.get("message")
         if not isinstance(message, dict):
             raise RuntimeError("Ollama 返回缺少 message")
-        return message
+        result = dict(message)
+        result["_provider"] = cfg.provider
+        result["_model"] = cfg.model
+        result["_usage"] = {
+            "input_tokens": int(body.get("prompt_eval_count") or 0),
+            "output_tokens": int(body.get("eval_count") or 0),
+        }
+        return result
 
-    payload = {
+    payload: dict[str, Any] = {
         "model": cfg.model,
         "stream": False,
         "temperature": temperature,
@@ -164,10 +251,8 @@ def chat_message(
     if tools:
         payload["tools"] = tools
     if cfg.provider == "deepseek":
-        # DeepSeek V4 enables thinking by default. Tool-calling in thinking mode
-        # requires replaying reasoning_content on every following tools request.
-        # This adapter intentionally uses non-thinking mode for tool rounds so the
-        # existing bounded Agent loop stays protocol-safe and low-latency.
+        # DeepSeek thinking + tools requires replaying hidden reasoning_content.
+        # yaoke does not persist hidden reasoning, so tool rounds are non-thinking.
         payload["thinking"] = {"type": "disabled" if tools else ("enabled" if think else "disabled")}
     if max_tokens is not None:
         payload["max_tokens"] = int(max_tokens)
@@ -182,16 +267,24 @@ def chat_message(
         timeout=settings.llm_timeout_seconds,
     )
     response.raise_for_status()
-    choices = response.json().get("choices") or []
+    body = response.json()
+    choices = body.get("choices") or []
     if not choices or not isinstance(choices[0], dict):
         raise RuntimeError(f"{cfg.provider} 返回缺少 choices")
     message = choices[0].get("message")
     if not isinstance(message, dict):
         raise RuntimeError(f"{cfg.provider} 返回缺少 message")
+    usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
     return {
         "role": str(message.get("role") or "assistant"),
         "content": message.get("content") or "",
         "tool_calls": message.get("tool_calls") or [],
+        "_provider": cfg.provider,
+        "_model": cfg.model,
+        "_usage": {
+            "input_tokens": int(usage.get("prompt_tokens") or 0),
+            "output_tokens": int(usage.get("completion_tokens") or 0),
+        },
     }
 
 
@@ -201,8 +294,9 @@ def stream_chat(
     temperature: float = 0.2,
     max_tokens: int | None = None,
     think: bool = False,
+    runtime_config: LLMRuntimeConfig | None = None,
 ) -> Iterator[str]:
-    cfg = resolve_llm_config()
+    cfg = runtime_config or resolve_llm_config()
 
     if cfg.is_ollama:
         payload: dict[str, Any] = {
@@ -216,7 +310,6 @@ def stream_chat(
         }
         if max_tokens is not None:
             payload["options"]["num_predict"] = int(max_tokens)
-
         finished = False
         with httpx.stream(
             "POST",
@@ -246,7 +339,7 @@ def stream_chat(
             raise RuntimeError("Ollama 流式响应提前结束，未收到 done=true")
         return
 
-    payload = {
+    payload: dict[str, Any] = {
         "model": cfg.model,
         "stream": True,
         "temperature": temperature,
@@ -302,10 +395,8 @@ def stream_chat(
 
 def probe_ollama(timeout: float = 2.5) -> tuple[bool, str]:
     try:
-        response = httpx.get(
-            settings.ollama_base_url.rstrip("/") + "/api/tags",
-            timeout=timeout,
-        )
+        cfg = _explicit_provider_config("ollama")
+        response = httpx.get(cfg.base_url + "/api/tags", timeout=timeout)
         response.raise_for_status()
         models = response.json().get("models", [])
         installed_names = {
@@ -314,28 +405,29 @@ def probe_ollama(timeout: float = 2.5) -> tuple[bool, str]:
             for key in ("name", "model")
             if isinstance(item, dict) and item.get(key)
         }
-        wanted = settings.ollama_model.strip()
+        wanted = cfg.model.strip()
         installed = (
             wanted in installed_names
             if ":" in wanted
             else any(name == wanted or name.split(":", 1)[0] == wanted for name in installed_names)
         )
         if not installed:
-            return False, f"Ollama 已连接，但未发现模型 {settings.ollama_model}"
-        return True, f"provider=ollama;model={settings.ollama_model}"
+            return False, f"Ollama 已连接，但未发现模型 {cfg.model}"
+        return True, f"provider=ollama;model={cfg.model}"
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
 
 
-def probe_llm(timeout: float = 2.5) -> tuple[bool, str]:
+def probe_llm(
+    timeout: float = 2.5,
+    runtime_config: LLMRuntimeConfig | None = None,
+) -> tuple[bool, str]:
     try:
-        cfg = resolve_llm_config()
+        cfg = runtime_config or resolve_llm_config()
     except Exception as exc:
         return False, f"{type(exc).__name__}: {exc}"
-
     if cfg.is_ollama:
         return probe_ollama(timeout)
-
     try:
         response = httpx.get(
             cfg.base_url + "/models",
