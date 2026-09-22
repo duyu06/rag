@@ -52,6 +52,13 @@ def validate_production_security() -> None:
     if settings.jwt_secret == "change-me-before-production-yaoke-demo-secret":
         errors.append("JWT_SECRET must not use the demo default")
 
+    if not settings.rate_limit_enabled:
+        errors.append("RATE_LIMIT_ENABLED must be true")
+    if settings.rate_limit_fail_open:
+        errors.append("RATE_LIMIT_FAIL_OPEN must be false")
+    if not str(settings.redis_url or "").strip():
+        errors.append("REDIS_URL is required")
+
     if errors:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 
