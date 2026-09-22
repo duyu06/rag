@@ -28,6 +28,18 @@ class Settings(BaseSettings):
     postgres_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
 
 
+    # Document binary storage: local for standalone demo, S3-compatible for HA production.
+    document_store_backend: str = "local"
+    s3_bucket: str = ""
+    s3_prefix: str = "yaoke/documents"
+    s3_region: str = ""
+    s3_endpoint_url: str = ""
+    s3_access_key_id: SecretStr = SecretStr("")
+    s3_secret_access_key: SecretStr = SecretStr("")
+    s3_session_token: SecretStr = SecretStr("")
+    s3_force_path_style: bool = False
+
+
     # Prometheus observability.
     metrics_enabled: bool = True
     metrics_bearer_token: SecretStr = SecretStr("")
