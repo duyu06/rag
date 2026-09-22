@@ -26,14 +26,16 @@ class AgentContractsTest(unittest.TestCase):
 
     def test_p16_ollama_keeps_model_warm_and_bounds_synthesis(self):
         agent = (ROOT / "backend/app/agent.py").read_text(encoding="utf-8")
+        provider = (ROOT / "backend/app/llm_provider.py").read_text(encoding="utf-8")
         config = (ROOT / "backend/app/config.py").read_text(encoding="utf-8")
         self.assertIn('ollama_keep_alive: str = "30m"', config)
         self.assertIn("agent_think_tool_routing: bool = True", config)
         self.assertIn("agent_think_synthesis: bool = False", config)
         self.assertIn("agent_num_predict_synthesis", config)
-        self.assertIn('"keep_alive": settings.ollama_keep_alive', agent)
-        self.assertIn('"num_predict": int(num_predict)', agent)
+        self.assertIn('"keep_alive": settings.ollama_keep_alive', provider)
+        self.assertIn("max_tokens=int(num_predict)", agent)
         self.assertIn("routing_turn = bool(tools)", agent)
+        self.assertIn("routed_chat_message(", agent)
 
     def test_agent_routes_and_tools_endpoint_exist(self):
         routes = (ROOT / "backend/app/agent_routes.py").read_text(encoding="utf-8")
