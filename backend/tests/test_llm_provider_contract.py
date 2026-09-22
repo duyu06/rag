@@ -19,6 +19,7 @@ class LLMProviderContractsTest(unittest.TestCase):
         self.assertIn('provider = "openai-compatible"', provider)
         self.assertIn('cfg.base_url + "/chat/completions"', provider)
         self.assertIn('cfg.base_url + "/models"', provider)
+        self.assertIn('payload["thinking"] = {"type": "disabled" if tools', provider)
 
     def test_agent_and_streaming_use_provider_adapter_without_removing_ollama(self):
         agent = (ROOT / "backend/app/agent.py").read_text(encoding="utf-8")
