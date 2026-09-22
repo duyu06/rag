@@ -11,7 +11,7 @@ from app.agent_trace import new_trace_id, save_trace, utc_now
 from app.audit import record_event
 from app.auth import CurrentUser
 from app.config import settings
-from app.knowledge import allowed_ids, visible_bases
+from app.knowledge import allowed_ids, evidence_knowledge_base_ids, sensitivity_for_ids, visible_bases
 from app.llm_provider import current_model_name
 from app.native_stream import ollama_chat_stream
 from app.tools.base import AgentMode, ToolContext, ToolExecutionError
@@ -262,12 +262,14 @@ def _local_fast_path(
         llm_started = time.perf_counter()
         llm_calls = 1
         if token_sink is None:
-            message = agent_module._ollama_chat(messages, [])
+            sensitivity = sensitivity_for_ids(evidence_knowledge_base_ids(evidence))
+            message = agent_module._ollama_chat(messages, [], sensitivity=sensitivity)
             final_answer = str(message.get("content") or "").strip()
         else:
             native_stream = True
             chunks: list[str] = []
-            for text in ollama_chat_stream(messages):
+            sensitivity = sensitivity_for_ids(evidence_knowledge_base_ids(evidence))
+            for text in ollama_chat_stream(messages, sensitivity=sensitivity):
                 chunks.append(text)
                 token_sink(text)
             final_answer = "".join(chunks).strip()
