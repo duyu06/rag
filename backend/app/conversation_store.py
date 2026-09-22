@@ -38,6 +38,14 @@ class ConversationStore:
         finally:
             connection.close()
 
+    def ping(self) -> bool:
+        try:
+            with self.connect() as db:
+                row = db.execute("SELECT 1 AS ok").fetchone()
+                return bool(row and int(row["ok"]) == 1)
+        except Exception:
+            return False
+
     def initialize(self) -> None:
         with self.connect() as db:
             db.executescript(
@@ -325,4 +333,11 @@ class ConversationStore:
                 )
 
 
-conversation_store = ConversationStore()
+from app.config import settings
+
+if str(settings.conversation_store_backend or "sqlite").lower() == "postgres":
+    from app.postgres_conversation_store import PostgresConversationStore
+
+    conversation_store = PostgresConversationStore()
+else:
+    conversation_store = ConversationStore(settings.conversation_db_path)
