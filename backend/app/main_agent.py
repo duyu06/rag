@@ -4,6 +4,7 @@ from app.agent_routes import router as agent_router
 from app.config import settings
 from app.conversation_routes import router as conversation_router
 from app.conversation_stream_routes import router as conversation_stream_router
+from app.enterprise_routes import router as enterprise_router
 from app.llm_admin_routes import router as llm_admin_router
 from app.main import app
 from app.llm_provider import current_provider_name
@@ -75,5 +76,6 @@ def yaoke_health():
 
 app.include_router(agent_router)
 app.include_router(llm_admin_router)
+app.include_router(enterprise_router)
 app.include_router(conversation_router)
 app.include_router(conversation_stream_router)
