@@ -5,6 +5,8 @@ from threading import Lock
 from time import time
 from typing import Any
 
+from app.observability import observe_llm_attempt
+
 
 @dataclass
 class ProviderMetrics:
@@ -27,6 +29,7 @@ _STATS: dict[str, ProviderMetrics] = {}
 def record_llm_attempt(
     *,
     provider: str,
+    model: str = "unknown",
     success: bool,
     latency_ms: float,
     timeout: bool = False,
@@ -48,6 +51,17 @@ def record_llm_attempt(
         item.total_latency_ms += max(0.0, float(latency_ms or 0.0))
         item.last_error = None if success else str(error_type or "unknown")
         item.last_updated_at = time()
+
+    observe_llm_attempt(
+        provider=key,
+        model=str(model or "unknown"),
+        success=success,
+        latency_ms=latency_ms,
+        timeout=timeout,
+        fallback_index=fallback_index,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
 
 
 def llm_metrics_snapshot() -> dict[str, dict[str, Any]]:
