@@ -31,6 +31,26 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_timeout_seconds: int = Field(default=120, ge=1, le=600)
 
+    # Enterprise model router / gateway.
+    llm_router_enabled: bool = True
+    llm_router_fallback_providers: str = "qwen,ollama"
+    llm_router_max_attempts: int = Field(default=3, ge=1, le=5)
+    llm_router_failure_window: int = Field(default=20, ge=5, le=200)
+    llm_router_failure_threshold: float = Field(default=0.30, ge=0.05, le=1.0)
+    llm_router_cooldown_seconds: int = Field(default=60, ge=5, le=3600)
+    llm_external_internal_allowed: bool = True
+    llm_external_confidential_allowed: bool = False
+
+    # Provider-specific fallback credentials. Keys stay server-side and are never
+    # returned by health/admin APIs.
+    deepseek_api_key: SecretStr = SecretStr("")
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-flash"
+
+    qwen_api_key: SecretStr = SecretStr("")
+    qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    qwen_model: str = "qwen-plus"
+
     # Controlled web search backend. Agent mode decides whether the tool is exposed to Ornith.
     web_search_enabled: bool = True
     web_search_backend: str = "auto"
