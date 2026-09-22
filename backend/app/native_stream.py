@@ -6,17 +6,24 @@ from typing import Any, Iterator
 import httpx
 
 from app.config import settings
+from app.llm_provider import current_provider_name, stream_chat
 
 
 def ollama_chat_stream(messages: list[dict[str, Any]]) -> Iterator[str]:
-    """Yield visible synthesis text from Ollama's native NDJSON stream.
+    """Yield visible synthesis text from the active provider.
 
-    This helper is intentionally used only for final synthesis turns where tools
-    are disabled. Tool-routing turns remain buffered so partial tool-call JSON is
-    never exposed to the client. A stream is successful only after Ollama emits
-    `done: true`; otherwise the caller must persist the turn as failed rather than
-    accepting a truncated answer.
+    The historical function name is preserved for compatibility. Ollama keeps its
+    native NDJSON path; OpenAI-compatible providers (including DeepSeek) use SSE.
+    Tool-routing turns remain buffered so partial tool-call JSON is never exposed.
     """
+    if current_provider_name() != "ollama":
+        yield from stream_chat(
+            messages,
+            temperature=0.2,
+            max_tokens=int(settings.agent_num_predict_synthesis),
+            think=bool(settings.agent_think_synthesis),
+        )
+        return
     payload: dict[str, Any] = {
         "model": settings.ollama_model,
         "stream": True,
