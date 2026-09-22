@@ -1,54 +1,51 @@
 from __future__ import annotations
 
-import os
-import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Iterator
 from uuid import uuid4
+
+import psycopg
+from psycopg import Connection
+from psycopg.rows import dict_row
+
+from app.config import settings
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class ConversationStore:
-    """Small SQLite persistence layer for demo/standalone deployments.
+class PostgresConversationStore:
+    """PostgreSQL conversation persistence for multi-instance production."""
 
-    The database lives under backend/data by default. Docker already bind-mounts
-    that directory, so chat history survives container rebuilds.
-    """
-
-    def __init__(self, path: str | None = None) -> None:
-        configured = path or os.getenv("CONVERSATION_DB_PATH", "data/conversations.db")
-        self.path = Path(configured).expanduser()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, dsn: str | None = None) -> None:
+        configured = dsn or settings.postgres_dsn.get_secret_value()
+        if not configured:
+            raise RuntimeError("POSTGRES_DSN is required for postgres conversation store")
+        self.dsn = configured
         self.initialize()
 
     @contextmanager
-    def connect(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self.path, timeout=30.0)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA journal_mode = WAL")
-        try:
+    def connect(self) -> Iterator[Connection]:
+        with psycopg.connect(
+            self.dsn,
+            connect_timeout=int(settings.postgres_connect_timeout_seconds),
+            row_factory=dict_row,
+        ) as connection:
             yield connection
-            connection.commit()
-        finally:
-            connection.close()
 
     def ping(self) -> bool:
         try:
             with self.connect() as db:
                 row = db.execute("SELECT 1 AS ok").fetchone()
-                return bool(row and int(row["ok"]) == 1)
+                return bool(row and row["ok"] == 1)
         except Exception:
             return False
 
     def initialize(self) -> None:
         with self.connect() as db:
-            db.executescript(
+            db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS conversations (
                     id TEXT PRIMARY KEY,
@@ -58,44 +55,54 @@ class ConversationStore:
                     knowledge_base_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_conversations_user_updated
-                    ON conversations(username, updated_at DESC);
-
+                )
+                """
+            )
+            db.execute(
+                """CREATE INDEX IF NOT EXISTS idx_conversations_user_updated
+                   ON conversations(username, updated_at DESC)"""
+            )
+            db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS messages (
                     id TEXT PRIMARY KEY,
-                    conversation_id TEXT NOT NULL,
+                    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
                     role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
                     content TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'completed'
                         CHECK(status IN ('generating', 'completed', 'failed')),
                     trace_id TEXT,
-                    latency_ms REAL,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
-                );
-                CREATE INDEX IF NOT EXISTS idx_messages_conversation_created
-                    ON messages(conversation_id, created_at ASC);
-
+                    latency_ms DOUBLE PRECISION,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            db.execute(
+                """CREATE INDEX IF NOT EXISTS idx_messages_conversation_created
+                   ON messages(conversation_id, created_at ASC)"""
+            )
+            db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS message_sources (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    message_id TEXT NOT NULL,
+                    id BIGSERIAL PRIMARY KEY,
+                    message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
                     citation_index INTEGER,
                     source_type TEXT NOT NULL DEFAULT 'enterprise',
                     title TEXT,
                     file_name TEXT,
                     page INTEGER,
                     content_preview TEXT NOT NULL DEFAULT '',
-                    relevance_score REAL,
+                    relevance_score DOUBLE PRECISION,
                     knowledge_base_id TEXT,
                     knowledge_base_name TEXT,
                     url TEXT,
-                    domain TEXT,
-                    FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE
-                );
-                CREATE INDEX IF NOT EXISTS idx_sources_message
-                    ON message_sources(message_id, citation_index ASC);
+                    domain TEXT
+                )
                 """
+            )
+            db.execute(
+                """CREATE INDEX IF NOT EXISTS idx_sources_message
+                   ON message_sources(message_id, citation_index ASC)"""
             )
 
     def create(
@@ -112,7 +119,7 @@ class ConversationStore:
             db.execute(
                 """INSERT INTO conversations
                 (id, username, title, mode, knowledge_base_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                 (conversation_id, username, title.strip() or "新会话", mode, knowledge_base_id, now, now),
             )
         return self.get(conversation_id, username=username)
@@ -120,7 +127,7 @@ class ConversationStore:
     def owner(self, conversation_id: str) -> str | None:
         with self.connect() as db:
             row = db.execute(
-                "SELECT username FROM conversations WHERE id = ?", (conversation_id,)
+                "SELECT username FROM conversations WHERE id = %s", (conversation_id,)
             ).fetchone()
         return str(row["username"]) if row else None
 
@@ -144,10 +151,10 @@ class ConversationStore:
                        ) AS last_message_preview
                 FROM conversations c
                 LEFT JOIN messages m ON m.conversation_id = c.id
-                WHERE c.username = ?
+                WHERE c.username = %s
                 GROUP BY c.id
                 ORDER BY c.updated_at DESC
-                LIMIT ?
+                LIMIT %s
                 """,
                 (username, max(1, min(limit, 200))),
             ).fetchall()
@@ -157,10 +164,12 @@ class ConversationStore:
         self.require_owner(conversation_id, username)
         with self.connect() as db:
             conversation = db.execute(
-                "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+                "SELECT * FROM conversations WHERE id = %s", (conversation_id,)
             ).fetchone()
+            if conversation is None:
+                raise KeyError("Conversation 不存在")
             message_rows = db.execute(
-                "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+                "SELECT * FROM messages WHERE conversation_id = %s ORDER BY created_at ASC",
                 (conversation_id,),
             ).fetchall()
             messages: list[dict[str, Any]] = []
@@ -171,7 +180,7 @@ class ConversationStore:
                               content_preview, relevance_score, knowledge_base_id,
                               knowledge_base_name, url, domain
                        FROM message_sources
-                       WHERE message_id = ?
+                       WHERE message_id = %s
                        ORDER BY citation_index ASC, id ASC""",
                     (message["id"],),
                 ).fetchall()
@@ -192,29 +201,32 @@ class ConversationStore:
         fields: list[str] = []
         values: list[Any] = []
         if title is not None:
-            fields.append("title = ?")
+            fields.append("title = %s")
             values.append(title.strip()[:80] or "新会话")
         if mode is not None:
-            fields.append("mode = ?")
+            fields.append("mode = %s")
             values.append(mode)
         if knowledge_base_id is not ...:
-            fields.append("knowledge_base_id = ?")
+            fields.append("knowledge_base_id = %s")
             values.append(knowledge_base_id)
-        fields.append("updated_at = ?")
+        fields.append("updated_at = %s")
         values.append(utc_now())
         values.append(conversation_id)
         with self.connect() as db:
-            db.execute(f"UPDATE conversations SET {', '.join(fields)} WHERE id = ?", values)
+            db.execute(
+                f"UPDATE conversations SET {', '.join(fields)} WHERE id = %s",
+                values,
+            )
         return self.get(conversation_id, username=username)
 
     def delete(self, conversation_id: str, *, username: str) -> None:
         self.require_owner(conversation_id, username)
         with self.connect() as db:
-            db.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+            db.execute("DELETE FROM conversations WHERE id = %s", (conversation_id,))
 
     @staticmethod
     def _insert_sources(
-        db: sqlite3.Connection,
+        db: Connection,
         message_id: str,
         sources: list[dict[str, Any]] | None,
     ) -> None:
@@ -224,7 +236,7 @@ class ConversationStore:
                 (message_id, citation_index, source_type, title, file_name, page,
                  content_preview, relevance_score, knowledge_base_id,
                  knowledge_base_name, url, domain)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (
                     message_id,
                     source.get("citation_index"),
@@ -260,12 +272,12 @@ class ConversationStore:
             db.execute(
                 """INSERT INTO messages
                 (id, conversation_id, role, content, status, trace_id, latency_ms, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                 (message_id, conversation_id, role, content, status, trace_id, latency_ms, now),
             )
             self._insert_sources(db, message_id, sources)
             db.execute(
-                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                "UPDATE conversations SET updated_at = %s WHERE id = %s",
                 (now, conversation_id),
             )
         return self.get(conversation_id, username=username)["messages"][-1]
@@ -282,30 +294,25 @@ class ConversationStore:
         latency_ms: float | None = None,
         sources: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Replace one persisted message in place, including all Citation rows.
-
-        Retry uses this method so a failed assistant turn keeps the same message id
-        and does not create a duplicate user/assistant pair in conversation history.
-        """
         self.require_owner(conversation_id, username)
         now = utc_now()
         with self.connect() as db:
             row = db.execute(
-                "SELECT id FROM messages WHERE id = ? AND conversation_id = ?",
+                "SELECT id FROM messages WHERE id = %s AND conversation_id = %s",
                 (message_id, conversation_id),
             ).fetchone()
             if row is None:
                 raise KeyError("Message 不存在")
             db.execute(
                 """UPDATE messages
-                   SET content = ?, status = ?, trace_id = ?, latency_ms = ?
-                   WHERE id = ? AND conversation_id = ?""",
+                   SET content = %s, status = %s, trace_id = %s, latency_ms = %s
+                   WHERE id = %s AND conversation_id = %s""",
                 (content, status, trace_id, latency_ms, message_id, conversation_id),
             )
-            db.execute("DELETE FROM message_sources WHERE message_id = ?", (message_id,))
+            db.execute("DELETE FROM message_sources WHERE message_id = %s", (message_id,))
             self._insert_sources(db, message_id, sources)
             db.execute(
-                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                "UPDATE conversations SET updated_at = %s WHERE id = %s",
                 (now, conversation_id),
             )
 
@@ -321,25 +328,15 @@ class ConversationStore:
         self.require_owner(conversation_id, username)
         with self.connect() as db:
             row = db.execute(
-                "SELECT title, (SELECT COUNT(*) FROM messages WHERE conversation_id = ?) AS count FROM conversations WHERE id = ?",
+                """SELECT title,
+                          (SELECT COUNT(*) FROM messages WHERE conversation_id = %s) AS count
+                   FROM conversations WHERE id = %s""",
                 (conversation_id, conversation_id),
             ).fetchone()
             if row and row["title"] == "新会话" and int(row["count"] or 0) <= 1:
                 normalized = " ".join(question.strip().split())
                 title = normalized[:28] + ("…" if len(normalized) > 28 else "")
                 db.execute(
-                    "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
+                    "UPDATE conversations SET title = %s, updated_at = %s WHERE id = %s",
                     (title or "新会话", utc_now(), conversation_id),
                 )
-
-
-_STORE_BACKEND = os.getenv("CONVERSATION_STORE_BACKEND", "sqlite").strip().lower()
-
-if _STORE_BACKEND == "postgres":
-    from app.postgres_conversation_store import PostgresConversationStore
-
-    conversation_store = PostgresConversationStore()
-else:
-    conversation_store = ConversationStore(
-        os.getenv("CONVERSATION_DB_PATH", "data/conversations.db")
-    )

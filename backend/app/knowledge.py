@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
+
+Sensitivity = Literal["public", "internal", "confidential", "restricted"]
 
 KNOWLEDGE_BASES: dict[str, dict[str, str]] = {
     "kb_public": {
@@ -8,30 +10,35 @@ KNOWLEDGE_BASES: dict[str, dict[str, str]] = {
         "name": "公共制度",
         "description": "全员可访问的公司制度、通用规范与公告",
         "department": "ALL",
+        "sensitivity": "public",
     },
     "kb_hr": {
         "id": "kb_hr",
         "name": "HR 知识库",
         "description": "人事制度、员工手册、招聘与薪酬相关资料",
         "department": "HR",
+        "sensitivity": "restricted",
     },
     "kb_product": {
         "id": "kb_product",
         "name": "产品知识库",
         "description": "产品说明书、参数、FAQ 与交付文档",
         "department": "PRODUCT",
+        "sensitivity": "internal",
     },
     "kb_sales": {
         "id": "kb_sales",
         "name": "销售知识库",
         "description": "销售政策、折扣规则、客户沟通与渠道资料",
         "department": "SALES",
+        "sensitivity": "confidential",
     },
     "kb_service": {
         "id": "kb_service",
         "name": "售后知识库",
         "description": "售后 SOP、退款规则、维修与服务规范",
         "department": "SERVICE",
+        "sensitivity": "internal",
     },
 }
 
@@ -66,3 +73,39 @@ def get_base(knowledge_base_id: str) -> dict[str, str]:
     if knowledge_base_id not in KNOWLEDGE_BASES:
         raise ValueError("知识库不存在")
     return dict(KNOWLEDGE_BASES[knowledge_base_id])
+
+
+_SENSITIVITY_RANK: dict[str, int] = {
+    "public": 0,
+    "internal": 1,
+    "confidential": 2,
+    "restricted": 3,
+}
+
+
+def sensitivity_for_ids(knowledge_base_ids: list[str] | None) -> Sensitivity:
+    """Return the highest sensitivity in the requested/evidence scope."""
+    if not knowledge_base_ids:
+        return "public"
+    highest = "public"
+    highest_rank = 0
+    for knowledge_base_id in knowledge_base_ids:
+        item = KNOWLEDGE_BASES.get(str(knowledge_base_id))
+        if not item:
+            continue
+        sensitivity = str(item.get("sensitivity") or "internal")
+        rank = _SENSITIVITY_RANK.get(sensitivity, 1)
+        if rank > highest_rank:
+            highest = sensitivity
+            highest_rank = rank
+    return highest  # type: ignore[return-value]
+
+
+def evidence_knowledge_base_ids(rows: list[dict[str, Any]]) -> list[str]:
+    return sorted(
+        {
+            str(row.get("knowledge_base_id"))
+            for row in rows
+            if row.get("knowledge_base_id")
+        }
+    )

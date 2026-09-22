@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Literal
 
-import httpx
+import httpx  # compatibility hook for existing integration stubs
+from typing import Any, Literal
 
 from app.agent_trace import new_trace_id, public_args, save_trace, utc_now
 from app.audit import record_event
 from app.auth import CurrentUser
 from app.config import settings
-from app.knowledge import allowed_ids, visible_bases
+from app.knowledge import allowed_ids, sensitivity_for_ids, visible_bases
+from app.llm_provider import current_model_name
+from app.llm_router import RouteContext, routed_chat_message
 from app.tools.base import AgentMode, ToolContext, ToolExecutionError
 from app.tools.registry import tool_registry
 
-AGENT_SYSTEM_PROMPT = """You are yaoke Agent running with the local Ornith model.
+AGENT_SYSTEM_PROMPT = """You are yaoke Agent. The active model may be local or API-hosted.
 You may answer simple conversation directly, but factual enterprise or current external questions should use tools.
 Rules:
 1. Internal policies, HR, product parameters, sales rules and after-sales SOPs: use enterprise_search.
@@ -35,9 +37,12 @@ def _mode_prompt(mode: AgentMode) -> str:
     return "Mode=auto. Choose enterprise_search for internal facts and web_search only when public/current information is needed."
 
 
-def _ollama_chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
-    # Routing turns benefit from model reasoning. Evidence-only synthesis (no tools)
-    # should be fast, bounded and keep the already-loaded local model resident.
+def _ollama_chat(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    *,
+    sensitivity: str = "public",
+) -> dict[str, Any]:
     routing_turn = bool(tools)
     think = settings.agent_think_tool_routing if routing_turn else settings.agent_think_synthesis
     num_predict = (
@@ -45,28 +50,19 @@ def _ollama_chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]]) ->
         if routing_turn
         else settings.agent_num_predict_synthesis
     )
-    payload: dict[str, Any] = {
-        "model": settings.ollama_model,
-        "stream": False,
-        "think": bool(think),
-        "keep_alive": settings.ollama_keep_alive,
-        "messages": messages,
-        "tools": tools,
-        "options": {
-            "temperature": 0.2,
-            "num_predict": int(num_predict),
-        },
-    }
-    response = httpx.post(
-        settings.ollama_base_url.rstrip("/") + "/api/chat",
-        json=payload,
-        timeout=settings.agent_llm_timeout_seconds,
+    return routed_chat_message(
+        messages,
+        tools,
+        temperature=0.2,
+        max_tokens=int(num_predict),
+        think=bool(think),
+        context=RouteContext(
+            sensitivity=sensitivity,
+            requires_tools=routing_turn,
+            requires_reasoning=bool(think),
+            mode="agent",
+        ),
     )
-    response.raise_for_status()
-    message = response.json().get("message")
-    if not isinstance(message, dict):
-        raise RuntimeError("Ollama 返回缺少 message")
-    return message
 
 
 def _tool_arguments(call: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -149,6 +145,12 @@ def run_agent(
     trace_id = new_trace_id()
     started = time.perf_counter()
     allowed = allowed_ids(user.role)
+    route_scope = (
+        [knowledge_base_id]
+        if knowledge_base_id and knowledge_base_id not in {"", "all"}
+        else (allowed if mode == "local" else [])
+    )
+    route_sensitivity = sensitivity_for_ids(route_scope)
     visible = ", ".join(f"{item['id']}={item['name']}" for item in visible_bases(user.role))
     history_messages = _conversation_history(history)
     system = (
@@ -181,10 +183,14 @@ def run_agent(
     max_rounds = max(1, min(int(settings.agent_max_tool_rounds), 6))
 
     for round_index in range(1, max_rounds + 1):
-        message = _ollama_chat(messages, schemas)
+        message = _ollama_chat(messages, schemas, sensitivity=route_sensitivity)
         tool_calls = message.get("tool_calls") or []
         if not isinstance(tool_calls, list):
             tool_calls = []
+
+        route_meta = message.get("_route")
+        if isinstance(route_meta, dict):
+            events.append({"type": "model_route", "timestamp": utc_now(), **route_meta})
 
         if not tool_calls:
             final_answer = str(message.get("content") or "").strip()
@@ -289,13 +295,15 @@ def run_agent(
                 num_sources=result_count,
                 detail=f"tool={tool_name};trace_id={trace_id}",
             )
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_name": tool_name or "unknown",
-                    "content": json.dumps(result, ensure_ascii=False)[:16000],
-                }
-            )
+            tool_message: dict[str, Any] = {
+                "role": "tool",
+                "tool_name": tool_name or "unknown",
+                "content": json.dumps(result, ensure_ascii=False)[:16000],
+            }
+            tool_call_id = str(call.get("id") or "").strip() if isinstance(call, dict) else ""
+            if tool_call_id:
+                tool_message["tool_call_id"] = tool_call_id
+            messages.append(tool_message)
     else:
         messages.append(
             {
@@ -303,7 +311,7 @@ def run_agent(
                 "content": "Tool-call limit reached. Do not call more tools. Produce a final answer only from tool results already present; cite their citation_index values.",
             }
         )
-        message = _ollama_chat(messages, [])
+        message = _ollama_chat(messages, [], sensitivity=route_sensitivity)
         final_answer = str(message.get("content") or "").strip()
         events.append(
             {
@@ -330,7 +338,7 @@ def run_agent(
         "username": user.username,
         "role": user.role,
         "mode": mode,
-        "model": settings.ollama_model,
+        "model": current_model_name(),
         "max_tool_rounds": max_rounds,
         "context_messages": len(history_messages),
         "events": events,
@@ -356,7 +364,7 @@ def run_agent(
         "trace_id": trace_id,
         "sources": [_public_source(item) for item in evidence],
         "num_sources": len(evidence),
-        "model_used": settings.ollama_model,
+        "model_used": current_model_name(),
         "max_tool_rounds": max_rounds,
         "context_messages": len(history_messages),
     }

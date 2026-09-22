@@ -16,3 +16,6 @@ frontend/.env.local
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local disaster-recovery artifacts
+backups/

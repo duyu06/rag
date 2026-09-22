@@ -124,7 +124,7 @@ def login(client, username: str, password: str) -> tuple[str, dict]:
     return str(data["access_token"]), dict(data["user"])
 
 
-def fake_ornith_chat(messages: list[dict], tools: list[dict]) -> dict:
+def fake_ornith_chat(messages: list[dict], tools: list[dict], **_kwargs) -> dict:
     """CI-only Ornith boundary stub.
 
     It emits the same tool_calls shape expected from Ollama/Ornith, while every tool

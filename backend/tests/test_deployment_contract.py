@@ -13,6 +13,15 @@ class DeploymentContractsTest(unittest.TestCase):
         self.assertIn("./backend/data:/app/data", compose)
         self.assertIn("OLLAMA_BASE_URL: http://host.docker.internal:11434", compose)
 
+    def test_runtime_containers_drop_root_privileges(self):
+        backend = (ROOT / "backend/Dockerfile").read_text(encoding="utf-8")
+        frontend = (ROOT / "frontend/Dockerfile").read_text(encoding="utf-8")
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        self.assertIn("USER 10001:10001", backend)
+        self.assertIn("USER node", frontend)
+        self.assertIn("no-new-privileges:true", compose)
+        self.assertIn('127.0.0.1:6333:6333', compose)
+
     def test_windows_deploy_script_validates_real_runtime(self):
         script = (ROOT / "scripts/deploy.ps1").read_text(encoding="utf-8")
         for marker in (

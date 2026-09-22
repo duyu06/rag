@@ -43,7 +43,7 @@ def main() -> int:
     import app.agent as agent_module
     from app.main_agent import app
 
-    def fake_chat(messages: list[dict], tools: list[dict]) -> dict:
+    def fake_chat(messages: list[dict], tools: list[dict], **_kwargs) -> dict:
         if not tools and any(
             "AUTHORIZED_ENTERPRISE_EVIDENCE=" in str(m.get("content") or "")
             for m in messages

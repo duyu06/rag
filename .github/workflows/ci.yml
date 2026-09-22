@@ -16,6 +16,8 @@ jobs:
           python-version: '3.12'
       - run: python -m compileall -q backend/app scripts
       - run: python scripts/validate_demo_assets.py
+      - name: Scan repository and Git history for high-confidence secrets
+        run: python scripts/secret_scan.py
       - run: python -m unittest discover -s backend/tests -p 'test_*.py' -v
       - name: Validate Docker Compose configuration
         run: |
@@ -48,6 +50,8 @@ jobs:
           "rank-bm25>=0.2.2"
           "httpx>=0.27,<1"
           "PyJWT>=2.9,<3"
+          "redis>=5,<7"
+          "prometheus-client>=0.20,<1"
           "numpy>=1.26,<3"
       - name: Run real Qdrant API/RBAC/retrieval integration
         run: python scripts/qdrant_integration.py

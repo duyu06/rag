@@ -1,9 +1,58 @@
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
+
+
+    # Runtime / perimeter security.
+    app_env: str = "development"
+    cors_allowed_origins: str = "http://localhost:3000"
+    trusted_hosts: str = "localhost,127.0.0.1,testserver"
+    security_headers_enabled: bool = True
+
+
+    # Distributed API rate limiting. Production validation requires this enabled.
+    redis_url: str = "redis://localhost:6379/0"
+    rate_limit_enabled: bool = False
+    rate_limit_fail_open: bool = False
+    rate_limit_requests_per_minute: int = Field(default=120, ge=1, le=10000)
+    rate_limit_login_per_minute: int = Field(default=20, ge=1, le=1000)
+
+
+    # Conversation persistence: SQLite for standalone demo, PostgreSQL for HA production.
+    conversation_store_backend: str = "sqlite"
+    conversation_db_path: str = "data/conversations.db"
+    postgres_dsn: SecretStr = SecretStr("")
+    postgres_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
+
+
+    # Document binary storage: local for standalone demo, S3-compatible for HA production.
+    document_store_backend: str = "local"
+    s3_bucket: str = ""
+    s3_prefix: str = "yaoke/documents"
+    s3_region: str = ""
+    s3_endpoint_url: str = ""
+    s3_access_key_id: SecretStr = SecretStr("")
+    s3_secret_access_key: SecretStr = SecretStr("")
+    s3_session_token: SecretStr = SecretStr("")
+    s3_force_path_style: bool = False
+
+
+    # Prometheus observability.
+    metrics_enabled: bool = True
+    metrics_bearer_token: SecretStr = SecretStr("")
+
+    # Authentication. Demo auth is intentionally forbidden by production validation.
+    auth_mode: str = "demo"
+    oidc_issuer: str = ""
+    oidc_audience: str = ""
+    oidc_jwks_url: str = ""
+    oidc_username_claim: str = "preferred_username"
+    oidc_display_name_claim: str = "name"
+    oidc_role_claim: str = "roles"
+    oidc_role_map_json: str = '{"admin":"ADMIN","sales":"SALES","hr":"HR"}'
 
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""
@@ -21,6 +70,35 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-mini"
+
+    # Unified generation provider. New LLM_* settings take precedence while the
+    # legacy OPENAI_* family remains supported for backwards compatibility.
+    # provider: auto | ollama | deepseek | openai | qwen | openai-compatible
+    llm_provider: str = "auto"
+    llm_base_url: str = ""
+    llm_api_key: SecretStr = SecretStr("")
+    llm_model: str = ""
+    llm_timeout_seconds: int = Field(default=120, ge=1, le=600)
+
+    # Enterprise model router / gateway.
+    llm_router_enabled: bool = True
+    llm_router_fallback_providers: str = "qwen,ollama"
+    llm_router_max_attempts: int = Field(default=3, ge=1, le=5)
+    llm_router_failure_window: int = Field(default=20, ge=5, le=200)
+    llm_router_failure_threshold: float = Field(default=0.30, ge=0.05, le=1.0)
+    llm_router_cooldown_seconds: int = Field(default=60, ge=5, le=3600)
+    llm_external_internal_allowed: bool = True
+    llm_external_confidential_allowed: bool = False
+
+    # Provider-specific fallback credentials. Keys stay server-side and are never
+    # returned by health/admin APIs.
+    deepseek_api_key: SecretStr = SecretStr("")
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-flash"
+
+    qwen_api_key: SecretStr = SecretStr("")
+    qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    qwen_model: str = "qwen-plus"
 
     # Controlled web search backend. Agent mode decides whether the tool is exposed to Ornith.
     web_search_enabled: bool = True
@@ -68,6 +146,12 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "change-me-before-production-yaoke-demo-secret"
     jwt_expire_hours: int = 8
+
+
+    # Tamper-evident audit logging. Production should provide AUDIT_HMAC_KEY
+    # through a secret store rather than source control.
+    audit_hmac_key: SecretStr = SecretStr("")
+    audit_query_max_chars: int = Field(default=240, ge=0, le=1000)
 
     # Local backend cwd is normally ./backend, so ../demo-data points to repo demo data.
     # Docker overrides this to /app/demo-data via docker-compose.

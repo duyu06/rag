@@ -8,19 +8,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.audit import recent_events, record_event, today_summary
+from app.audit import recent_events, record_event, today_summary, verify_audit_chain
 from app.auth import CurrentUser, authenticate, issue_token, require_admin, require_user
 from app.config import settings
+from app.conversation_store import conversation_store
 from app.demo import demo_status, initialize_demo, reset_demo
+from app.document_store import document_store
 from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_file
 from app.knowledge import get_base, resolve_requested, visible_bases
+from app.llm_provider import current_provider_name
+from app.observability import metrics_payload, prometheus_middleware
 from app.rag import current_model_name, generate_answer, probe_llm
+from app.rate_limit import rate_limit_middleware, rate_limit_ready
 from app.retrieval import retrieval_service
+from app.security import cors_origins, security_headers_middleware, trusted_hosts, validate_production_security
 from app.store import vector_store
 
 app = FastAPI(
@@ -30,11 +37,19 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins(),
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=trusted_hosts() or ["localhost", "127.0.0.1"],
+)
+app.middleware("http")(security_headers_middleware)
+app.middleware("http")(rate_limit_middleware)
+app.middleware("http")(prometheus_middleware)
+validate_production_security()
 
 
 class LoginRequest(BaseModel):
@@ -136,19 +151,44 @@ def root():
     }
 
 
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics(authorization: str | None = Header(default=None)):
+    payload, content_type = metrics_payload(authorization)
+    return Response(content=payload, media_type=content_type)
+
+
 @app.get("/api/ready")
 def ready():
     qdrant_ok = vector_store.ping()
-    if not qdrant_ok:
-        raise HTTPException(status_code=503, detail="Qdrant not ready")
-    return {"status": "ready", "vector_db_connected": True}
+    redis_ok, redis_detail = rate_limit_ready()
+    conversation_ok = bool(conversation_store.ping())
+    if not qdrant_ok or not redis_ok or not conversation_ok:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "qdrant": "ready" if qdrant_ok else "not_ready",
+                "rate_limit": redis_detail,
+                "conversation_store": "ready" if conversation_ok else "not_ready",
+            },
+        )
+    return {
+        "status": "ready",
+        "vector_db_connected": True,
+        "rate_limit_ready": redis_ok,
+        "rate_limit_detail": redis_detail,
+        "conversation_store_ready": conversation_ok,
+        "conversation_store_backend": str(settings.conversation_store_backend),
+    }
 
 
 @app.get("/api/health")
 def health():
     qdrant_ok = vector_store.ping()
     llm_ok, llm_detail = probe_llm()
-    provider = "openai-compatible" if settings.openai_api_key else "ollama"
+    try:
+        provider = current_provider_name()
+    except Exception:
+        provider = str(settings.llm_provider or "auto")
     return {
         "status": "healthy" if (qdrant_ok and llm_ok) else "degraded",
         "vector_db_connected": qdrant_ok,
@@ -156,12 +196,19 @@ def health():
         "llm_detail": llm_detail,
         "ollama_connected": llm_ok if provider == "ollama" else False,
         "llm_provider": provider,
-        "llm_model": current_model_name(),
+        "llm_model": (
+            current_model_name()
+            if llm_ok
+            else str(settings.llm_model or settings.ollama_model)
+        ),
+        "rate_limit_enabled": bool(settings.rate_limit_enabled),
     }
 
 
 @app.post("/api/auth/login")
 def login(request: LoginRequest):
+    if str(settings.auth_mode or "demo").lower() != "demo":
+        raise HTTPException(status_code=404, detail="本地密码登录已禁用，请使用企业 SSO")
     user = authenticate(request.username.strip(), request.password)
     if not user:
         record_event(
@@ -226,7 +273,7 @@ def audit_log(
     user: CurrentUser = Depends(require_user),
 ):
     require_admin(user)
-    return {"events": recent_events(limit), "summary": today_summary()}
+    return {"events": recent_events(limit), "summary": today_summary(), "integrity": verify_audit_chain()}
 
 
 @app.post("/api/ingest")
@@ -256,10 +303,15 @@ async def ingest(
     path.write_bytes(content)
     try:
         chunk_count = ingest_file(path, knowledge_base_id)
+        document_store.put(knowledge_base_id, safe_name, content)
     except Exception as exc:
-        path.unlink(missing_ok=True)
+        if str(settings.document_store_backend).lower() == "s3":
+            path.unlink(missing_ok=True)
         _audit(user, "INGEST", status="FAILED", knowledge_base_id=knowledge_base_id, detail=str(exc))
         raise HTTPException(status_code=500, detail=f"文档处理失败：{exc}") from exc
+    finally:
+        if str(settings.document_store_backend).lower() == "s3":
+            path.unlink(missing_ok=True)
 
     _audit(
         user,
@@ -296,32 +348,30 @@ def documents(
     )
 
     result = []
-    for kb_id in kb_ids:
-        base = get_base(kb_id)
-        directory = DOC_DIR / kb_id
-        if not directory.exists():
-            continue
-        for path in sorted(directory.glob("*"), key=lambda item: item.stat().st_mtime, reverse=True):
-            if not path.is_file():
-                continue
-            stat = path.stat()
-            result.append(
-                {
-                    "file_name": path.name,
-                    "file_type": path.suffix.lower().lstrip("."),
-                    "file_size_kb": round(stat.st_size / 1024, 2),
-                    "upload_date": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    "chunk_count": counts.get((kb_id, path.name), 0),
-                    "knowledge_base_id": kb_id,
-                    "knowledge_base_name": base["name"],
-                }
-            )
+    try:
+        for kb_id in kb_ids:
+            base = get_base(kb_id)
+            for item in document_store.list(kb_id):
+                result.append(
+                    {
+                        "file_name": item.file_name,
+                        "file_type": Path(item.file_name).suffix.lower().lstrip("."),
+                        "file_size_kb": round(item.size_bytes / 1024, 2),
+                        "upload_date": item.last_modified,
+                        "chunk_count": counts.get((kb_id, item.file_name), 0),
+                        "knowledge_base_id": kb_id,
+                        "knowledge_base_name": base["name"],
+                    }
+                )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"文档存储不可用：{type(exc).__name__}") from exc
 
-    result.sort(key=lambda item: item["upload_date"], reverse=True)
+    result.sort(key=lambda item: str(item.get("upload_date") or ""), reverse=True)
     return {
         "documents": result,
         "total_documents": len(result),
         "total_chunks": sum(counts.values()),
+        "storage_backend": str(settings.document_store_backend),
     }
 
 
@@ -333,12 +383,19 @@ def source_document(
 ):
     _allowed_ids(user, knowledge_base_id)
     safe_name = Path(file_name).name
-    path = document_path(knowledge_base_id, safe_name)
-    if not path.exists() or not path.is_file():
-        raise HTTPException(status_code=404, detail="来源文件不存在")
-    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    try:
+        content = document_store.get(knowledge_base_id, safe_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="来源文件不存在") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="文档存储暂不可用") from exc
+    media_type = mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
     _audit(user, "SOURCE_VIEW", knowledge_base_id=knowledge_base_id, detail=safe_name)
-    return FileResponse(path, media_type=media_type)
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{safe_name}"'},
+    )
 
 
 @app.delete("/api/documents/{file_name}")
@@ -360,6 +417,11 @@ def delete_document(
         _audit(user, "DELETE", status="FAILED", knowledge_base_id=knowledge_base_id, detail=str(exc))
         raise HTTPException(status_code=503, detail=f"删除向量失败：{exc}") from exc
 
+    try:
+        document_store.delete(knowledge_base_id, safe_name)
+    except Exception as exc:
+        _audit(user, "DELETE", status="FAILED", knowledge_base_id=knowledge_base_id, detail=f"storage:{type(exc).__name__}")
+        raise HTTPException(status_code=503, detail="文档存储删除失败") from exc
     document_path(knowledge_base_id, safe_name).unlink(missing_ok=True)
     _audit(user, "DELETE", knowledge_base_id=knowledge_base_id, detail=safe_name)
     return {"success": True, "message": "文档已删除"}
