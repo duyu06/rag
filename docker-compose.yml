@@ -15,7 +15,7 @@ services:
     image: qdrant/qdrant:v1.19.1
     restart: unless-stopped
     ports:
-      - "6333:6333"
+      - "127.0.0.1:6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
@@ -28,6 +28,9 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - ./backend/.env
     environment:
@@ -56,6 +59,9 @@ services:
       start_period: 10s
 
   frontend:
+    init: true
+    security_opt:
+      - no-new-privileges:true
     build:
       context: ./frontend
       args:
