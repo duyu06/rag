@@ -14,7 +14,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.audit import recent_events, record_event, today_summary
+from app.audit import recent_events, record_event, today_summary, verify_audit_chain
 from app.auth import CurrentUser, authenticate, issue_token, require_admin, require_user
 from app.config import settings
 from app.demo import demo_status, initialize_demo, reset_demo
@@ -240,7 +240,7 @@ def audit_log(
     user: CurrentUser = Depends(require_user),
 ):
     require_admin(user)
-    return {"events": recent_events(limit), "summary": today_summary()}
+    return {"events": recent_events(limit), "summary": today_summary(), "integrity": verify_audit_chain()}
 
 
 @app.post("/api/ingest")
