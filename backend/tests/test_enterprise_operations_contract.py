@@ -20,6 +20,19 @@ class EnterpriseOperationsContractsTest(unittest.TestCase):
         self.assertIn('priority": "snapshot"', restore)
         self.assertIn("safe_extract", restore)
 
+    def test_prometheus_observability_covers_http_and_llm_gateway(self):
+        obs = (ROOT / "backend/app/observability.py").read_text(encoding="utf-8")
+        main = (ROOT / "backend/app/main.py").read_text(encoding="utf-8")
+        security = (ROOT / "backend/app/security.py").read_text(encoding="utf-8")
+        self.assertIn("yaoke_http_requests_total", obs)
+        self.assertIn("yaoke_http_request_duration_seconds", obs)
+        self.assertIn("yaoke_llm_requests_total", obs)
+        self.assertIn("yaoke_llm_request_duration_seconds", obs)
+        self.assertIn("yaoke_llm_tokens_total", obs)
+        self.assertIn("metrics_payload", main)
+        self.assertIn("prometheus_middleware", main)
+        self.assertIn("METRICS_BEARER_TOKEN is required", security)
+
     def test_postgres_conversation_store_supports_multi_instance_backend(self):
         store = (ROOT / "backend/app/postgres_conversation_store.py").read_text(encoding="utf-8")
         factory = (ROOT / "backend/app/conversation_store.py").read_text(encoding="utf-8")
