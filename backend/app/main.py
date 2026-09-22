@@ -8,10 +8,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.audit import recent_events, record_event, today_summary, verify_audit_chain
@@ -22,6 +22,7 @@ from app.demo import demo_status, initialize_demo, reset_demo
 from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_file
 from app.knowledge import get_base, resolve_requested, visible_bases
 from app.llm_provider import current_provider_name
+from app.observability import metrics_payload, prometheus_middleware
 from app.rag import current_model_name, generate_answer, probe_llm
 from app.rate_limit import rate_limit_middleware, rate_limit_ready
 from app.retrieval import retrieval_service
@@ -46,6 +47,7 @@ app.add_middleware(
 )
 app.middleware("http")(security_headers_middleware)
 app.middleware("http")(rate_limit_middleware)
+app.middleware("http")(prometheus_middleware)
 validate_production_security()
 
 
@@ -146,6 +148,12 @@ def root():
         "health": "/api/health",
         "ready": "/api/ready",
     }
+
+
+@app.get("/metrics", include_in_schema=False)
+def prometheus_metrics(authorization: str | None = Header(default=None)):
+    payload, content_type = metrics_payload(authorization)
+    return Response(content=payload, media_type=content_type)
 
 
 @app.get("/api/ready")
