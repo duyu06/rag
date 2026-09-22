@@ -3,6 +3,12 @@ from __future__ import annotations
 import httpx
 
 from app.config import settings
+from app.llm_provider import (
+    chat_message,
+    current_model_name as provider_current_model_name,
+    probe_llm as provider_probe_llm,
+    probe_ollama as provider_probe_ollama,
+)
 from app.web_search import clean_question, search_web, wants_web_search
 
 SYSTEM_PROMPT = """你是 yaoke 企业知识助手。
@@ -34,10 +40,8 @@ def build_context(rows: list[dict]) -> str:
 
 
 def current_model_name() -> str:
-    """Model used by the legacy RAG answer path."""
-    if settings.openai_api_key:
-        return settings.openai_model
-    return settings.ollama_model
+    """Model used by the active generation provider."""
+    return provider_current_model_name()
 
 
 def _ollama_model_installed(models: list[dict], wanted_model: str) -> bool:
@@ -59,35 +63,13 @@ def _ollama_model_installed(models: list[dict], wanted_model: str) -> bool:
 
 
 def probe_ollama(timeout: float = 2.5) -> tuple[bool, str]:
-    """Probe the Ollama model that the P1.4 Tool Calling Agent actually uses."""
-    try:
-        response = httpx.get(
-            settings.ollama_base_url.rstrip("/") + "/api/tags",
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        models = response.json().get("models", [])
-        if not _ollama_model_installed(models, settings.ollama_model):
-            return False, f"Ollama 已连接，但未发现模型 {settings.ollama_model}"
-        return True, f"model={settings.ollama_model}"
-    except Exception as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+    """Backwards-compatible Ollama health probe."""
+    return provider_probe_ollama(timeout)
 
 
 def probe_llm(timeout: float = 2.5) -> tuple[bool, str]:
-    """Probe the provider used by the legacy RAG answer path."""
-    if not settings.openai_api_key:
-        return probe_ollama(timeout)
-    try:
-        response = httpx.get(
-            settings.openai_base_url.rstrip("/") + "/models",
-            headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        return True, "openai-compatible"
-    except Exception as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+    """Probe the active generation provider."""
+    return provider_probe_llm(timeout)
 
 
 def _append_web_sources(answer: str, enterprise_count: int, web_rows: list[dict]) -> str:
@@ -135,38 +117,14 @@ def generate_answer(question: str, rows: list[dict]) -> str:
 请给出答案，并对关键结论标注引用编号。"""
 
     try:
-        if settings.openai_api_key:
-            url = settings.openai_base_url.rstrip("/") + "/chat/completions"
-            response = httpx.post(
-                url,
-                headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-                json={
-                    "model": settings.openai_model,
-                    "temperature": 0.1,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                },
-                timeout=120,
-            )
-            response.raise_for_status()
-            answer = str(response.json()["choices"][0]["message"]["content"])
-        else:
-            response = httpx.post(
-                settings.ollama_base_url.rstrip("/") + "/api/chat",
-                json={
-                    "model": settings.ollama_model,
-                    "stream": False,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                },
-                timeout=120,
-            )
-            response.raise_for_status()
-            answer = str(response.json()["message"]["content"])
+        message = chat_message(
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.1,
+        )
+        answer = str(message.get("content") or "")
 
         if web_error:
             answer = answer.rstrip() + "\n\n注：本次联网检索部分失败，答案主要依据已成功获得的证据。"
