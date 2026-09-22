@@ -8,10 +8,11 @@ import fitz
 from docx import Document as DocxDocument
 
 from app.config import settings
+from app.document_store import LOCAL_DOCUMENT_ROOT
 from app.knowledge import get_base
 from app.store import vector_store
 
-DOC_DIR = Path("data/documents")
+DOC_DIR = LOCAL_DOCUMENT_ROOT
 DOC_DIR.mkdir(parents=True, exist_ok=True)
 SUPPORTED_SUFFIXES = {".pdf", ".docx", ".txt", ".md"}
 MARKDOWN_HEADING = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$")
