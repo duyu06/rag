@@ -38,16 +38,24 @@ def resolve_llm_config() -> LLMRuntimeConfig:
     New LLM_* settings take precedence. Existing OPENAI_* settings remain a
     backwards-compatible fallback, and Ollama remains the zero-key default.
     """
-    provider = str(settings.llm_provider or "auto").strip().lower().replace("_", "-")
+    requested_provider = str(settings.llm_provider or "auto").strip().lower().replace("_", "-")
+    provider = requested_provider
     generic_key = _secret_value(settings.llm_api_key)
     generic_base = str(settings.llm_base_url or "").strip()
     generic_model = str(settings.llm_model or "").strip()
+    generic_configured = bool(generic_key or generic_base or generic_model)
 
     if provider in {"", "auto"}:
-        if generic_key or generic_base or generic_model:
+        if generic_configured:
             provider = "openai-compatible"
         elif str(settings.openai_api_key or "").strip():
-            provider = "openai-compatible"
+            return LLMRuntimeConfig(
+                provider="openai-compatible",
+                base_url=settings.openai_base_url.rstrip("/"),
+                api_key=str(settings.openai_api_key).strip(),
+                model=settings.openai_model,
+                is_ollama=False,
+            )
         else:
             provider = "ollama"
 
@@ -64,14 +72,6 @@ def resolve_llm_config() -> LLMRuntimeConfig:
     base_url = generic_base or (defaults[0] if defaults else "")
     model = generic_model or (defaults[1] if defaults else "")
     api_key = generic_key
-
-    # Preserve the original OPENAI_* contract when the new LLM_* family is not set.
-    if not api_key and str(settings.openai_api_key or "").strip():
-        api_key = str(settings.openai_api_key).strip()
-    if not base_url and str(settings.openai_base_url or "").strip():
-        base_url = str(settings.openai_base_url).strip()
-    if not model and str(settings.openai_model or "").strip():
-        model = str(settings.openai_model).strip()
 
     if not base_url:
         raise RuntimeError(
@@ -163,6 +163,12 @@ def chat_message(
     }
     if tools:
         payload["tools"] = tools
+    if cfg.provider == "deepseek":
+        # DeepSeek V4 enables thinking by default. Tool-calling in thinking mode
+        # requires replaying reasoning_content on every following tools request.
+        # This adapter intentionally uses non-thinking mode for tool rounds so the
+        # existing bounded Agent loop stays protocol-safe and low-latency.
+        payload["thinking"] = {"type": "disabled" if tools else ("enabled" if think else "disabled")}
     if max_tokens is not None:
         payload["max_tokens"] = int(max_tokens)
 
@@ -246,6 +252,8 @@ def stream_chat(
         "temperature": temperature,
         "messages": _openai_messages(messages),
     }
+    if cfg.provider == "deepseek":
+        payload["thinking"] = {"type": "enabled" if think else "disabled"}
     if max_tokens is not None:
         payload["max_tokens"] = int(max_tokens)
 
