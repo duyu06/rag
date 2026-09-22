@@ -21,15 +21,16 @@ class LLMProviderContractsTest(unittest.TestCase):
         self.assertIn('cfg.base_url + "/models"', provider)
         self.assertIn('payload["thinking"] = {"type": "disabled" if tools', provider)
 
-    def test_agent_and_streaming_use_provider_adapter_without_removing_ollama(self):
+    def test_agent_and_streaming_use_enterprise_router_without_removing_ollama(self):
         agent = (ROOT / "backend/app/agent.py").read_text(encoding="utf-8")
         native = (ROOT / "backend/app/native_stream.py").read_text(encoding="utf-8")
-        self.assertIn('current_provider_name() != "ollama"', agent)
-        self.assertIn("return chat_message(", agent)
-        self.assertIn('current_provider_name() != "ollama"', native)
-        self.assertIn("yield from stream_chat(", native)
-        self.assertIn('settings.ollama_base_url.rstrip("/") + "/api/chat"', agent)
-        self.assertIn("with httpx.stream(", native)
+        router = (ROOT / "backend/app/llm_router.py").read_text(encoding="utf-8")
+        provider = (ROOT / "backend/app/llm_provider.py").read_text(encoding="utf-8")
+        self.assertIn("routed_chat_message(", agent)
+        self.assertIn("routed_stream_chat(", native)
+        self.assertIn("route_candidates(", router)
+        self.assertIn('cfg.base_url + "/api/chat"', provider)
+        self.assertIn("with httpx.stream(", provider)
 
     def test_env_documents_deepseek_and_custom_provider(self):
         env = (ROOT / "backend/.env.example").read_text(encoding="utf-8")
