@@ -333,11 +333,13 @@ class ConversationStore:
                 )
 
 
-from app.config import settings
+_STORE_BACKEND = os.getenv("CONVERSATION_STORE_BACKEND", "sqlite").strip().lower()
 
-if str(settings.conversation_store_backend or "sqlite").lower() == "postgres":
+if _STORE_BACKEND == "postgres":
     from app.postgres_conversation_store import PostgresConversationStore
 
     conversation_store = PostgresConversationStore()
 else:
-    conversation_store = ConversationStore(settings.conversation_db_path)
+    conversation_store = ConversationStore(
+        os.getenv("CONVERSATION_DB_PATH", "data/conversations.db")
+    )
