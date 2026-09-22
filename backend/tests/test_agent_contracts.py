@@ -19,7 +19,7 @@ class AgentContractsTest(unittest.TestCase):
         self.assertIn("agent_max_tool_rounds: int = Field(default=3, ge=1, le=3)", config)
         self.assertIn("for round_index in range(1, max_rounds + 1)", agent)
         self.assertIn("Tool-call limit reached", agent)
-        self.assertIn('"think": bool(think)', agent)
+        self.assertIn("think=bool(think)", agent)
         self.assertIn("messages.append(message)", agent)
         self.assertNotIn("reasoning_content", trace)
         self.assertNotIn('"thinking"', trace)
