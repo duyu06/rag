@@ -255,6 +255,7 @@ def routed_chat_message(
             _breaker_record(cfg.provider, True)
             record_llm_attempt(
                 provider=cfg.provider,
+                model=cfg.model,
                 success=True,
                 latency_ms=latency_ms,
                 fallback_index=index,
@@ -279,6 +280,7 @@ def routed_chat_message(
             _breaker_record(cfg.provider, False)
             record_llm_attempt(
                 provider=cfg.provider,
+                model=cfg.model,
                 success=False,
                 latency_ms=latency_ms,
                 timeout=timed_out,
@@ -349,6 +351,7 @@ def routed_stream_chat(
             _breaker_record(cfg.provider, True)
             record_llm_attempt(
                 provider=cfg.provider,
+                model=cfg.model,
                 success=True,
                 latency_ms=latency_ms,
                 fallback_index=index,
@@ -364,6 +367,7 @@ def routed_stream_chat(
         _breaker_record(cfg.provider, False)
         record_llm_attempt(
             provider=cfg.provider,
+            model=cfg.model,
             success=False,
             latency_ms=latency_ms,
             timeout=timed_out,
