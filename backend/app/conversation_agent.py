@@ -12,6 +12,7 @@ from app.audit import record_event
 from app.auth import CurrentUser
 from app.config import settings
 from app.knowledge import allowed_ids, visible_bases
+from app.llm_provider import current_model_name
 from app.native_stream import ollama_chat_stream
 from app.tools.base import AgentMode, ToolContext, ToolExecutionError
 from app.tools.registry import tool_registry
@@ -308,7 +309,7 @@ def _local_fast_path(
         "username": user.username,
         "role": user.role,
         "mode": "local",
-        "model": settings.ollama_model,
+        "model": current_model_name(),
         "max_tool_rounds": 0,
         "context_messages": len(history_messages),
         "events": events,
@@ -335,7 +336,7 @@ def _local_fast_path(
         "trace_id": trace_id,
         "sources": [agent_module._public_source(item) for item in evidence],
         "num_sources": len(evidence),
-        "model_used": settings.ollama_model,
+        "model_used": current_model_name(),
         "max_tool_rounds": 0,
         "context_messages": len(history_messages),
         "timings": timings,

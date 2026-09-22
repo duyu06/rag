@@ -11,10 +11,11 @@ from app.audit import record_event
 from app.auth import CurrentUser
 from app.config import settings
 from app.knowledge import allowed_ids, visible_bases
+from app.llm_provider import chat_message, current_model_name, current_provider_name
 from app.tools.base import AgentMode, ToolContext, ToolExecutionError
 from app.tools.registry import tool_registry
 
-AGENT_SYSTEM_PROMPT = """You are yaoke Agent running with the local Ornith model.
+AGENT_SYSTEM_PROMPT = """You are yaoke Agent. The active model may be local or API-hosted.
 You may answer simple conversation directly, but factual enterprise or current external questions should use tools.
 Rules:
 1. Internal policies, HR, product parameters, sales rules and after-sales SOPs: use enterprise_search.
@@ -45,8 +46,16 @@ def _ollama_chat(messages: list[dict[str, Any]], tools: list[dict[str, Any]]) ->
         if routing_turn
         else settings.agent_num_predict_synthesis
     )
+    if current_provider_name() != "ollama":
+        return chat_message(
+            messages,
+            tools,
+            temperature=0.2,
+            max_tokens=int(num_predict),
+            think=bool(think),
+        )
     payload: dict[str, Any] = {
-        "model": settings.ollama_model,
+        "model": current_model_name(),
         "stream": False,
         "think": bool(think),
         "keep_alive": settings.ollama_keep_alive,
@@ -289,13 +298,15 @@ def run_agent(
                 num_sources=result_count,
                 detail=f"tool={tool_name};trace_id={trace_id}",
             )
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_name": tool_name or "unknown",
-                    "content": json.dumps(result, ensure_ascii=False)[:16000],
-                }
-            )
+            tool_message: dict[str, Any] = {
+                "role": "tool",
+                "tool_name": tool_name or "unknown",
+                "content": json.dumps(result, ensure_ascii=False)[:16000],
+            }
+            tool_call_id = str(call.get("id") or "").strip() if isinstance(call, dict) else ""
+            if tool_call_id:
+                tool_message["tool_call_id"] = tool_call_id
+            messages.append(tool_message)
     else:
         messages.append(
             {
@@ -330,7 +341,7 @@ def run_agent(
         "username": user.username,
         "role": user.role,
         "mode": mode,
-        "model": settings.ollama_model,
+        "model": current_model_name(),
         "max_tool_rounds": max_rounds,
         "context_messages": len(history_messages),
         "events": events,
@@ -356,7 +367,7 @@ def run_agent(
         "trace_id": trace_id,
         "sources": [_public_source(item) for item in evidence],
         "num_sources": len(evidence),
-        "model_used": settings.ollama_model,
+        "model_used": current_model_name(),
         "max_tool_rounds": max_rounds,
         "context_messages": len(history_messages),
     }

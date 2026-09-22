@@ -5,6 +5,7 @@ from app.config import settings
 from app.conversation_routes import router as conversation_router
 from app.conversation_stream_routes import router as conversation_stream_router
 from app.main import app
+from app.llm_provider import current_provider_name
 from app.rag import current_model_name, probe_llm, probe_ollama
 from app.store import vector_store
 
@@ -38,18 +39,16 @@ def yaoke_root():
 @app.get("/api/health")
 def yaoke_health():
     qdrant_ok = vector_store.ping()
-    agent_ok, agent_detail = probe_ollama()
-
-    if settings.openai_api_key:
-        legacy_ok, legacy_detail = probe_llm()
-        legacy_provider = "openai-compatible"
-    else:
-        legacy_ok, legacy_detail = agent_ok, agent_detail
-        legacy_provider = "ollama"
+    agent_ok, agent_detail = probe_llm()
+    try:
+        provider = current_provider_name()
+        model = current_model_name()
+    except Exception:
+        provider = str(settings.llm_provider or "auto")
+        model = str(settings.llm_model or settings.ollama_model)
 
     return {
-        # Frontend and preflight use these compatibility fields. They must
-        # describe the provider run_agent() / conversation agent actually calls.
+        # Agent and legacy RAG now share the same provider adapter.
         "status": "healthy" if (qdrant_ok and agent_ok) else "degraded",
         "version": "0.8.0",
         "phase": "P1.8",
@@ -57,18 +56,17 @@ def yaoke_health():
         "vector_db_connected": qdrant_ok,
         "llm_connected": agent_ok,
         "llm_detail": agent_detail,
-        "ollama_connected": agent_ok,
-        "llm_provider": "ollama",
-        "llm_model": settings.ollama_model,
+        "ollama_connected": agent_ok if provider == "ollama" else False,
+        "llm_provider": provider,
+        "llm_model": model,
         "agent_llm_connected": agent_ok,
         "agent_llm_detail": agent_detail,
-        "agent_llm_provider": "ollama",
-        "agent_llm_model": settings.ollama_model,
-        # Optional legacy RAG path may use OpenAI-compatible instead.
-        "legacy_rag_connected": legacy_ok,
-        "legacy_rag_detail": legacy_detail,
-        "legacy_rag_provider": legacy_provider,
-        "legacy_rag_model": current_model_name(),
+        "agent_llm_provider": provider,
+        "agent_llm_model": model,
+        "legacy_rag_connected": agent_ok,
+        "legacy_rag_detail": agent_detail,
+        "legacy_rag_provider": provider,
+        "legacy_rag_model": model,
     }
 
 

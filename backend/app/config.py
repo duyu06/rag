@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-mini"
+
+    # Unified generation provider. New LLM_* settings take precedence while the
+    # legacy OPENAI_* family remains supported for backwards compatibility.
+    # provider: auto | ollama | deepseek | openai | qwen | openai-compatible
+    llm_provider: str = "auto"
+    llm_base_url: str = ""
+    llm_api_key: SecretStr = SecretStr("")
+    llm_model: str = ""
+    llm_timeout_seconds: int = Field(default=120, ge=1, le=600)
 
     # Controlled web search backend. Agent mode decides whether the tool is exposed to Ornith.
     web_search_enabled: bool = True
