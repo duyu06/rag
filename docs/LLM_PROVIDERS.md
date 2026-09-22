@@ -75,6 +75,18 @@ OPENAI_MODEL=gpt-4.1-mini
 
 这保证企业检索、Web Search 等 Tool Calling 能在兼容模型上继续工作，而不是只让基础问答支持云 API。
 
+### DeepSeek Thinking 与 Tool Calling
+
+DeepSeek V4 默认开启 Thinking。当前适配器在 **携带 tools 的 DeepSeek 路由轮** 显式发送：
+
+```json
+{"thinking":{"type":"disabled"}}
+```
+
+原因是 DeepSeek 的 Thinking + Tool Calling 协议要求后续携带 tools 的轮次完整回传历史 `reasoning_content`。当前 yaoke Agent 不保存隐藏推理，因此先使用非思考 Tool Calling，避免多轮工具调用出现 400，同时保持 Trace 不记录隐藏 reasoning。
+
+最终证据综合轮仍由项目现有 `agent_think_synthesis=false` 策略控制，优先低延迟。
+
 ## 流式输出
 
 Conversation 的 SSE 对外契约不变：
