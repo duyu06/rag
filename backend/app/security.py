@@ -59,6 +59,11 @@ def validate_production_security() -> None:
     if not str(settings.redis_url or "").strip():
         errors.append("REDIS_URL is required")
 
+    if str(settings.conversation_store_backend or "").lower() != "postgres":
+        errors.append("CONVERSATION_STORE_BACKEND must be postgres")
+    if not _secret(settings.postgres_dsn):
+        errors.append("POSTGRES_DSN is required")
+
     if errors:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 
