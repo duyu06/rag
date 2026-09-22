@@ -13,3 +13,4 @@ PyJWT>=2.9,<3
 ddgs>=9.0,<10
 redis>=5,<7
 psycopg[binary]>=3.2,<4
+prometheus-client>=0.20,<1
