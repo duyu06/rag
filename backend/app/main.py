@@ -22,7 +22,7 @@ from app.ingestion import DOC_DIR, SUPPORTED_SUFFIXES, document_path, ingest_fil
 from app.knowledge import get_base, resolve_requested, visible_bases
 from app.llm_provider import current_provider_name
 from app.rag import current_model_name, generate_answer, probe_llm
-from app.rate_limit import rate_limit_middleware
+from app.rate_limit import rate_limit_middleware, rate_limit_ready
 from app.retrieval import retrieval_service
 from app.security import cors_origins, security_headers_middleware, trusted_hosts, validate_production_security
 from app.store import vector_store
@@ -150,9 +150,21 @@ def root():
 @app.get("/api/ready")
 def ready():
     qdrant_ok = vector_store.ping()
-    if not qdrant_ok:
-        raise HTTPException(status_code=503, detail="Qdrant not ready")
-    return {"status": "ready", "vector_db_connected": True}
+    redis_ok, redis_detail = rate_limit_ready()
+    if not qdrant_ok or not redis_ok:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "qdrant": "ready" if qdrant_ok else "not_ready",
+                "rate_limit": redis_detail,
+            },
+        )
+    return {
+        "status": "ready",
+        "vector_db_connected": True,
+        "rate_limit_ready": redis_ok,
+        "rate_limit_detail": redis_detail,
+    }
 
 
 @app.get("/api/health")
@@ -170,7 +182,12 @@ def health():
         "llm_detail": llm_detail,
         "ollama_connected": llm_ok if provider == "ollama" else False,
         "llm_provider": provider,
-        "llm_model": current_model_name(),
+        "llm_model": (
+            current_model_name()
+            if llm_ok
+            else str(settings.llm_model or settings.ollama_model)
+        ),
+        "rate_limit_enabled": bool(settings.rate_limit_enabled),
     }
 
 
