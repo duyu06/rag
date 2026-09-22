@@ -5,6 +5,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
+
+    # Runtime / perimeter security.
+    app_env: str = "development"
+    cors_allowed_origins: str = "http://localhost:3000"
+    trusted_hosts: str = "localhost,127.0.0.1"
+    security_headers_enabled: bool = True
+
+    # Authentication. Demo auth is intentionally forbidden by production validation.
+    auth_mode: str = "demo"
+    oidc_issuer: str = ""
+    oidc_audience: str = ""
+    oidc_jwks_url: str = ""
+    oidc_username_claim: str = "preferred_username"
+    oidc_display_name_claim: str = "name"
+    oidc_role_claim: str = "roles"
+    oidc_role_map_json: str = '{"admin":"ADMIN","sales":"SALES","hr":"HR"}'
+
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""
     qdrant_collection: str = "yaoke"
@@ -97,6 +114,12 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "change-me-before-production-yaoke-demo-secret"
     jwt_expire_hours: int = 8
+
+
+    # Tamper-evident audit logging. Production should provide AUDIT_HMAC_KEY
+    # through a secret store rather than source control.
+    audit_hmac_key: SecretStr = SecretStr("")
+    audit_query_max_chars: int = Field(default=240, ge=0, le=1000)
 
     # Local backend cwd is normally ./backend, so ../demo-data points to repo demo data.
     # Docker overrides this to /app/demo-data via docker-compose.
