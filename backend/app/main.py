@@ -10,6 +10,7 @@ from typing import Literal
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -22,6 +23,7 @@ from app.knowledge import get_base, resolve_requested, visible_bases
 from app.llm_provider import current_provider_name
 from app.rag import current_model_name, generate_answer, probe_llm
 from app.retrieval import retrieval_service
+from app.security import cors_origins, security_headers_middleware, trusted_hosts, validate_production_security
 from app.store import vector_store
 
 app = FastAPI(
@@ -31,11 +33,17 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins(),
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=trusted_hosts() or ["localhost", "127.0.0.1"],
+)
+app.middleware("http")(security_headers_middleware)
+app.add_event_handler("startup", validate_production_security)
 
 
 class LoginRequest(BaseModel):
@@ -166,6 +174,8 @@ def health():
 
 @app.post("/api/auth/login")
 def login(request: LoginRequest):
+    if str(settings.auth_mode or "demo").lower() != "demo":
+        raise HTTPException(status_code=404, detail="本地密码登录已禁用，请使用企业 SSO")
     user = authenticate(request.username.strip(), request.password)
     if not user:
         record_event(
