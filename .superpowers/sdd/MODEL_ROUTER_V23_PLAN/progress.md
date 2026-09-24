@@ -131,3 +131,13 @@ Task 11: 容器层冒烟**通过**（证据 `task-11-smoke.md`）。镜像 `rag-
 - 排除并说明：`.superpowers/` 默认忽略（`*.tsbuildinfo` 同），仅以 `-f` 精选入库 SDD ledger、各任务 brief/report、评审与复审 findings、P0 runner 脚本、容器对账日志；快照树、baseline 树、变异 scratch 脚本与日志保持不入库（报告内逐轮可复核）。仓库根散件 `task-10-brief.md`（我早期误路径产物）已并回 SDD 目录内同名 brief 并删除。
 - 结果：`git status --porcelain` = **0 条（clean）**；未 push、未打 tag（按裁定保留 `model-router-v2.3-rc1` 给后续云侧 live test 之后再决定，与"正式 release"语义分开）。
 - 已知瑕疵（如实记，不擅自 amend）：commit message 末尾那行 `Co-authored-by:` 因带括号说明文字而**不是合法 trailer**，GitHub 可能按异常 co-author 渲染。要修需 `--amend` 重写这条未推送提交，等你点头再做。
+
+## 封版动作的后续对账（amend / tag / push，2026-09-25）
+- 上面记的 `21498bc` **已被 amend 取代**（仓库内无人引用旧 SHA，符合 amend 前置条件）。动因有两处，都不是"顺手改内容"：
+  ① 提交正文声称"SDD ledger / briefs / reports / findings 已入库"，实际那次 `git add -f` 因我混进一个不存在的 `.md` 路径而**整条命令失败** ⇒ 证据一个都没进（只有 runner 脚本进了）；
+  ② 末尾 `Co-authored-by:` 带括号说明 ⇒ 非法 trailer。
+- amend 后：**commit `5ba5f20e2e63525ed394dfa96b932840be7b8612`，tree `3184517a88b063b3dd2adf11549c040e7b953873`**。
+  **tree 变化只因为补入 40 个证据文件**：`git diff --name-only 21498bc HEAD` 的非 `.superpowers/` 差异 = **0** ⇒ 代码/测试/文档零改动，因此**没有重跑 961**（用户口径：tree 一致才要求重跑；这里变的是证据集，已明确证明）。trailer 直接删除（无真实共同作者需归属）。
+- annotated tag `model-router-v2.3-rc1` → 指向 `5ba5f20e`（tag object `3af20e8c`）。**未打 v2.3.0**（正式版本号留给真正的 release 决策）。
+- push：`origin/main bc2085c..5ba5f20`，tag 新建；远端核对 `refs/heads/main=5ba5f20e`、`refs/tags/model-router-v2.3-rc1=3af20e8c`；本地 ahead/behind = 0/0。
+- 本条记录本身是一枚**位于 tag 之后**的 docs 提交（只动 SDD ledger，不动 release 内容），所以 RC 基线仍等于 `5ba5f20` 的 tree。
