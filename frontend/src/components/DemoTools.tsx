@@ -3,29 +3,54 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, AuditEvent, session, User } from "@/lib/api";
 
+/* 显示层译名：键为接口模式值，只改值文案。 */
 const labels: Record<string, string> = {
-  vector: "Vector",
-  bm25: "BM25",
-  hybrid: "Hybrid",
-  hybrid_rerank: "Hybrid + Rerank",
+  vector: "向量检索",
+  bm25: "关键词检索 BM25",
+  hybrid: "混合检索",
+  hybrid_rerank: "混合检索 + 重排序",
 };
 
 function percent(value?: number) {
   return value == null ? "—" : `${Math.round(value * 100)}%`;
 }
 
+const AUDIT_STATUS_LABELS: Record<string, string> = {
+  DENIED: "已拒绝",
+  GRANTED: "通过",
+  OK: "正常",
+  FAILED: "失败",
+};
+
+function statusLabel(status?: string | null) {
+  if (!status) return "—";
+  return AUDIT_STATUS_LABELS[status.toUpperCase()] ?? status;
+}
+
 function actionLabel(action: string) {
   const map: Record<string, string> = {
     LOGIN: "登录",
     QUERY: "问答",
-    ACCESS: "访问控制",
+    ASK: "问答",
+    SEARCH: "搜索",
+    ACCESS: "访问",
+    AUTHORIZATION: "授权",
+    ACCESS_REQUEST: "权限申请",
     INGEST: "文档入库",
+    UPLOAD: "上传",
+    DOWNLOAD: "下载",
     DELETE: "删除文档",
+    DOCUMENT_MOVE: "文档移动",
+    DOCUMENT_REINDEX: "重建索引",
     SOURCE_VIEW: "查看来源",
     RETRIEVAL_DEBUG: "检索调试",
     EVALUATION: "RAG 评测",
-    DEMO_INIT: "初始化 Demo",
-    DEMO_RESET: "重置 Demo",
+    EVAL_FAILURE_TRIAGE: "评测失败归类",
+    FEEDBACK: "回答反馈",
+    DEMO_INIT: "初始化演示数据",
+    DEMO_RESET: "重置演示数据",
+    TOOL_CALL: "工具调用",
+    TOOL_RESULT: "工具结果",
   };
   return map[action] || action;
 }
@@ -82,7 +107,7 @@ export default function DemoTools() {
 
   const runInit = async () => {
     setBusy("init");
-    setMessage("正在初始化 20 份企业演示资料，首次运行可能需要下载 Embedding 模型…");
+    setMessage("正在初始化 20 份企业演示资料，首次运行可能需要下载向量化模型…");
     try {
       const result = await api.initializeDemo();
       setStatus(result.status);
@@ -97,9 +122,9 @@ export default function DemoTools() {
   };
 
   const runReset = async () => {
-    if (!confirm("重置会重新索引内置 20 份 Demo 文档，但不会删除你额外上传的资料。继续吗？")) return;
+    if (!confirm("重置会重新索引内置的 20 份演示文档，但不会删除你额外上传的资料。继续吗？")) return;
     setBusy("reset");
-    setMessage("正在重建 Demo 索引…");
+    setMessage("正在重建演示数据索引…");
     try {
       const result = await api.resetDemo();
       setStatus(result.status);
@@ -142,7 +167,7 @@ export default function DemoTools() {
 
   const metrics = [
     ["文档", String(stats?.total_documents ?? "—")],
-    ["Chunks", String(stats?.total_chunks ?? "—")],
+    ["分块", String(stats?.total_chunks ?? "—")],
     ["今日问答", String(stats?.today_queries ?? 0)],
     ["平均耗时", `${stats?.avg_query_latency_ms ?? 0}ms`],
     ["拒绝访问", String(stats?.denied_access ?? 0)],
@@ -153,9 +178,9 @@ export default function DemoTools() {
       {open && (
         <div style={panel}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <div><strong style={{ fontSize: 14 }}>Demo 工具 / 运行态</strong><div style={{ marginTop: 3, fontSize: 10, color: "#98a2b3" }}>P1.8 / v0.8.0 · Interview Readiness + Real Streaming + Retrieval + Agent + 审计</div></div>
+            <div><strong style={{ fontSize: 14 }}>演示工具 / 运行态</strong><div style={{ marginTop: 3, fontSize: 10, color: "#98a2b3" }}>P1.8 / v0.8.0 · 演示就绪检查 + 真实流式输出 + 检索 + 智能体 + 审计</div></div>
             <span style={{ fontSize: 10, color: status?.ready ? "#6ce9a6" : "#fdb022" }}>
-              {status ? `${status.ready_count}/${status.total} ready` : "checking"}
+              {status ? `${status.ready_count}/${status.total} 就绪` : "检查中"}
             </span>
           </div>
 
@@ -170,10 +195,10 @@ export default function DemoTools() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 10 }}>
             <button disabled={Boolean(busy)} onClick={() => void runInit()} style={{ ...button, background: "#2357d9", color: "white" }}>
-              {busy === "init" ? "初始化中…" : "初始化 Demo"}
+              {busy === "init" ? "初始化中…" : "初始化演示数据"}
             </button>
             <button disabled={Boolean(busy)} onClick={() => void runReset()} style={{ ...button, background: "#344054", color: "white" }}>
-              {busy === "reset" ? "重置中…" : "重置 Demo"}
+              {busy === "reset" ? "重置中…" : "重置演示数据"}
             </button>
           </div>
 
@@ -190,8 +215,8 @@ export default function DemoTools() {
                 return (
                   <div key={key} style={{ display: "grid", gridTemplateColumns: "1.5fr .7fr .7fr .7fr", gap: 6, alignItems: "center", padding: "8px 9px", background: "#182230", borderRadius: 7, fontSize: 10 }}>
                     <strong>{labels[key] || key}</strong>
-                    <span>H@1 {percent(data.hit_at_1)}</span>
-                    <span>H@3 {percent(data.hit_at_3)}</span>
+                    <span>HIT@1 {percent(data.hit_at_1)}</span>
+                    <span>HIT@3 {percent(data.hit_at_3)}</span>
                     <span>MRR {Number(data.mrr || 0).toFixed(2)}</span>
                   </div>
                 );
@@ -209,7 +234,7 @@ export default function DemoTools() {
                 <div key={`${event.timestamp}-${index}`} style={{ padding: "7px 8px", borderRadius: 6, background: "#182230", fontSize: 9, lineHeight: 1.45 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                     <strong>{actionLabel(event.action)} · {event.username}</strong>
-                    <span style={{ color: event.status === "DENIED" ? "#f97066" : "#6ce9a6" }}>{event.status}</span>
+                    <span style={{ color: event.status === "DENIED" ? "#f97066" : "#6ce9a6" }}>{statusLabel(event.status)}</span>
                   </div>
                   <div style={{ marginTop: 2, color: "#98a2b3" }}>
                     {event.query ? event.query.slice(0, 42) : event.detail || event.knowledge_base_id || "—"}
@@ -224,7 +249,7 @@ export default function DemoTools() {
       )}
 
       <button onClick={() => setOpen((value) => !value)} style={{ ...button, background: "#101828", color: "white", boxShadow: "0 10px 30px rgba(16,24,40,.22)" }}>
-        {open ? "收起 Demo 工具" : "Demo 工具"}
+        {open ? "收起演示工具" : "演示工具"}
       </button>
     </div>
   );

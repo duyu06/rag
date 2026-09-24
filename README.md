@@ -137,9 +137,13 @@ SQLite Conversation + Citation + Audit + Agent Trace
 
 ## 企业权限边界
 
-- `ADMIN`：全部 5 个知识域
-- `SALES`：公共 / 产品 / 销售 / 售后
-- `HR`：公共 / HR
+权限采用“平台能力 + 业务知识域”双维分离，完整设计见 [`docs/RBAC_UX_DESIGN.md`](docs/RBAC_UX_DESIGN.md)。
+
+- `ADMIN`：平台管理员，全部 5 个知识域，可管理知识、调试、评测、审计和运维
+- `SALES`：平台成员，公共 / 产品 / 销售 / 售后，可发起问答
+- `HR`：平台成员，公共 / HR，可发起问答
+- `USER`：平台成员，仅公共知识，可发起问答
+- `VIEWER`：只读访客，仅公共知识和自己的已有会话，不能发起问答
 
 即使模型主动请求 `enterprise_search(knowledge_base_id="kb_hr")`，SALES 账号仍会在工具执行层收到 `DENIED`。用户在 UI 选择单个知识库后，模型也不能通过 Tool 参数扩大检索范围。
 
@@ -157,11 +161,13 @@ SQLite Conversation + Citation + Audit + Agent Trace
 
 ## 演示账号
 
-| 角色 | 用户名 | 密码 | 可访问知识库 |
-|---|---|---|---|
-| 管理员 | `admin` | `admin123` | 全部 |
-| 销售 | `sales01` | `sales123` | 公共 / 产品 / 销售 / 售后 |
-| HR | `hr01` | `hr123` | 公共 / HR |
+| 角色 | 用户名 | 密码 | 平台能力 | 可访问知识库 |
+|---|---|---|---|---|
+| 管理员 | `admin` | `admin123` | 管理员 | 全部 |
+| 销售 | `sales01` | `sales123` | 成员 | 公共 / 产品 / 销售 / 售后 |
+| HR | `hr01` | `hr123` | 成员 | 公共 / HR |
+| 普通成员 | `user` | `user123` | 成员 | 公共 |
+| 只读访客 | `viewer` | `viewer123` | 只读 | 公共 |
 
 > 仅供 Demo。生产环境应替换为 OIDC / SAML / 企业微信 / 飞书等企业身份源，并替换 Demo 密码与 `JWT_SECRET`。
 
@@ -178,6 +184,29 @@ docker compose up --build
 ```
 
 `backend/.env.example` 面向宿主机直跑，默认 `OLLAMA_BASE_URL=http://localhost:11434`。Docker Compose 会为 backend 容器覆盖为 `http://host.docker.internal:11434`。
+
+### 可选 TypeSafe 判定层
+
+TypeSafe 默认完全关闭，原 Cross-Encoder 路径和现有 API 响应不变。要接入服务端判定，在 `backend/.env` 配置：
+
+```dotenv
+RERANK_PROVIDER=typesafe
+TYPESAFE_ENABLED=true
+TYPESAFE_MODE=shadow
+TYPESAFE_API_KEY=
+```
+
+把新轮换的密钥仅填入本机这一空值。请求还需启用 Rerank；Conversation UI 可直接勾选“启用 Rerank”。`shadow` 会对授权候选逐条判断相关性、答案证据、错误前提冲突和 Prompt Injection，但不改变排序。完成中文数据集校准后再切到 `TYPESAFE_MODE=active`，此时会过滤低相关/无证据/疑似注入内容，并把纠正错误前提的内容标为冲突证据。任何缺 Key、超时、限流、异常或部分返回都会标记 `typesafe_degraded=true`，并确定性退回原 RRF 顺序，不直接制造 5xx。
+
+密钥只放 `backend/.env` 或生产 Secret Store，禁止使用 `NEXT_PUBLIC_*`，也不要提交到 Git。TypeSafe 开启时，评测响应和 Conversation `timings` 会附带请求数、输入/输出 token、估算成本、P50/P95、总耗时和 TTFT。59 题复杂集可运行：
+
+```bash
+python scripts/complex_accuracy.py --min-hit1 0.90 --min-hit3 0.90 --min-mrr 0.90
+python scripts/complex_accuracy.py --require-typesafe --expect-typesafe-mode active --max-typesafe-degraded 0 --min-typesafe-requests 414 --json-output output/typesafe-active-complex.json
+python scripts/complex_accuracy.py --llm-only --rerank-llm-boundaries --require-typesafe --expect-typesafe-mode active --max-typesafe-degraded 0 --min-typesafe-requests 36 --json-output output/typesafe-active-llm.json
+```
+
+先在 `shadow` 记录基线，再用同一数据和配置切换 `active` 做 A/B。TypeSafe 的注入信号是辅助判断，不替代后端 RBAC、Qdrant metadata filter 和系统 Prompt 边界。完整接入结构、故障降级和实测数据见 [`docs/TYPESAFE_ACCEPTANCE_2026-09-22.md`](docs/TYPESAFE_ACCEPTANCE_2026-09-22.md)。
 
 先单独验证本机模型：
 

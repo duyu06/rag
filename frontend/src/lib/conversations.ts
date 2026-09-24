@@ -43,6 +43,7 @@ export type ConversationTurnResponse = {
 
 export type ConversationStreamHandlers = {
   onMessage?: (messageId: string) => void;
+  onStatus?: (phase: string, message: string) => void;
   onToken?: (text: string) => void;
   onSources?: (sources: Source[]) => void;
   onTrace?: (traceId: string) => void;
@@ -98,7 +99,9 @@ async function parseTurnStream(
     if (!event || !raw) return;
     const data = JSON.parse(raw);
 
-    if (event === "message" && data.message_id) {
+    if (event === "status") {
+      handlers.onStatus?.(String(data.phase || "working"), String(data.message || "正在处理"));
+    } else if (event === "message" && data.message_id) {
       handlers.onMessage?.(String(data.message_id));
     } else if (event === "token") {
       handlers.onToken?.(String(data.text || ""));

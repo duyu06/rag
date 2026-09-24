@@ -1,0 +1,12 @@
+{
+  "rules": [
+    {
+      "match": { "department_names": ["人力资源"] },
+      "grant": { "access_role": "user", "knowledge_base_ids": ["kb_public", "kb_hr"] }
+    },
+    {
+      "match": { "chat_names": ["知识库管理员群"] },
+      "grant": { "access_role": "admin", "knowledge_base_ids": ["*"] }
+    }
+  ]
+}

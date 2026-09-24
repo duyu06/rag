@@ -30,7 +30,7 @@ export default function DashboardMetrics() {
         if (label) label.textContent = "今日查询";
         if (value) value.textContent = String(stats?.today_queries ?? 0);
         if (desc) {
-          desc.textContent = `平均 ${Math.round(stats?.avg_query_latency_ms ?? 0)} ms · 拒绝 ${stats?.denied_access ?? 0}`;
+          desc.textContent = `平均 ${Math.round(stats?.avg_query_latency_ms ?? 0)} ms · 拒绝访问 ${stats?.denied_access ?? 0}`;
         }
       } catch {
         // Dashboard remains usable with its original system-status metric when telemetry is offline.

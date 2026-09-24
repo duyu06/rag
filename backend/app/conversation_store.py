@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any, Iterator
 from uuid import uuid4
 
+from app.security import redact_secrets, redact_text
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -105,7 +107,7 @@ class ConversationStore:
                 """INSERT INTO conversations
                 (id, username, title, mode, knowledge_base_id, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (conversation_id, username, title.strip() or "新会话", mode, knowledge_base_id, now, now),
+                (conversation_id, username, redact_text(title).strip() or "新会话", mode, knowledge_base_id, now, now),
             )
         return self.get(conversation_id, username=username)
 
@@ -132,6 +134,7 @@ class ConversationStore:
                        (
                          SELECT content FROM messages lm
                          WHERE lm.conversation_id = c.id
+                           AND lm.role = 'user'
                          ORDER BY lm.created_at DESC LIMIT 1
                        ) AS last_message_preview
                 FROM conversations c
@@ -143,7 +146,7 @@ class ConversationStore:
                 """,
                 (username, max(1, min(limit, 200))),
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [redact_secrets(dict(row)) for row in rows]
 
     def get(self, conversation_id: str, *, username: str) -> dict[str, Any]:
         self.require_owner(conversation_id, username)
@@ -169,7 +172,7 @@ class ConversationStore:
                 ).fetchall()
                 message["sources"] = [dict(item) for item in sources]
                 messages.append(message)
-        return {**dict(conversation), "messages": messages}
+        return redact_secrets({**dict(conversation), "messages": messages})
 
     def update(
         self,
@@ -185,7 +188,7 @@ class ConversationStore:
         values: list[Any] = []
         if title is not None:
             fields.append("title = ?")
-            values.append(title.strip()[:80] or "新会话")
+            values.append(redact_text(title).strip()[:80] or "新会话")
         if mode is not None:
             fields.append("mode = ?")
             values.append(mode)
@@ -210,7 +213,8 @@ class ConversationStore:
         message_id: str,
         sources: list[dict[str, Any]] | None,
     ) -> None:
-        for source in sources or []:
+        for raw_source in sources or []:
+            source = redact_secrets(raw_source)
             db.execute(
                 """INSERT INTO message_sources
                 (message_id, citation_index, source_type, title, file_name, page,
@@ -253,7 +257,7 @@ class ConversationStore:
                 """INSERT INTO messages
                 (id, conversation_id, role, content, status, trace_id, latency_ms, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (message_id, conversation_id, role, content, status, trace_id, latency_ms, now),
+                (message_id, conversation_id, role, redact_text(content), status, trace_id, latency_ms, now),
             )
             self._insert_sources(db, message_id, sources)
             db.execute(
@@ -292,7 +296,7 @@ class ConversationStore:
                 """UPDATE messages
                    SET content = ?, status = ?, trace_id = ?, latency_ms = ?
                    WHERE id = ? AND conversation_id = ?""",
-                (content, status, trace_id, latency_ms, message_id, conversation_id),
+                (redact_text(content), status, trace_id, latency_ms, message_id, conversation_id),
             )
             db.execute("DELETE FROM message_sources WHERE message_id = ?", (message_id,))
             self._insert_sources(db, message_id, sources)
@@ -317,7 +321,7 @@ class ConversationStore:
                 (conversation_id, conversation_id),
             ).fetchone()
             if row and row["title"] == "新会话" and int(row["count"] or 0) <= 1:
-                normalized = " ".join(question.strip().split())
+                normalized = " ".join(redact_text(question).strip().split())
                 title = normalized[:28] + ("…" if len(normalized) > 28 else "")
                 db.execute(
                     "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",

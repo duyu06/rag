@@ -6,10 +6,10 @@ import { AgentMode, agentModePreference, session } from "@/lib/api";
 const MODES: Array<{ value: AgentMode; label: string; hint: string }> = [
   { value: "local", label: "本地", hint: "只允许企业知识库工具；问题不会发送到公共搜索服务" },
   { value: "auto", label: "自动", hint: "由 Ornith 判断使用企业检索、联网搜索或直接回答" },
-  { value: "web", label: "联网", hint: "允许企业检索和 Web Search，并优先处理当前/外部信息" },
+  { value: "web", label: "联网", hint: "允许企业检索与网页搜索，并优先处理时效性和外部信息" },
 ];
 
-export default function AgentModeToggle() {
+export default function AgentModeToggle({ embedded = false }: { embedded?: boolean }) {
   const [visible, setVisible] = useState(false);
   const [mode, setMode] = useState<AgentMode>("auto");
 
@@ -31,20 +31,8 @@ export default function AgentModeToggle() {
 
   return (
     <div
-      aria-label="Agent 运行模式"
-      style={{
-        position: "fixed",
-        left: 18,
-        bottom: 18,
-        zIndex: 1001,
-        display: "flex",
-        gap: 4,
-        padding: 4,
-        border: "1px solid #d0d5dd",
-        borderRadius: 12,
-        background: "rgba(255,255,255,.96)",
-        boxShadow: "0 8px 24px rgba(16,24,40,.12)",
-      }}
+      className={embedded ? "agent-mode-toggle embedded" : "agent-mode-toggle"}
+      aria-label="智能体运行模式"
     >
       {MODES.map((item) => {
         const active = item.value === mode;
@@ -53,20 +41,12 @@ export default function AgentModeToggle() {
             key={item.value}
             type="button"
             title={item.hint}
+            aria-pressed={active}
             onClick={() => {
               agentModePreference.set(item.value);
               setMode(item.value);
             }}
-            style={{
-              border: active ? "1px solid #1570ef" : "1px solid transparent",
-              borderRadius: 8,
-              padding: "7px 10px",
-              background: active ? "#eff8ff" : "transparent",
-              color: active ? "#175cd3" : "#475467",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
+            className={active ? "active" : ""}
           >
             {item.label}
           </button>

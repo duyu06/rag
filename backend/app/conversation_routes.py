@@ -6,10 +6,12 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
-from app.auth import CurrentUser, require_user
+from app.auth import CurrentUser, require_permission, require_permissions
 from app.config import settings
 from app.conversation_agent import run_conversation_agent
 from app.conversation_store import conversation_store
+from app.knowledge import allowed_for, resolve_for
+from app.security import public_exception_detail, public_timings, redact_text
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 AgentMode = Literal["local", "auto", "web"]
@@ -45,10 +47,58 @@ class ConversationRetryRequest(BaseModel):
 
 def _translate_store_error(exc: Exception) -> HTTPException:
     if isinstance(exc, PermissionError):
-        return HTTPException(status_code=403, detail=str(exc))
+        return HTTPException(status_code=403, detail=redact_text(exc))
     if isinstance(exc, KeyError):
-        return HTTPException(status_code=404, detail=str(exc).strip("'"))
-    return HTTPException(status_code=500, detail=f"Conversation 存储失败：{type(exc).__name__}: {exc}")
+        return HTTPException(status_code=404, detail=redact_text(exc).strip("'"))
+    return HTTPException(status_code=500, detail=f"Conversation 存储失败：{public_exception_detail(exc)}")
+
+
+def _validate_knowledge_base_scope(user: CurrentUser, knowledge_base_id: str | None) -> None:
+    """Reject an unauthorized KB before any conversation state is persisted."""
+    try:
+        resolve_for(user, knowledge_base_id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def _sanitize_conversation_for_user(conversation: dict, user: CurrentUser) -> dict:
+    """Redact answers whose persisted citations are outside the user's current ACL."""
+    authorized = set(allowed_for(user))
+    sanitized = dict(conversation)
+    sanitized_messages: list[dict] = []
+    for item in conversation.get("messages", []):
+        message = dict(item)
+        sources = [dict(source) for source in item.get("sources", [])]
+        unauthorized = any(
+            source.get("source_type", "enterprise") == "enterprise"
+            and source.get("knowledge_base_id") not in authorized
+            for source in sources
+        )
+        if unauthorized:
+            message.update(
+                {
+                    "content": "该历史回答涉及当前无权访问的知识，已隐藏。",
+                    "sources": [],
+                    "trace_id": None,
+                    "redacted": True,
+                }
+            )
+        else:
+            message["sources"] = sources
+        sanitized_messages.append(message)
+    sanitized["messages"] = sanitized_messages
+    return sanitized
+
+
+def _load_conversation_for_user(conversation_id: str, user: CurrentUser) -> dict:
+    try:
+        conversation = conversation_store.get(conversation_id, username=user.username)
+    except (PermissionError, KeyError) as exc:
+        raise _translate_store_error(exc) from exc
+    _validate_knowledge_base_scope(user, conversation.get("knowledge_base_id"))
+    return _sanitize_conversation_for_user(conversation, user)
 
 
 def _recent_completed_history(conversation: dict) -> list[dict]:
@@ -118,7 +168,7 @@ def _replace_failed_message(
         conversation_id=conversation_id,
         message_id=message_id,
         username=user.username,
-        content=detail,
+        content=redact_text(detail),
         status="failed",
         trace_id=None,
         latency_ms=(time.perf_counter() - started) * 1000,
@@ -135,19 +185,19 @@ def _success_payload(
     history_size: int,
 ) -> dict:
     return {
-        "conversation": conversation_store.get(conversation_id, username=user.username),
+        "conversation": _load_conversation_for_user(conversation_id, user),
         "message": assistant_message,
         "trace_id": result.get("trace_id"),
         "model_used": result.get("model_used"),
         "context_messages": result.get("context_messages", history_size),
-        "timings": result.get("timings"),
+        "timings": public_timings(result.get("timings")),
     }
 
 
 @router.get("")
 def list_conversations(
     limit: int = Query(default=100, ge=1, le=200),
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(require_permission("conversation:read")),
 ):
     return {"conversations": conversation_store.list(user.username, limit=limit)}
 
@@ -155,8 +205,9 @@ def list_conversations(
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_conversation(
     request: ConversationCreateRequest,
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(require_permission("conversation:write")),
 ):
+    _validate_knowledge_base_scope(user, request.knowledge_base_id)
     return conversation_store.create(
         username=user.username,
         title=request.title or "新会话",
@@ -168,19 +219,16 @@ def create_conversation(
 @router.get("/{conversation_id}")
 def get_conversation(
     conversation_id: str,
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(require_permission("conversation:read")),
 ):
-    try:
-        return conversation_store.get(conversation_id, username=user.username)
-    except (PermissionError, KeyError) as exc:
-        raise _translate_store_error(exc) from exc
+    return _load_conversation_for_user(conversation_id, user)
 
 
 @router.patch("/{conversation_id}")
 def update_conversation(
     conversation_id: str,
     request: ConversationUpdateRequest,
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(require_permission("conversation:write")),
 ):
     try:
         kwargs = {
@@ -189,6 +237,7 @@ def update_conversation(
             "mode": request.mode,
         }
         if request.update_knowledge_base:
+            _validate_knowledge_base_scope(user, request.knowledge_base_id)
             kwargs["knowledge_base_id"] = request.knowledge_base_id
         return conversation_store.update(conversation_id, **kwargs)
     except (PermissionError, KeyError) as exc:
@@ -198,7 +247,7 @@ def update_conversation(
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(
     conversation_id: str,
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(require_permission("conversation:write")),
 ):
     try:
         conversation_store.delete(conversation_id, username=user.username)
@@ -211,20 +260,20 @@ def delete_conversation(
 def create_message(
     conversation_id: str,
     request: ConversationMessageRequest,
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(
+        require_permissions("conversation:write", "agent:run", "knowledge:query")
+    ),
 ):
-    try:
-        conversation = conversation_store.get(conversation_id, username=user.username)
-    except (PermissionError, KeyError) as exc:
-        raise _translate_store_error(exc) from exc
+    conversation = _load_conversation_for_user(conversation_id, user)
 
     mode = request.mode or conversation.get("mode") or "auto"
     selected_kb = _selected_kb(request, conversation)
+    _validate_knowledge_base_scope(user, selected_kb)
 
     # Capture history before storing the current user turn so the current question
     # remains a separate final user message in the model input.
     history = _recent_completed_history(conversation)
-    question = request.content.strip()
+    question = redact_text(request.content.strip())
     conversation_store.add_message(
         conversation_id=conversation_id,
         username=user.username,
@@ -256,17 +305,18 @@ def create_message(
             history=history,
         )
     except ValueError as exc:
+        detail = redact_text(exc)
         conversation_store.add_message(
             conversation_id=conversation_id,
             username=user.username,
             role="assistant",
-            content=str(exc),
+            content=detail,
             status="failed",
             latency_ms=(time.perf_counter() - started) * 1000,
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
     except Exception as exc:
-        detail = f"Agent 服务不可用：{type(exc).__name__}: {exc}"
+        detail = f"Agent 服务不可用：{public_exception_detail(exc)}"
         conversation_store.add_message(
             conversation_id=conversation_id,
             username=user.username,
@@ -301,17 +351,17 @@ def retry_message(
     conversation_id: str,
     message_id: str,
     request: ConversationRetryRequest,
-    user: CurrentUser = Depends(require_user),
+    user: CurrentUser = Depends(
+        require_permissions("conversation:write", "agent:run", "knowledge:query")
+    ),
 ):
     """Retry one failed assistant turn without duplicating the user message."""
-    try:
-        conversation = conversation_store.get(conversation_id, username=user.username)
-    except (PermissionError, KeyError) as exc:
-        raise _translate_store_error(exc) from exc
+    conversation = _load_conversation_for_user(conversation_id, user)
 
     _target, question, history = _retry_target(conversation, message_id)
     mode = request.mode or conversation.get("mode") or "auto"
     selected_kb = _selected_kb(request, conversation)
+    _validate_knowledge_base_scope(user, selected_kb)
     conversation_store.update(
         conversation_id,
         username=user.username,
@@ -331,16 +381,17 @@ def retry_message(
             history=history,
         )
     except ValueError as exc:
+        detail = redact_text(exc)
         _replace_failed_message(
             conversation_id=conversation_id,
             message_id=message_id,
             user=user,
-            detail=str(exc),
+            detail=detail,
             started=started,
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
     except Exception as exc:
-        detail = f"Agent 服务不可用：{type(exc).__name__}: {exc}"
+        detail = f"Agent 服务不可用：{public_exception_detail(exc)}"
         _replace_failed_message(
             conversation_id=conversation_id,
             message_id=message_id,

@@ -113,13 +113,17 @@ class P16ReviewRegressionTests(unittest.TestCase):
     def test_non_positive_bm25_score_keeps_real_lexical_match(self):
         ns = _load_subset(
             RETRIEVAL,
-            functions={"tokenize", "rank_bm25_match_ids"},
+            functions={"tokenize", "build_bm25_query_tokens", "rank_bm25_match_ids"},
+            assignments={"BM25_QUERY_EXPANSIONS"},
         )
         tokenize = ns["tokenize"]
+        build_query_tokens = ns["build_bm25_query_tokens"]
         rank_matches = ns["rank_bm25_match_ids"]
 
         rows = [{"id": "x200-temp"}]
         corpus = [tokenize("X200 工作温度 -20 到 60 摄氏度")]
+        self.assertIn("20", corpus[0])
+        self.assertIn("住宿", build_query_tokens("北京出差酒店多少钱"))
         self.assertEqual(
             ["x200-temp"],
             rank_matches(rows, corpus, [-0.25], "X200 工作温度"),

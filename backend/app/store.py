@@ -114,13 +114,15 @@ class VectorStore:
 
     @staticmethod
     def _kb_filter(knowledge_base_ids: list[str] | None) -> Filter | None:
-        if not knowledge_base_ids:
+        # `None` == 调用方没有范围概念（不加过滤）；`[]` == 权威白名单是"零可见"，
+        # 必须命中零行。空 MatchAny 对任何 point 都不匹配，因此 `[]` 绝不会退化成全库。
+        if knowledge_base_ids is None:
             return None
         return Filter(
             must=[
                 FieldCondition(
                     key="knowledge_base_id",
-                    match=MatchAny(any=knowledge_base_ids),
+                    match=MatchAny(any=list(knowledge_base_ids)),
                 )
             ]
         )
@@ -178,6 +180,40 @@ class VectorStore:
             )
         return rows
 
+    def fetch_vectors(self, point_ids: list[str] | None) -> dict[str, list[float]]:
+        """按 id 批量取回向量（语义去重用，设计 §6）——一次 retrieve，不查 payload。
+
+        异常安全是这个方法的契约：任何 Qdrant 失败都返回 ``{}``，让调用方的去重
+        退化成"不合并"（不丢块），绝不打断检索主链路。
+        """
+        ids = [str(point_id) for point_id in (point_ids or []) if str(point_id or "")]
+        if not ids:
+            return {}
+        try:
+            records = self.client.retrieve(
+                collection_name=settings.qdrant_collection,
+                points=ids,
+                with_payload=False,
+                with_vectors=True,
+            )
+        except Exception:
+            return {}
+
+        vectors: dict[str, list[float]] = {}
+        for record in records or []:
+            values = getattr(record, "vector", None)
+            if isinstance(values, dict):
+                # 命名向量集合：取第一个可用分量
+                values = next(iter(values.values()), None)
+            if not isinstance(values, (list, tuple)) or not values:
+                continue
+            try:
+                vector = [float(component) for component in values]
+            except (TypeError, ValueError):
+                continue
+            vectors[str(getattr(record, "id", ""))] = vector
+        return vectors
+
     def all_chunks(
         self,
         limit: int = 10000,
@@ -209,7 +245,8 @@ class VectorStore:
             }
 
         info = self.client.get_collection(settings.qdrant_collection)
-        if knowledge_base_ids:
+        if knowledge_base_ids is not None:
+            # 含 `[]`：零可见用户的 chunk 数是 0，不是整个 collection 的点数。
             chunks = self.all_chunks(knowledge_base_ids=knowledge_base_ids)
             count = len(chunks)
         else:

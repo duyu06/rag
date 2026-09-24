@@ -31,10 +31,12 @@ class RuntimeUsabilityContractsTest(unittest.TestCase):
         self.assertIn('raise ValueError("无效检索模式")', retrieval)
 
     def test_ollama_probe_checks_configured_tag(self):
-        rag = (ROOT / "backend/app/rag.py").read_text(encoding="utf-8")
-        self.assertIn("def _ollama_model_installed", rag)
-        self.assertIn('if ":" in wanted:', rag)
-        self.assertIn("return wanted in installed_names", rag)
+        # Model Router V2.3 Task 2（D6）：probe 与其 model-installed 判定随迁至
+        # app/llm/health.py（HTTP 出口在 app/llm/provider.py）。三条断言原样保留，只换文件。
+        health = (ROOT / "backend/app/llm/health.py").read_text(encoding="utf-8")
+        self.assertIn("def _ollama_model_installed", health)
+        self.assertIn('if ":" in wanted:', health)
+        self.assertIn("return wanted in installed_names", health)
 
     def test_agent_stream_releases_busy_state_on_eof(self):
         api = (ROOT / "frontend/src/lib/api.ts").read_text(encoding="utf-8")

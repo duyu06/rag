@@ -66,6 +66,11 @@
 - [ ] Vector / BM25 / Hybrid / Hybrid+Rerank all return valid results on the bundled evaluation set
 - [ ] P1.6 Hybrid Hit@1 / Hit@3 / MRR are reviewed before release
 - [ ] known single-query vector rank movement is treated as diagnostic, not tuned at the expense of overall recall
+- [ ] `python scripts/complex_accuracy.py` → four-mode complex retrieval / compound / RBAC gate PASS
+- [ ] `python scripts/complex_accuracy.py --with-llm` → multi-turn Citation + no-answer boundary PASS
+- [ ] TypeSafe active strict gates → complex 426+ requests and LLM boundary 36+ requests, `degraded=0`, unauthorized candidates `0`
+- [ ] TypeSafe fault injection → business API HTTP 200, `typesafe_degraded=true`, deterministic fallback
+- [ ] TypeSafe key scan → frontend / response / SSE / SQLite / Trace / audit / Git history all clean
 
 ## P1.8 Interview Readiness gate
 

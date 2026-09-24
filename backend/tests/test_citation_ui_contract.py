@@ -9,8 +9,9 @@ class CitationUiContractsTest(unittest.TestCase):
         actions = (ROOT / "frontend/src/components/CitationActions.tsx").read_text(encoding="utf-8")
 
         self.assertIn('kbName !== "知识库"', actions)
-        self.assertIn('kbName.startsWith("Web ·")', actions)
-        self.assertIn('kbTag.textContent = `Web · ${parsed.hostname}`', actions)
+        # 显示层中文化后，公开网页来源的标签前缀是 "网页 · "（原 "Web · "）。
+        self.assertIn('kbName.startsWith("网页 ·")', actions)
+        self.assertIn('kbTag.textContent = `网页 · ${parsed.hostname}`', actions)
         self.assertIn('yaoke-web-source-open', actions)
         self.assertIn('yaoke-source-open', actions)
         self.assertIn('api.openSource(kbId, fileName)', actions)

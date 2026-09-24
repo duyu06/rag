@@ -13,10 +13,21 @@ class BrandingContractsTest(unittest.TestCase):
         env_example = (ROOT / "backend/.env.example").read_text(encoding="utf-8")
         logo = ROOT / "frontend/public/yaoke-logo.webp"
 
-        self.assertIn('title: "yaoke"', layout)
-        self.assertIn('/yaoke-logo.webp', layout)
-        self.assertIn('/yaoke-logo.webp', page)
+        # 浏览器标题带上中文产品定位；lang 已切到 zh-CN。
+        self.assertIn('title: "yaoke · 企业知识操作系统"', layout)
+        self.assertIn('description: "yaoke · 企业知识库：问答 / 检索 / 证据 / 评测 / 治理"', layout)
+        self.assertIn('<html lang="zh-CN">', layout)
+        # 品牌标记仍是内联的字母 mark（不是图片资源），侧栏与登录页各一处。
+        self.assertIn('<div className="side-brand">', page)
+        self.assertIn('<span className="mark" aria-hidden="true">Y</span>', page)
+        self.assertIn(
+            '<span className="mark" style={{ background: "#fff", color: "var(--dark)" }} aria-hidden="true">Y</span>',
+            page,
+        )
+        self.assertNotIn('/yaoke-logo.webp', layout)
+        self.assertNotIn('/yaoke-logo.webp', page)
         self.assertIn('<strong>yaoke</strong>', page)
+        self.assertIn('<span>企业知识操作系统</span>', page)
         self.assertIn('QDRANT_COLLECTION=yaoke', env_example)
         self.assertIn('JWT_SECRET=change-me-before-production-yaoke-demo-secret', env_example)
         self.assertTrue(logo.exists(), "yaoke logo asset is missing")

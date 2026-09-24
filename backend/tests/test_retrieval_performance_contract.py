@@ -65,6 +65,7 @@ class RetrievalPerformanceContractTests(unittest.TestCase):
 
     def test_explicit_rerank_is_bounded(self):
         self.assertIn("retrieval_rerank_candidates", CONFIG)
+        self.assertIn("retrieval_rerank_candidates: int = Field(default=6", CONFIG)
         self.assertIn("rerank_pool_size", RETRIEVAL)
         self.assertIn("rows = rows[:rerank_pool_size]", RETRIEVAL)
 

@@ -67,15 +67,15 @@ export default function DemoReadiness({ onNavigate }: { onNavigate: (view: "chat
     return [
       {
         key: "runtime",
-        label: "API Runtime",
+        label: "API 运行时",
         ok: health ? health.status === "healthy" : null,
-        detail: health ? `${health.phase || "unknown"} / v${health.version || "?"}` : "等待健康检查",
+        detail: health ? `${health.phase || "未知"} / v${health.version || "?"}` : "等待健康检查",
       },
       {
         key: "qdrant",
         label: "Qdrant",
         ok: health ? Boolean(health.vector_db_connected) : null,
-        detail: health?.vector_db_connected ? "Vector DB connected" : "未连接",
+        detail: health?.vector_db_connected ? "向量库已连接" : "未连接",
       },
       {
         key: "ornith",
@@ -85,27 +85,27 @@ export default function DemoReadiness({ onNavigate }: { onNavigate: (view: "chat
       },
       {
         key: "corpus",
-        label: "Demo Corpus",
+        label: "演示语料",
         ok: demo ? Boolean(demo.ready) && corpusTotal > 0 && corpusReady === corpusTotal : null,
-        detail: demo ? `${corpusReady}/${corpusTotal} ready` : "等待 Demo 状态",
+        detail: demo ? `${corpusReady}/${corpusTotal} 就绪` : "等待演示数据状态",
       },
       {
         key: "local-policy",
-        label: "Local Tool Policy",
+        label: "本地工具策略",
         ok: localTools ? toolPolicyOk(local, ["enterprise_search"]) : null,
-        detail: localTools ? Array.from(local).join(" + ") || "无工具" : "等待 Tool Registry",
+        detail: localTools ? Array.from(local).join(" + ") || "无工具" : "等待工具注册表",
       },
       {
         key: "auto-policy",
-        label: "Auto Tool Policy",
+        label: "自动工具策略",
         ok: autoTools ? toolPolicyOk(auto, ["enterprise_search", "web_search"]) : null,
-        detail: autoTools ? Array.from(auto).join(" + ") || "无工具" : "等待 Tool Registry",
+        detail: autoTools ? Array.from(auto).join(" + ") || "无工具" : "等待工具注册表",
       },
       {
         key: "streaming",
-        label: "Native Streaming",
+        label: "原生流式输出",
         ok: health ? health.native_streaming === true && health.phase === "P1.8" : null,
-        detail: health?.native_streaming ? "Conversation SSE · local native stream" : "等待 P1.8 runtime",
+        detail: health?.native_streaming ? "对话 SSE · 本地原生流式" : "等待 P1.8 运行时",
       },
     ];
   }, [health, demo, localTools, autoTools]);
@@ -114,7 +114,7 @@ export default function DemoReadiness({ onNavigate }: { onNavigate: (view: "chat
   const ready = checks.length > 0 && passed === checks.length;
   const metrics = [
     ["文档", stats?.total_documents ?? "—"],
-    ["Chunks", stats?.total_chunks ?? "—"],
+    ["分块", stats?.total_chunks ?? "—"],
     ["今日问答", stats?.today_queries ?? 0],
     ["平均耗时", `${Math.round(stats?.avg_query_latency_ms ?? 0)} ms`],
     ["拒绝访问", stats?.denied_access ?? 0],
@@ -125,7 +125,7 @@ export default function DemoReadiness({ onNavigate }: { onNavigate: (view: "chat
       <div className="panel-head" style={{ alignItems: "flex-start" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
-            <h3 style={{ margin: 0 }}>Interview Readiness</h3>
+            <h3 style={{ margin: 0 }}>演示就绪检查</h3>
             <span
               style={{
                 borderRadius: 999,
@@ -136,11 +136,11 @@ export default function DemoReadiness({ onNavigate }: { onNavigate: (view: "chat
                 color: ready ? "#067647" : "#b54708",
               }}
             >
-              {loading ? "CHECKING" : ready ? "READY" : "DEGRADED"}
+              {loading ? "检查中" : ready ? "就绪" : "降级"}
             </span>
           </div>
           <p style={{ marginTop: 6 }}>
-            P1.8 演示前一屏检查：运行依赖、20/20 数据、Tool Policy、原生 Streaming 与最近运行指标。
+            P1.8 演示前一屏检查：运行依赖、20/20 数据、工具策略、原生流式输出与最近运行指标。
           </p>
         </div>
         <button className="link-btn" disabled={loading} onClick={() => void refresh()}>
@@ -162,7 +162,7 @@ export default function DemoReadiness({ onNavigate }: { onNavigate: (view: "chat
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
               <strong style={{ fontSize: 12 }}>{item.label}</strong>
               <span style={{ fontSize: 11, fontWeight: 800, color: item.ok === true ? "#067647" : item.ok === false ? "#b42318" : "#667085" }}>
-                {item.ok === true ? "PASS" : item.ok === false ? "FAIL" : "…"}
+                {item.ok === true ? "通过" : item.ok === false ? "失败" : "…"}
               </span>
             </div>
             <div style={{ marginTop: 6, fontSize: 10, lineHeight: 1.45, color: "#667085", wordBreak: "break-word" }}>
@@ -185,7 +185,7 @@ export default function DemoReadiness({ onNavigate }: { onNavigate: (view: "chat
 
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
         <small style={{ color: "#667085" }}>
-          {lastChecked ? `最近检查：${lastChecked.toLocaleTimeString("zh-CN", { hour12: false })} · ${passed}/${checks.length} PASS` : "尚未完成检查"}
+          {lastChecked ? `最近检查：${lastChecked.toLocaleTimeString("zh-CN", { hour12: false })} · ${passed}/${checks.length} 通过` : "尚未完成检查"}
         </small>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="link-btn" onClick={() => onNavigate("system")}>系统状态</button>

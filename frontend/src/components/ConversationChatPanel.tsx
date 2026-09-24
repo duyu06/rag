@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, KnowledgeBase, Source } from "@/lib/api";
+import AgentModeToggle from "@/components/AgentModeToggle";
 import {
   activeConversationPreference,
   Conversation,
@@ -37,9 +38,13 @@ function latestAssistant(messages: ConversationMessage[]) {
 export default function ConversationChatPanel({
   selectedKb,
   bases,
+  canWrite,
+  canUseAgent,
 }: {
   selectedKb: string;
   bases: KnowledgeBase[];
+  canWrite: boolean;
+  canUseAgent: boolean;
 }) {
   const [items, setItems] = useState<ConversationSummary[]>([]);
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -48,7 +53,17 @@ export default function ConversationChatPanel({
   const [rerank, setRerank] = useState(false);
   const [error, setError] = useState("");
   const [selectedMessageId, setSelectedMessageId] = useState("");
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [phase, setPhase] = useState<"idle" | "connecting" | "retrieving" | "generating" | "finalizing">("idle");
+  const [phaseMessage, setPhaseMessage] = useState("");
   const initialSelectedKb = useRef(selectedKb);
+
+  const applyServerStatus = useCallback((serverPhase: string, message: string) => {
+    if (serverPhase === "retrieving") setPhase("retrieving");
+    else if (serverPhase === "generating") setPhase("generating");
+    else setPhase("connecting");
+    setPhaseMessage(message);
+  }, []);
 
   const selectedName = selectedKb === "all"
     ? "全部可访问知识库"
@@ -70,6 +85,7 @@ export default function ConversationChatPanel({
   }, []);
 
   const createConversation = useCallback(async () => {
+    if (!canWrite) throw new Error("当前账号只有会话只读权限");
     setError("");
     const created = await conversationApi.create(selectedKb);
     setConversation(created);
@@ -78,7 +94,7 @@ export default function ConversationChatPanel({
     setInput("");
     await reloadList();
     return created;
-  }, [reloadList, selectedKb]);
+  }, [canWrite, reloadList, selectedKb]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +106,7 @@ export default function ConversationChatPanel({
         const candidate = rows.find((item) => item.id === preferred)?.id || rows[0]?.id;
         if (candidate) {
           await openConversation(candidate);
-        } else {
+        } else if (canWrite) {
           const created = await conversationApi.create(initialSelectedKb.current);
           if (cancelled) return;
           setConversation(created);
@@ -100,13 +116,15 @@ export default function ConversationChatPanel({
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "会话加载失败");
+      } finally {
+        if (!cancelled) setInitialLoading(false);
       }
     };
     void boot();
     return () => {
       cancelled = true;
     };
-  }, [openConversation, reloadList]);
+  }, [canWrite, openConversation, reloadList]);
 
   const selectedSources: Source[] = useMemo(() => {
     if (!conversation) return [];
@@ -117,8 +135,10 @@ export default function ConversationChatPanel({
 
   const send = async (preset?: string) => {
     const question = (preset ?? input).trim();
-    if (!question || running) return;
+    if (!question || running || !canWrite) return;
     setRunning(true);
+    setPhase("connecting");
+    setPhaseMessage("正在建立安全连接");
     setError("");
     setInput("");
 
@@ -150,6 +170,8 @@ export default function ConversationChatPanel({
         messages: [...active.messages, optimisticUser, optimisticAssistant],
       });
       setSelectedMessageId(optimisticAssistant.id);
+      setPhase("retrieving");
+      setPhaseMessage("正在等待授权检索");
 
       const result = await conversationApi.sendStream(
         active.id,
@@ -159,7 +181,10 @@ export default function ConversationChatPanel({
           rerank,
         },
         {
+          onStatus: applyServerStatus,
           onToken: (text) => {
+            setPhase("generating");
+            setPhaseMessage("已找到依据，正在组织回答");
             setConversation((current) => current ? {
               ...current,
               messages: current.messages.map((item) =>
@@ -170,6 +195,8 @@ export default function ConversationChatPanel({
             } : current);
           },
           onSources: (sources) => {
+            setPhase("generating");
+            setPhaseMessage("已找到依据，正在组织回答");
             setConversation((current) => current ? {
               ...current,
               messages: current.messages.map((item) =>
@@ -179,6 +206,8 @@ export default function ConversationChatPanel({
           },
         },
       );
+      setPhase("finalizing");
+      setPhaseMessage("正在保存回答与引用");
       setConversation(result.conversation);
       setSelectedMessageId(result.message.id);
       await reloadList();
@@ -194,6 +223,8 @@ export default function ConversationChatPanel({
       }
     } finally {
       setRunning(false);
+      setPhase("idle");
+      setPhaseMessage("");
     }
   };
 
@@ -201,6 +232,8 @@ export default function ConversationChatPanel({
     if (!conversation || running || message.role !== "assistant" || message.status !== "failed") return;
     const active = conversation;
     setRunning(true);
+    setPhase("retrieving");
+    setPhaseMessage("正在重新检索授权知识");
     setError("");
     setSelectedMessageId(message.id);
     setConversation({
@@ -221,7 +254,10 @@ export default function ConversationChatPanel({
           rerank,
         },
         {
+          onStatus: applyServerStatus,
           onToken: (text) => {
+            setPhase("generating");
+            setPhaseMessage("已找到依据，正在组织回答");
             setConversation((current) => current ? {
               ...current,
               messages: current.messages.map((item) =>
@@ -230,6 +266,8 @@ export default function ConversationChatPanel({
             } : current);
           },
           onSources: (sources) => {
+            setPhase("generating");
+            setPhaseMessage("已找到依据，正在组织回答");
             setConversation((current) => current ? {
               ...current,
               messages: current.messages.map((item) =>
@@ -239,6 +277,8 @@ export default function ConversationChatPanel({
           },
         },
       );
+      setPhase("finalizing");
+      setPhaseMessage("正在保存回答与引用");
       setConversation(result.conversation);
       setSelectedMessageId(result.message.id);
       await reloadList();
@@ -252,12 +292,15 @@ export default function ConversationChatPanel({
       }
     } finally {
       setRunning(false);
+      setPhase("idle");
+      setPhaseMessage("");
     }
   };
 
   const removeConversation = async (item: ConversationSummary) => {
     if (!confirm(`确认删除会话“${item.title}”？`)) return;
     setError("");
+    setItems((current) => current.filter((row) => row.id !== item.id));
     try {
       await conversationApi.remove(item.id);
       const rows = await reloadList();
@@ -268,18 +311,21 @@ export default function ConversationChatPanel({
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "删除会话失败");
+      await reloadList().catch(() => undefined);
     }
   };
 
   const renameConversation = async (item: ConversationSummary) => {
     const value = prompt("会话名称", item.title)?.trim();
     if (!value || value === item.title) return;
+    setItems((current) => current.map((row) => row.id === item.id ? { ...row, title: value } : row));
     try {
       const updated = await conversationApi.rename(item.id, value);
       if (conversation?.id === item.id) setConversation(updated);
       await reloadList();
     } catch (e) {
       setError(e instanceof Error ? e.message : "重命名失败");
+      await reloadList().catch(() => undefined);
     }
   };
 
@@ -300,10 +346,11 @@ export default function ConversationChatPanel({
   return (
     <section className="conversation-shell" aria-label="持久化 AI 会话">
       <aside className="conversation-history panel">
-        <button className="primary full" onClick={() => void createConversation()} disabled={running}>
+        {canWrite && <button className="primary full" onClick={() => void createConversation()} disabled={running}>
           ＋ 新建会话
-        </button>
+        </button>}
         <div className="conversation-history-list">
+          {initialLoading && [0, 1, 2].map((item) => <div className="skeleton conversation-skeleton" key={item} />)}
           {items.map((item) => {
             const active = conversation?.id === item.id;
             return (
@@ -317,12 +364,13 @@ export default function ConversationChatPanel({
                   <span>{item.message_count} 条消息 · {compactTime(item.updated_at)}</span>
                 </button>
                 <div className="conversation-history-actions">
-                  <button className="link-btn" onClick={() => void renameConversation(item)}>重命名</button>
-                  <button className="danger-link" onClick={() => void removeConversation(item)}>删除</button>
+                  {canWrite && <button className="link-btn" onClick={() => void renameConversation(item)}>重命名</button>}
+                  {canWrite && <button className="danger-link" onClick={() => void removeConversation(item)}>删除</button>}
                 </div>
               </div>
             );
           })}
+          {!initialLoading && items.length === 0 && <p className="history-empty">暂无可查看的会话</p>}
         </div>
       </aside>
 
@@ -332,25 +380,31 @@ export default function ConversationChatPanel({
             <span className="assistant-logo">AI</span>
             <div>
               <h3>{conversation?.title || "企业知识助手"}</h3>
-              <p>检索范围：{selectedName} · 历史已持久化 · Local 模式支持原生流式</p>
+              <p>检索范围：{selectedName} · 历史已持久化 · 本地模式支持原生流式输出</p>
             </div>
           </div>
-          <label className="switch-label">
-            <input type="checkbox" checked={rerank} onChange={(e) => setRerank(e.target.checked)} />启用 Rerank
-          </label>
+          <div className="chat-controls">
+            {canUseAgent && <AgentModeToggle embedded />}
+            <label className="switch-label">
+              <input type="checkbox" checked={rerank} onChange={(e) => setRerank(e.target.checked)} disabled={!canWrite} />启用重排序
+            </label>
+          </div>
         </div>
 
-        {error && <div className="notice danger conversation-error">{error}</div>}
+        {error && <div className="notice danger conversation-error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label="关闭错误">×</button></div>}
+        {running && <div className="generation-status" role="status" aria-live="polite"><i />{phaseMessage || (phase === "connecting" ? "正在建立安全连接" : phase === "retrieving" ? "正在执行权限过滤与知识检索" : phase === "generating" ? "已找到依据，正在组织回答" : "正在保存回答与引用")}</div>}
 
         <div className="conversation-message-list">
-          {!conversation?.messages.length && !running ? (
+          {initialLoading ? (
+            <div className="chat-loading" aria-label="正在恢复会话"><div className="skeleton message-skeleton short" /><div className="skeleton message-skeleton" /><div className="skeleton message-skeleton short" /></div>
+          ) : !conversation?.messages.length && !running ? (
             <div className="chat-empty">
-              <img className="large-mark" src="/yaoke-logo.webp" alt="yaoke" style={{ objectFit: "contain", background: "#fff" }} />
-              <h2>今天想查什么企业知识？</h2>
-              <p>当前会话会保存在服务端 SQLite，刷新或重新打开网页后仍可恢复。</p>
-              <div className="suggestions">
+              <span className="large-mark" aria-hidden="true">Y</span>
+              <h2>{canWrite ? "今天想查什么企业知识？" : "暂无可查看的会话"}</h2>
+              <p>{canWrite ? "回答只会使用当前账号有权访问的知识，并附上可核验来源。" : "当前账号只有读取权限，已有会话会显示在左侧。"}</p>
+              {canWrite && <div className="suggestions">
                 {suggestions.map((item) => <button key={item} onClick={() => void send(item)}>{item}</button>)}
-              </div>
+              </div>}
             </div>
           ) : (
             <div className="conversation persistent-conversation">
@@ -399,9 +453,11 @@ export default function ConversationChatPanel({
                 void send();
               }
             }}
-            placeholder="输入问题；Enter 发送，Shift+Enter 换行"
+            placeholder={canWrite ? "输入问题；Enter 发送，Shift+Enter 换行" : "当前账号只有会话只读权限"}
+            disabled={!canWrite}
+            aria-label="向企业知识助手提问"
           />
-          <button className="primary" disabled={running || !input.trim()} onClick={() => void send()}>
+          <button className="primary" disabled={!canWrite || running || !input.trim()} onClick={() => void send()}>
             {running ? "生成中" : "发送"}
           </button>
         </div>
@@ -425,7 +481,7 @@ export default function ConversationChatPanel({
             <div>
               <strong>{source.title || source.file_name}</strong>
               <span className="kb-tag">
-                {source.source_type === "web" ? `Web${source.domain ? ` · ${source.domain}` : ""}` : source.knowledge_base_name || "企业知识库"}
+                {source.source_type === "web" ? `网页${source.domain ? ` · ${source.domain}` : ""}` : source.knowledge_base_name || "企业知识库"}
               </span>
               <span>
                 {source.page ? `第 ${source.page} 页 · ` : ""}

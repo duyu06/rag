@@ -1,0 +1,22 @@
+=== 停止前记录（恢复清单）===
+aclc-api-1
+aclc-temporal-1
+aclc-postgres-1
+aclc-redis-1
+aclc-object-storage-1
+aclc-prometheus-1
+ai-commerce-prometheus-1
+ai-commerce-otel-collector-1
+ai-commerce-api-1
+ai-commerce-temporal-1
+ai-commerce-web-1
+ai-commerce-temporal-ui-1
+ai-commerce-grafana-1
+ai-commerce-postgres-1
+ai-commerce-redis-1
+ai-commerce-object-storage-1
+yaoke-postgres
+yaoke-redis
+yaoke-minio
+rag-backend-1
+rag-qdrant-1

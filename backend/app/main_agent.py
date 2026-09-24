@@ -4,8 +4,10 @@ from app.agent_routes import router as agent_router
 from app.config import settings
 from app.conversation_routes import router as conversation_router
 from app.conversation_stream_routes import router as conversation_stream_router
+from app.knowledge_os import router as knowledge_os_router
+from app.llm.health import probe_llm, probe_ollama
 from app.main import app
-from app.rag import current_model_name, probe_llm, probe_ollama
+from app.rag import current_model_name
 from app.store import vector_store
 
 # P1.8 runtime metadata for the yaoke Agent entrypoint.
@@ -75,3 +77,4 @@ def yaoke_health():
 app.include_router(agent_router)
 app.include_router(conversation_router)
 app.include_router(conversation_stream_router)
+app.include_router(knowledge_os_router)

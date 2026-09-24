@@ -6,6 +6,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from app.security import redact_secrets
+
 AUDIT_PATH = Path("data/audit.jsonl")
 _LOCK = Lock()
 
@@ -38,7 +40,7 @@ def record_event(
         "detail": detail,
     }
     event.update({key: value for key, value in optional.items() if value is not None})
-    line = json.dumps(event, ensure_ascii=False)
+    line = json.dumps(redact_secrets(event), ensure_ascii=False)
     with _LOCK:
         with AUDIT_PATH.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
@@ -52,7 +54,9 @@ def recent_events(limit: int = 100) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for line in reversed(lines[-max(limit * 3, limit) :]):
         try:
-            events.append(json.loads(line))
+            # Redact on read as well so historical rows written before this
+            # boundary was introduced cannot leak through the admin API.
+            events.append(redact_secrets(json.loads(line)))
         except json.JSONDecodeError:
             continue
         if len(events) >= limit:
@@ -60,9 +64,11 @@ def recent_events(limit: int = 100) -> list[dict[str, Any]]:
     return events
 
 
-def today_summary() -> dict[str, Any]:
+def today_summary(*, username: str | None = None) -> dict[str, Any]:
     today = datetime.now(timezone.utc).date().isoformat()
     events = [item for item in recent_events(5000) if str(item.get("timestamp", "")).startswith(today)]
+    if username is not None:
+        events = [item for item in events if item.get("username") == username]
     queries = [item for item in events if item.get("action") == "QUERY" and item.get("status") == "SUCCESS"]
     denied = [item for item in events if item.get("status") == "DENIED"]
     latencies = [float(item["latency_ms"]) for item in queries if item.get("latency_ms") is not None]

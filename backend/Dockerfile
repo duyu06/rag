@@ -11,9 +11,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY config ./config
 COPY eval_dataset.json ./eval_dataset.json
 COPY eval_retrieval.py ./eval_retrieval.py
 RUN mkdir -p /app/data/documents /app/demo-data

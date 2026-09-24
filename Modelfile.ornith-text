@@ -1,0 +1,2 @@
+FROM D:\ollama\blobs\sha256-852922174ee4f76621df26105333f1dfe2171cdfb60ebe5a4b013836681a8a77
+TEMPLATE {{ .Prompt }}

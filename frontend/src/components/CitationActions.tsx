@@ -14,9 +14,10 @@ const KB_NAME_TO_ID: Record<string, string> = {
 function webUrlFromCard(card: HTMLElement): string | null {
   const kbName = card.querySelector<HTMLElement>(".kb-tag")?.textContent?.trim() || "";
   // Agent web evidence currently has no enterprise KB name, so the base UI falls back to “知识库”.
-  // Treat only that fallback (or an already decorated Web tag) as eligible for URL classification;
+  // Treat only that fallback (or an already decorated 网页 tag) as eligible for URL classification;
   // known enterprise KB cards are never inferred as public web evidence even if their text contains a URL.
-  if (kbName !== "知识库" && !kbName.startsWith("Web ·")) return null;
+  // The “网页 · ” prefix mirrors the display text rendered by the conversation source panel.
+  if (kbName !== "知识库" && !kbName.startsWith("网页 ·")) return null;
 
   const text = card.querySelector("p")?.textContent || "";
   const match = text.match(/https?:\/\/[^\s]+/i);
@@ -53,7 +54,7 @@ export default function CitationActions() {
         const webUrl = webUrlFromCard(card);
         if (webUrl) {
           const parsed = new URL(webUrl);
-          if (kbTag) kbTag.textContent = `Web · ${parsed.hostname}`;
+          if (kbTag) kbTag.textContent = `网页 · ${parsed.hostname}`;
 
           const link = document.createElement("a");
           link.className = "link-btn yaoke-web-source-open";

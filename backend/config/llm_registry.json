@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "ollama-ornith",
+      "provider": "ollama",
+      "model": "ornith-1.5:9b-text",
+      "enabled": true,
+      "external": false,
+      "capabilities": { "chat": true, "rag": true, "tools": false, "stream": true, "reasoning": true },
+      "priority": { "chat": 100, "rag": 100, "tools": 0 },
+      "limits": { "context_tokens": 8192, "max_output_tokens": 2048 },
+      "pricing": { "input_per_1m": 0.0, "output_per_1m": 0.0, "currency": "USD" }
+    },
+    {
+      "id": "ollama-phi3",
+      "provider": "ollama",
+      "model": "phi3:mini",
+      "enabled": true,
+      "external": false,
+      "capabilities": { "chat": true, "rag": true, "tools": false, "stream": true, "reasoning": false },
+      "priority": { "chat": 80, "rag": 80, "tools": 0 },
+      "limits": { "context_tokens": 8192, "max_output_tokens": 2048 },
+      "pricing": { "input_per_1m": 0.0, "output_per_1m": 0.0, "currency": "USD" }
+    },
+    {
+      "id": "openai",
+      "provider": "openai",
+      "model": "gpt-4.1-mini",
+      "enabled": true,
+      "external": true,
+      "capabilities": { "chat": true, "rag": true, "tools": true, "stream": true, "reasoning": false },
+      "priority": { "chat": 90, "rag": 90, "tools": 100 },
+      "limits": { "context_tokens": 128000, "max_output_tokens": 8192 },
+      "pricing": { "input_per_1m": 0.40, "output_per_1m": 1.60, "currency": "USD" }
+    },
+    {
+      "id": "deepseek-chat",
+      "provider": "deepseek",
+      "model": "deepseek-chat",
+      "enabled": false,
+      "external": true,
+      "capabilities": { "chat": true, "rag": true, "tools": true, "stream": true, "reasoning": false },
+      "priority": { "chat": 70, "rag": 70, "tools": 90 },
+      "limits": { "context_tokens": 65536, "max_output_tokens": 8192 },
+      "pricing": { "input_per_1m": 0.27, "output_per_1m": 1.10, "currency": "USD" }
+    },
+    {
+      "id": "qwen-plus",
+      "provider": "qwen",
+      "model": "qwen-plus",
+      "enabled": false,
+      "external": true,
+      "capabilities": { "chat": true, "rag": true, "tools": true, "stream": true, "reasoning": false },
+      "priority": { "chat": 60, "rag": 60, "tools": 80 },
+      "limits": { "context_tokens": 131072, "max_output_tokens": 8192 },
+      "pricing": { "input_per_1m": 0.40, "output_per_1m": 1.20, "currency": "USD" }
+    }
+  ]
+}
