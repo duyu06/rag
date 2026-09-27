@@ -1,0 +1,36 @@
+{
+  "profile": {
+    "time_cost": 2,
+    "memory_cost": 19456,
+    "parallelism": 1
+  },
+  "environment": "win32",
+  "serial": {
+    "runs": 50,
+    "p50_ms": 53.5,
+    "p95_ms": 60.9
+  },
+  "concurrent": {
+    "runs": 32,
+    "workers": 2,
+    "p95_ms": 88.5
+  },
+  "peak_rss_delta_kib": null,
+  "budget": {
+    "serial_p95_ms": 1500.0,
+    "concurrent_p95_ms": 3000.0,
+    "rss_delta_kib": 262144
+  },
+  "environment_detail": {
+    "python": "3.13.7",
+    "peak_rss_delta_unit": "KiB on Linux (ru_maxrss); macOS reports bytes — container is the criterion",
+    "rss_delta_meaning": "process peak RSS high-water mark minus baseline, not per-op footprint"
+  },
+  "budget_checks": {
+    "serial_p95": true,
+    "concurrent_p95": true,
+    "peak_rss_delta": null
+  },
+  "verdict": "NOT_THE_CRITERION",
+  "verdict_reason": "ru_maxrss 在 win32 上不可得（无 resource 模块）；SECA-19 只按 argon2-benchmark-container.json 判，本文件仅作对照。"
+}

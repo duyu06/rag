@@ -8,7 +8,7 @@ from threading import Lock
 from typing import Any
 from uuid import uuid4
 
-from app.security import redact_secrets, redact_text
+from app.security import redact_for_persistence, redact_text
 
 TRACE_PATH = Path("data/agent_traces.jsonl")
 _LOCK = Lock()
@@ -70,7 +70,7 @@ def public_args(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def save_trace(trace: dict[str, Any]) -> None:
     TRACE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(redact_secrets(trace), ensure_ascii=False)
+    line = json.dumps(redact_for_persistence(trace), ensure_ascii=False)
     with _LOCK:
         with TRACE_PATH.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
@@ -88,5 +88,5 @@ def get_trace(trace_id: str) -> dict[str, Any] | None:
             continue
         if item.get("trace_id") == trace_id:
             # Keep legacy trace rows safe when served through the debugger.
-            return redact_secrets(item)
+            return redact_for_persistence(item)
     return None

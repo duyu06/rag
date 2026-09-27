@@ -28,6 +28,13 @@
 - `validate_evidence()` 会**重新 sha1 盘上的文件**并逐枚比对 `files_sha1`。所以「手抄一份
   JSON 声称跑过」在文件层面就会被抓住——但真正的不可伪造性来自「phi3 的中文答案只能真生成
   出来」，sha1 只是防篡改的第二道。
+- §5.5 的**登录凭据接缝**（`install_login_credential_seam()`）是 SEC-A Task 10f 登记的
+  harness 侧垫脚：它包 `usage.init_usage_db`，只在那枚开关（`acceptance_enabled()`）打开时
+  装上，开关不合时对 `app.llm.usage` 一个字节都不碰。它是「测试怎么造出凭据行」这件事，
+  不是「产品怎么造出凭据行」——§8.2 的设计（生产代码永不自动造凭据行）由
+  `tests/test_security_a_closure.py` 的负向对照继续钉住，接缝**没有**把它放宽。
+  所有 import 都在函数体内（与 `repo_ledger_row_counts()` 借 conftest 同一手法），
+  所以本模块在收集阶段被 import 时仍然零副作用。
 """
 from __future__ import annotations
 
@@ -45,7 +52,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 TESTS_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = TESTS_DIR.parent
@@ -427,6 +434,104 @@ def repo_ledger_row_counts() -> dict[str, int | None]:
 
     return {str(path): count for path, count in
             ledger_guard.real_ledger_row_counts().items()}
+
+
+# ==========================================================================
+# 5.5 P0 登录腿的凭据接缝（SEC-A Task 10f）
+# ==========================================================================
+# **为什么存在（不是"顺手补一句 seed"）**
+#
+# SEC-A 把 `app/auth.py` 的硬编码 `USERS` 换成 SQLite 里的 argon2id 行之后，按规格
+# §8.2/§8.5/§8.6 的设计：**生产代码永不自动造凭据行**。一份只有 schema 的新库里没有任何
+# 凭据行，登录因此**统一**塌成 401 `invalid_credentials`（fail-closed，不是 500，也不是
+# "帮你建一个"）。这条设计本身是对的，被 `tests/test_security_a_closure.py` 与
+# `test_credentials_contract.py` 钉着。
+#
+# 代价落在 §16「必须原样绿」那 8 处登录调用点里最特殊的一枚：
+# `test_real_llm_failover_acceptance.py:686`。它跑在**自己造的临时库**上（`setUp` 调
+# `usage.init_usage_db(<证据目录>/run/<stamp>/conversations.db)`），因此**拿不到**
+# `tests/conftest.py` 那份会话级 `seed_demo_credentials()`（那份 seed 落在会话临时库，
+# 不是这一枚文件）。规格对这一枚的要求写得很死：调用形式与口令字面量都不改，
+# 「改的是它们脚下的凭据来源（fixture 造 argon2id 行，§8.2 与 SECA-24）」——而那份文件是
+# V2.3 封版产物（do-not-touch），所以"脚下"只能由 harness 层来垫。本接缝就是那层垫脚。
+#
+# **它凭什么对默认套件是惰性的**：唯一的门是 `acceptance_enabled()`（即
+# `REAL_LLM_ACCEPTANCE=1`，与 §闸② 给 P0 用例设的那枚收集门同一枚开关、同一个函数）。
+# 这里刻意**不**长出第二个条件：两处解析开关 = 两处口径，正是闸②点名禁止的形状。
+# 因此默认套件里 `install_login_credential_seam()` 直接返回 False，`app.llm.usage`
+# 的 `init_usage_db` 属性**一字未动**（由 `tests/test_security_a_closure.py` 钉住）。
+#
+# **它为什么不走第四条 seed 路径**：造行这件事完全委托
+# `tests/sec_a_seed.install_demo_credentials(target)`——那枚函数已经负责"种进**指定的这一份**
+# 文件"，并且**动手之前**先过保护集这一关（往 `backend/data/` 下的真库盖凭据行是整套护栏
+# 最想拦的形状）。落点顺序（先种凭据、后建账本表）也与
+# `test_model_router_v23_contract.py:4127-4131` 那处已存在的用法同形：目标文件尚不在场时
+# 走"整份复制模板"，一次 Argon2 都不重算。
+#: 接缝垫进临时库的那张表（表名以产品侧 `user_store.TABLE_NAME` 为准，这里只做证据描述）。
+CREDENTIAL_TABLE = "user_credentials"
+
+#: 还原钩子：非 None 表示 `init_usage_db` 当前挂着本接缝。
+_LOGIN_SEAM_RESTORE: "Callable[[], None] | None" = None
+
+
+def prepare_login_credentials(db_path: Path | str) -> None:
+    """把 demo 凭据行（argon2id）种进**指定的那一份**库文件。
+
+    纯委托给 `sec_a_seed.install_demo_credentials()`：口令字面量的唯一真源在那枚模块里，
+    本函数不复制字面量、不写 SQL、不列 schema。保护集拒写也由那枚函数负责（本函数只转发，
+    因此"拒写"这件事在接缝这条路上同样成立，见 closure 用例）。
+    """
+    import sec_a_seed
+
+    sec_a_seed.install_demo_credentials(Path(db_path))
+
+
+def login_credential_seam_is_installed() -> bool:
+    """当前进程的 `usage.init_usage_db` 是否挂着本接缝（判据取自还原钩子，不取自 env）。"""
+    return _LOGIN_SEAM_RESTORE is not None
+
+
+def install_login_credential_seam() -> bool:
+    """把 `app.llm.usage.init_usage_db` 包一层：建库之前先给那一份文件垫凭据行。
+
+    返回「接缝是否在位」。开关不合 ⇒ **一个字节都不碰**产品模块并返回 False（默认套件的
+    形状）。已在位时幂等（不叠第二层包装）。
+
+    包装是**透传**的：参数原样转发、返回值原样返回、异常原样上抛；接缝只在"调用方显式
+    指名了落点"时动作（`path is None` 时落点由 env 决定，那是会话临时库——它早就被
+    `conftest.seeded_demo_credentials` 种过了，这里不越权替别人决定落点）。
+    """
+    global _LOGIN_SEAM_RESTORE
+    if not acceptance_enabled():
+        return False
+    if _LOGIN_SEAM_RESTORE is not None:
+        return True
+    from app.llm import usage as usage_module
+
+    previous = usage_module.init_usage_db
+
+    def init_usage_db_with_credentials(*args: Any, **kwargs: Any) -> Any:
+        target = args[0] if args else kwargs.get("path")
+        if target is not None:
+            prepare_login_credentials(target)
+        return previous(*args, **kwargs)
+
+    usage_module.init_usage_db = init_usage_db_with_credentials
+    _LOGIN_SEAM_RESTORE = (
+        lambda module=usage_module, value=previous: setattr(
+            module, "init_usage_db", value))
+    return True
+
+
+def uninstall_login_credential_seam() -> bool:
+    """摘掉接缝（还原 install 时抓下的那枚属性，可能是上一层包装）。返回"摘之前是否在位"。"""
+    global _LOGIN_SEAM_RESTORE
+    restore = _LOGIN_SEAM_RESTORE
+    if restore is None:
+        return False
+    restore()
+    _LOGIN_SEAM_RESTORE = None
+    return True
 
 
 # ==========================================================================

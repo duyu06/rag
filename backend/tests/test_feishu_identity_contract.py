@@ -471,6 +471,31 @@ class ResolverTests(unittest.TestCase):
         self.assertEqual(clock.samples, 1)
 
 
+def _identity_record(username: str = "staff", role: str = "USER", **fields):
+    """`resolve_for_user` 的第三参：SEC-A 之后它是 `directory.UserIdentity`，不再是 dict。
+
+    默认 username/role 与调用处传的前两参同值：这一层的契约是"前两参与记录一致"，
+    用例里故意让它们相等，才不会把"读错字段"这种缺陷读成"参数顺序换了也能过"。
+    """
+    from app.directory import UserIdentity
+
+    return UserIdentity(username=username, display_name=username, role=role, **fields)
+
+
+def _blank_open_id_record(username: str = "staff", role: str = "USER"):
+    """一条带空串 `feishu_open_id` 的记录。
+
+    `min_length=1` 让正常装载根本到不了这个形态，所以这里用 `model_construct` 绕开校验：
+    要钉的是"空串以任何形态走到这一层，都按没有 open_id 处理"那条折叠规则本身，
+    不能只靠上游校验器代劳（校验器哪天放宽，这条就没人守了）。
+    """
+    from app.directory import UserIdentity
+
+    return UserIdentity.model_construct(
+        username=username, display_name=username, role=role, feishu_open_id=""
+    )
+
+
 class ResolveForUserTests(unittest.TestCase):
     """包入口的三态：开关关 / 无 open_id → None（本地语义）；有 open_id → 委派 resolver。"""
 
@@ -496,14 +521,19 @@ class ResolveForUserTests(unittest.TestCase):
 
     def test_disabled_returns_none_without_touching_resolver(self):
         self.settings.feishu_permissions_enabled = False
-        grant = self.identity.resolve_for_user("viewer", "USER", {"feishu_open_id": "ou_x"})
+        grant = self.identity.resolve_for_user(
+            "viewer", "USER", _identity_record("viewer", "USER", feishu_open_id="ou_x"))
         self.assertIsNone(grant)                      # 即使记录里有 open_id
         self.assertEqual(self.resolver_built, 0)
 
     def test_missing_or_blank_open_id_returns_none_without_touching_resolver(self):
         self.settings.feishu_permissions_enabled = True
-        for record in ({}, {"feishu_open_id": ""}, {"feishu_open_id": None}):
-            with self.subTest(record=record):
+        for label, record in (
+            ("no-attribute", object()),
+            ("open-id-none", _identity_record("staff", "USER")),
+            ("open-id-blank", _blank_open_id_record("staff", "USER")),
+        ):
+            with self.subTest(record=label):
                 self.assertIsNone(self.identity.resolve_for_user("staff", "USER", record))
         self.assertEqual(self.resolver_built, 0)
 
@@ -526,7 +556,8 @@ class ResolveForUserTests(unittest.TestCase):
             return real_get_resolver()
 
         self.identity.get_resolver = spy
-        grant = self.identity.resolve_for_user("staff", "ADMIN", {"feishu_open_id": "ou_9"})
+        grant = self.identity.resolve_for_user(
+            "staff", "ADMIN", _identity_record("staff", "ADMIN", feishu_open_id="ou_9"))
         self.assertEqual(self.resolver_built, 1)      # 且只装配一次
         self.assertIs(self.identity._resolver, stub)  # 用的是注入的单例，没另起真客户端
         self.assertEqual(stub.calls, [("staff", "ADMIN", "ou_9")])   # 三参原样透传，不换序
@@ -588,17 +619,19 @@ class AuthWiringTests(unittest.TestCase):
                          [("AUTHORIZATION", "DENIED")])
 
     def test_authenticate_and_require_user_inject_resolved_grant(self):
-        # 接线本身才是 Task 4 的交付物：两处构造点都必须把 `resolve_for_user` 的结果传进去，
+        # 接线本身才是这一段的交付物：两处构造点都必须把 `resolve_for_user` 的结果传进去，
         # 且每请求重解析——token 里的角色只用于回查账号，权限判定不信任它。
         import app.auth as auth
+        from app.directory import get_identity
         from app.identity.base import FeishuGrant
 
         calls = []
         saved = auth.resolve_for_user
 
         def spy(username, role, record):
-            # 第三参必须是账号记录本身：`feishu_open_id` 就住在里面，传别的等于断线。
-            calls.append((username, role, record is auth.USERS[username]))
+            # 第三参必须是身份对象本身：`feishu_open_id` 就住在它身上，传别的等于断线。
+            # 等值判的是"与 directory 交回的是同一个对象"，不是"字段抄得对"。
+            calls.append((username, role, record is get_identity(username)))
             return FeishuGrant(access_role="admin")
 
         auth.resolve_for_user = spy
@@ -1562,7 +1595,8 @@ class EndToEndGuardTests(unittest.TestCase):
 
         settings.feishu_permissions_enabled = False
         self.identity.get_resolver = self._forbid_assembly
-        grant = self.identity.resolve_for_user("hr01", "HR", {"feishu_open_id": "ou_1"})
+        grant = self.identity.resolve_for_user(
+            "hr01", "HR", _identity_record("hr01", "HR", feishu_open_id="ou_1"))
         self.assertIsNone(grant)
         self.assertEqual(self.assembly_calls, [])
         user = self._user("HR", grant)
@@ -1575,7 +1609,8 @@ class EndToEndGuardTests(unittest.TestCase):
         from app.knowledge import allowed_for, resolve_for, visible_for
 
         self._enable(self._resolver(self.HR_RULES, FakeClient(departments=["od-hr"])))
-        grant = self.identity.resolve_for_user("hr01", "HR", {"feishu_open_id": "ou_1"})
+        grant = self.identity.resolve_for_user(
+            "hr01", "HR", _identity_record("hr01", "HR", feishu_open_id="ou_1"))
         self.assertIsNotNone(grant)
         self.assertFalse(grant.degraded)
         user = self._user("HR", grant)
@@ -1602,7 +1637,8 @@ class EndToEndGuardTests(unittest.TestCase):
         client = FakeClient(departments=["od-hr"], chats=[ChatInfo("oc_hr", "HR群")],
                             members={"oc_hr": ["ou_1"]})
         self._enable(self._resolver(rules, client))
-        grant = self.identity.resolve_for_user("viewer", "VIEWER", {"feishu_open_id": "ou_1"})
+        grant = self.identity.resolve_for_user(
+            "viewer", "VIEWER", _identity_record("viewer", "VIEWER", feishu_open_id="ou_1"))
         self.assertEqual(grant.access_role, "admin")            # 多条命中取高
         self.assertTrue(grant.all_knowledge_bases)              # "*" 并集
         user = self._user("VIEWER", grant)
@@ -1626,8 +1662,17 @@ class EndToEndGuardTests(unittest.TestCase):
         from app.config import settings
         from app.knowledge import allowed_for
 
-        for record in ({}, {"feishu_open_id": ""}, {"feishu_open_id": None}):
-            self.assertIsNone(self.identity.resolve_for_user("hr01", "HR", record))
+        # 三枚形状都要过：根本没有这个属性（`getattr` 的默认值分支）、字段是 None、字段是
+        # 空串。空串那一形在 SEC-A 之后进不了正常装载（`feishu_open_id` 的 `min_length=1`
+        # 把它拒在身份文件那一步，那条由 `test_user_directory_contract.py` 钉），所以这里
+        # 用 `model_construct` 绕开校验造一条：折叠规则本身要有钉子，不能只靠上游校验器。
+        for label, record in (
+            ("no-attribute", object()),
+            ("open-id-none", _identity_record("hr01", "HR")),
+            ("open-id-blank", _blank_open_id_record("hr01", "HR")),
+        ):
+            with self.subTest(record=label):
+                self.assertIsNone(self.identity.resolve_for_user("hr01", "HR", record))
         self.assertEqual(spy.calls, 0)
         self.assertEqual(allowed_for(self._user("HR", None)), ["kb_public", "kb_hr"])
         self.assertTrue(settings.feishu_permissions_enabled)
@@ -1637,7 +1682,8 @@ class EndToEndGuardTests(unittest.TestCase):
 
         self._enable(self._resolver(self.HR_RULES, FakeClient(fail=True)))
         with _AuditRecorder() as audit:
-            grant = self.identity.resolve_for_user("hr01", "HR", {"feishu_open_id": "ou_1"})
+            grant = self.identity.resolve_for_user(
+            "hr01", "HR", _identity_record("hr01", "HR", feishu_open_id="ou_1"))
         self.assertTrue(grant.degraded)
         self.assertIsNone(grant.access_role)                    # 角色回本地，不放大
         self.assertEqual(grant.knowledge_base_ids, public_kb_ids())
@@ -1655,7 +1701,8 @@ class EndToEndGuardTests(unittest.TestCase):
         rules = {"rules": [{"match": {"department_names": ["人力资源"]},
                             "grant": {"access_role": "admin"}}]}
         self._enable(self._resolver(rules, FakeClient(departments=["od-hr"])))
-        grant = self.identity.resolve_for_user("admin", "ADMIN", {"feishu_open_id": "ou_1"})
+        grant = self.identity.resolve_for_user(
+            "admin", "ADMIN", _identity_record("admin", "ADMIN", feishu_open_id="ou_1"))
         self.assertEqual(grant.access_role, "admin")
         user = self._user("ADMIN", grant)
         self.assertEqual(allowed_for(user), [])
@@ -1692,8 +1739,8 @@ class ResponseContractTests(unittest.TestCase):
 
     def test_login_and_me_bodies_do_not_leak_grant(self):
         # 真走 HTTP：授予生效时也不许把外部身份结构体推给浏览器。
-        import app.auth as auth
         import app.identity as identity
+        import app.directory as directory
         from app.config import settings
         from app.identity.base import FeishuGrant
         from fastapi.testclient import TestClient
@@ -1704,26 +1751,36 @@ class ResponseContractTests(unittest.TestCase):
                 return FeishuGrant(access_role="user", knowledge_base_ids=["kb_hr"])
 
         state = _saved_identity_state()
-        saved_viewer = auth.USERS["viewer"]
+        # 注入走 directory 的测试接缝（身份的唯一体面入口）：过去那种"直接改常量表"的
+        # 做法已经把账号名册从 auth 里删掉了，接缝退场时自己还原，不留 half-patch。
+        identities = dict(directory.identities())
+        identities["viewer"] = directory.UserIdentity(
+            username="viewer", display_name="只读访客演示账号", role="VIEWER",
+            feishu_open_id="ou_contract_probe",
+        )
         try:
             settings.feishu_permissions_enabled = True
             identity._resolver = StubResolver()
-            auth.USERS["viewer"] = {**saved_viewer, "feishu_open_id": "ou_contract_probe"}
-            client = TestClient(app)
-            with _ModuleAuditSpy("app.main") as audit:
-                login = client.post("/api/auth/login",
-                                    json={"username": "viewer", "password": "viewer123"})
-            self.assertEqual(login.status_code, 200)
-            token = login.json()["access_token"]
-            me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
-            self.assertEqual(me.status_code, 200)
-            for body in (login.json()["user"], me.json()):
-                self.assertNotIn("grant", body)
-                self.assertEqual(set(body), self._LOCAL_KEYS)
-                self.assertEqual(body["access_role"], "user")     # 授予仍然驱动可见角色
-            self.assertEqual([e["action"] for e in audit.events], ["LOGIN"])
+            with directory.override_identities(identities):
+                client = TestClient(app)
+                with _ModuleAuditSpy("app.main") as audit:
+                    login = client.post("/api/auth/login",
+                                        json={"username": "viewer", "password": "viewer123"})
+                self.assertEqual(login.status_code, 200)
+                token = login.json()["access_token"]
+                me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+                self.assertEqual(me.status_code, 200)
+                # 两处的键集合**不同**并且都是等值判定：`password_change_required` 只加在
+                # 顶层（§11 声明的本版唯一一处响应面键变化），`user` 那一格里外没动。
+                # 少一枚等值钉，多出来的键就会在这一片"只查 grant"的断言里静默通过。
+                for body, keys in (
+                        (login.json()["user"], self._LOCAL_KEYS),
+                        (me.json(), self._LOCAL_KEYS | {"password_change_required"})):
+                    self.assertNotIn("grant", body)
+                    self.assertEqual(set(body), keys)
+                    self.assertEqual(body["access_role"], "user")     # 授予仍然驱动可见角色
+                self.assertEqual([e["action"] for e in audit.events], ["LOGIN"])
         finally:
-            auth.USERS["viewer"] = saved_viewer
             _restore_identity_state(state)
 
 
@@ -1791,17 +1848,79 @@ class LegacyAdminHelperTests(unittest.TestCase):
 class AccessTokenClaimTests(unittest.TestCase):
     """护栏 5：JWT 的 `access_role` 只作兼容展示，鉴权不读它（授予每请求重解析）。"""
 
-    def test_forged_claims_do_not_widen_permissions(self):
-        import jwt
-        from app.auth import require_user
+    #: 够长的 dev secret（≥32 字节）。默认那一枚短于 PyJWT 建议下限，每签/解一次就喊一句
+    #: `InsecureKeyLengthWarning`；本文件新增的两枚用例各签一枚 token，不该为此多出声。
+    #: 警告计数是套件的回归信号，所以新用例换钥匙、既有那枚**照旧**用 `settings` 里的现值
+    #: （它贡献的那两声是 SEC-A 之前就存在的事实，一起改掉就等于顺手挪动基线）。
+    #: 换 secret 用"存原值 + addCleanup 还原"，不用 `importlib.reload(config)`。
+    SECRET = "sec-a-feishu-claim-test-secret-0123456789abcdef"
+
+    def _quiet_secret(self) -> str:
         from app.config import settings
 
-        token = jwt.encode({"sub": "viewer", "role": "ADMIN", "access_role": "admin",
-                            "iss": "yaoke"}, settings.jwt_secret, algorithm="HS256")
-        online = require_user(f"Bearer {token}")
-        self.assertEqual(online.role, "VIEWER")                 # role 也只认本地 USERS 表
+        saved = settings.jwt_secret
+        settings.jwt_secret = self.SECRET
+        self.addCleanup(setattr, settings, "jwt_secret", saved)
+        return self.SECRET
+
+    def _forged_token(self, username: str, **overrides) -> str:
+        """自签一枚**生命周期上活着**的 token：`cv` 必须填表里那一行的当前值。
+
+        §7.5 把"签名有效但没有 `cv`"判成不符（那是 SEC-A 之前签发的会话的形状），所以少了
+        这一格，token 在认证那一步就出局，权限面根本没机会发言——这一族的三条断言也就从
+        "伪造不放大权限"悄悄退化成"伪造进不来"。填上当前版本才是原本那道判定。
+
+        钥匙取的是 `settings.jwt_secret` 的**当时**值：调用 `_quiet_secret()` 的用例拿到长
+        钥匙，没调的沿用现值。
+        """
+        import jwt
+
+        from app import user_store
+        from app.auth import CREDENTIAL_VERSION_CLAIM
+        from app.config import settings
+
+        payload = {"sub": username, "role": "ADMIN", "access_role": "admin", "iss": "yaoke",
+                   "exp": 2 ** 31 - 1, "iat": 1,
+                   CREDENTIAL_VERSION_CLAIM: user_store.get_record(username).credentials_version}
+        payload.update(overrides)
+        return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+
+    def test_forged_claims_do_not_widen_permissions(self):
+        from app.auth import require_user
+
+        online = require_user(f"Bearer {self._forged_token('viewer')}")
+        self.assertEqual(online.role, "VIEWER")                 # role 也只认身份声明文件那一侧
         self.assertEqual(online.access_role, "viewer")
         self.assertNotIn("system:operate", online.permissions)
+
+    def test_a_claimless_token_is_rejected_rather_than_treated_as_legacy(self):
+        """反向钉：同一枚 payload **去掉** `cv` 就直接 401，不许有"那就当旧 token 放行"那臂。
+
+        与上面那条成对：只留一条，另一条就会被"整条认证都挂了"这种实现蒙过去；两条一起
+        才说清"活着但没权限"与"根本没活着"是两格。
+        """
+        import jwt
+
+        from app.auth import require_user
+
+        claimless = jwt.encode({"sub": "viewer", "role": "ADMIN", "access_role": "admin",
+                                "iss": "yaoke", "exp": 2 ** 31 - 1, "iat": 1},
+                               self._quiet_secret(), algorithm="HS256")
+        with self.assertRaises(HTTPException) as raised:
+            require_user(f"Bearer {claimless}")
+        self.assertEqual(401, raised.exception.status_code)
+        self.assertEqual("无效登录凭证", raised.exception.detail)
+
+    def test_a_forged_cv_does_not_buy_a_longer_session(self):
+        """版本比对读的是表：claim 里写多大的数都不算数（§7.5 的"只作提示"那一半）。"""
+        from app.auth import CREDENTIAL_VERSION_CLAIM, require_user
+
+        self._quiet_secret()
+        forged = self._forged_token("viewer", **{CREDENTIAL_VERSION_CLAIM: 99})
+        with self.assertRaises(HTTPException) as raised:
+            require_user(f"Bearer {forged}")
+        self.assertEqual(401, raised.exception.status_code)
+        self.assertEqual("无效登录凭证", raised.exception.detail)
 
     def test_claim_is_kept_and_documented_as_display_only(self):
         source = (BACKEND_DIR / "app" / "auth.py").read_text(encoding="utf-8")

@@ -1,0 +1,41 @@
+SEC-A rev 3 / SECA-20 CI 接入的取证记录（2026-09-27，控制器亲自跑）
+===================================================================
+
+1) 既有步在 SEC-A 之前就红（本地等价复现，干净 venv，零历史依赖）
+   $ python -m venv /tmp/cienv                       # 未装任何包
+   $ /tmp/cienv/Scripts/python.exe -m unittest discover -s backend/tests -p 'test_*.py'
+     Ran 132 tests ... FAILED (failures=3, errors=26)
+   补上轻量依赖（pytest + fastapi + pydantic(-settings) + httpx + PyJWT + argon2-cffi + numpy + rank-bm25 + qdrant-client）后：
+     FAILED (failures=11, errors=160)                # 依赖不是根因，runner 形状才是
+   远端读数：gh run list -> 最近三次 push 全部 failure（含 V2.3 RC），backend-contracts 失败步
+     = "Run python -m unittest discover -s backend/tests -p 'test_*.py' -v"
+
+2) 新步的本地等价执行（命令与 ci.yml step 4 逐字相同；cwd = 仓库根；干净 venv）
+   $ /tmp/cienv/Scripts/python.exe -m pytest backend/tests/test_secret_hygiene_contract.py -q \
+       -k "tracked_files or exemption_table or states_why or planted_credential or exempt_line"
+     5 passed, 41 deselected in 1.05s
+
+3) 红→绿两态（真凭据形状，非拼接）
+   植入 backend/app/_seca_ci_probe.py：
+     JWT_SECRET = "<前缀-素材-28位无空白字面量>"        # 形状：连续、无空白、>=16、带引号
+     OPENAI_API_KEY = "<sk- 前缀 + 26 位字面量>"            # 形状：provider key，见 §20.8 卡 D
+   $ 同上命令
+     2 failed, 3 passed  =>  exit code 1
+   删除探针后：
+     5 passed, 41 deselected => exit code 0
+     probe exists: False；git status --porcelain | grep -c _seca_ci_probe = 0
+
+4) 附带发现（第一次植入不成立，值得留档）
+   第一次我用的是测试夹具惯用的拼接写法：
+     JWT_SECRET = "<前缀-素材>" + "<24位字面量>"          # 拼接写法：两段各自短于 16
+   门 **不红**（rc=0）。原因：门要的是**连续**的无空白字面量，拼接形态在两种语言里都不是凭据值 ——
+   这正是测试夹具合法的自保通道，也是规格 §18 坚持要一枚带 git 历史的第三方扫描器的理由。
+   结论：任何"门能红"的声明都必须用连续字面量取证。
+
+5) 终态复测（修掉控制器自写测试的 cwd 缺陷之后）
+   仓库根：  1316 passed, 36 warnings, 1133 subtests passed in 299.32s
+   backend： 1316 passed, 36 warnings, 1133 subtests passed in 368.25s
+   修复前（仓库根，同一条命令）：1 failed, 1315 passed  —— 失败的是
+     test_credentials_contract.py::AuditSinkIsolationTests::test_a_recorded_event_lands_in_the_sink_and_not_in_the_operational_log
+     根因：相对路径 Path("data")/audit.jsonl 在两种 cwd 下指向两枚不同文件 + marker 跨运行不唯一
+     处置：marker 改 uuid4、落点改 BACKEND_DIR/"data"/audit.jsonl（绝对），断言只增不减

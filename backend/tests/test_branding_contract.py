@@ -1,6 +1,8 @@
 from pathlib import Path
 import unittest
 
+from app import security_startup
+
 ROOT = Path(__file__).resolve().parents[2]
 LEGACY_BRAND = ("Nexus" + "KB").lower()
 
@@ -30,6 +32,17 @@ class BrandingContractsTest(unittest.TestCase):
         self.assertIn('<span>企业知识操作系统</span>', page)
         self.assertIn('QDRANT_COLLECTION=yaoke', env_example)
         self.assertIn('JWT_SECRET=change-me-before-production-yaoke-demo-secret', env_example)
+        # 收紧（不是放松）：占位符仍是部署模板的一部分，但企业形态启动守卫**必须**拒绝这枚出厂
+        # 默认值——一条"模板里写着的东西"若能一路跑进生产，那这条 branding 断言就是在保护漏洞。
+        self.assertIn(security_startup.DEFAULT_JWT_SECRET, env_example)
+        violations = security_startup.evaluate_startup_guards(
+            enterprise_mode=True,
+            jwt_secret=security_startup.DEFAULT_JWT_SECRET,
+            cors_allow_origins='',
+        )
+        # 默认 secret + 空 CORS 白名单 ⇒ 三守卫中的两件同时亮（demo 身份那件由 directory 结构判）。
+        self.assertEqual(2, len(violations), violations)
+        self.assertTrue(any('JWT_SECRET' in v for v in violations), violations)
         self.assertTrue(logo.exists(), "yaoke logo asset is missing")
         self.assertGreater(logo.stat().st_size, 1024, "yaoke logo asset looks unexpectedly small")
         self.assertTrue(readme.startswith('<p align="center">'))

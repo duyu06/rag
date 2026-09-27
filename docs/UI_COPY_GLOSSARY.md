@@ -27,6 +27,7 @@
 - 01 首页 · 02 问答 · 03 检索 · 04 知识库 · 05 检索实验室 · 06 请求追踪 · 07 评测 · 08 运营 · 09 治理 · 10 系统；分区：工作区 / 知识 / 检索 / 评测 / 运营 / 治理 / 系统
 - 通用动作：UPLOAD→上传 · SEARCH→搜索 · RETRY→重试 · RETRIEVE→检索 · SAVE→保存 · CANCEL→取消 · DELETE→删除 · ARCHIVE→归档 · DISABLE/ENABLE→停用/启用 · REINDEX→重建索引 · EXPORT→导出 · RUN→运行 · OPEN→打开 · BACK→返回 · VIEW→查看 · COPY→复制 · DOWNLOAD→下载 · SIGN IN→登录 · SIGN OUT→登出
 - 时间词：Today→今天 · Yesterday→昨天 · This Week→本周 · Earlier→更早
+- 审计事件动作（`OperationsView`/`GovernanceView` 两张 `ACTION_LABELS`）：LOGIN→登录 · LOGOUT→登出 · PASSWORD→口令变更 · QUERY/ASK→问答 · UPLOAD→上传 · INGEST→文档入库 · DELETE→删除 · DOWNLOAD→下载 · DENIED→已拒绝。数据层与审计面仍是英文枚举 token（SEC-A 规格 §9.1 的两栏契约），中文只活在展示层
 - 角色：ADMIN/SALES/HR/USER/VIEWER→管理员/销售/人事/普通用户/访客（只读）；"YOU"→本人
 - 部门码：ALL→全企业 · HR→人事 · PRODUCT→产品 · SALES→销售 · SERVICE→售后（映射集中在 ui.tsx 的 departmentLabel，数据层仍存英文码）
 

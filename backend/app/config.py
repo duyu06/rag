@@ -152,8 +152,33 @@ class Settings(BaseSettings):
     retrieval_max_chunks_per_document: int = Field(default=2, ge=1, le=10)
     retrieval_query_context_max_chars: int = Field(default=320, ge=80, le=1000)
 
+    # SEC-A 生产形态总开关。true ⇒ 不加载 demo 身份 + 默认 JWT secret 拒启动 +
+    # CORS 白名单未配拒启动（三件同生同死，规格 §8.5）。
+    security_enterprise_mode: bool = False
+    # CORS 白名单（逗号分隔，既不是子串也不是通配）。默认值是 dev / 测试形态的本地
+    # 前端来源；SECURITY_ENTERPRISE_MODE=true 且这一格为空或含 * 即拒启动
+    # （§8.5 三守卫之一，判定在 app/security_startup.py）。allow_credentials 恒 False
+    # ——token 走 header，收紧 origin 才是有效项（§10）。
+    cors_allow_origins: str = "http://localhost:3000"
+
     jwt_secret: str = "change-me-before-production-yaoke-demo-secret"
     jwt_expire_hours: int = 8
+
+    # Argon2 并发槽上限（可用性旋钮）。**密码学档位不在这里**：m/t/p 固定在
+    # app/credentials.py 的常量上，改它等于改规格（SEC-A-008）。
+    # 槽与节流桶都住在进程内，因此横向扩到 `uvicorn --workers N` 时第一层的天花板一并乘 N
+    # （现网 `backend/Dockerfile` 的 CMD 没有 `--workers`）；只有落库的账号锁定不受进程数影响。
+    argon2_max_concurrent_ops: int = 2
+
+    # 账号级持久锁定（规格 §7.2 第二层）：键只有 username，跨来源共享同一失败状态。
+    account_max_failed_attempts: int = 5
+    account_lock_seconds: int = 900
+
+    # pre-hash 节流（规格 §7.2 第一层）：键是 (username, client_ip)，进程内、重启即清。
+    # 它挡的是"认证面自己被当成 DoS 面"，与上面的账号锁定正交；两枚都是可用性旋钮，
+    # 依旧**不含** m/t/p —— 能运维调的安全强度等于没有强度（SEC-A-008）。
+    login_throttle_window_seconds: int = 60
+    login_throttle_max_attempts: int = 10
 
     # Local backend cwd is normally ./backend, so ../demo-data points to repo demo data.
     # Docker overrides this to /app/demo-data via docker-compose.

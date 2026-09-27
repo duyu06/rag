@@ -1,0 +1,120 @@
+[M1] 注入 app/credentials.py 6ebbbb4ffdc0 -> 6de14d3a4ebd
+[M1] pytest: 2 failed, 3 passed in 0.61s
+[M1]   RED tests/test_credentials_contract.py::Argon2ProfileTests::test_a_wrong_password_does_not_verify
+[M1]   RED tests/test_credentials_contract.py::Argon2ProfileTests::test_hashed_password_is_a_verifiable_argon2id_phc_string
+[M1] 还原后 sha1 相同 = True
+[M2] 注入 app/auth.py 7f669c167487 -> fc1f10ef3b54
+[M2] pytest: 1 failed, 5 passed in 37.07s
+[M2]   RED tests/test_password_lifecycle_contract.py::SelfServiceChangeTests::test_changing_password_logs_in_clears_the_gate_and_kills_old_tokens
+[M2] 还原后 sha1 相同 = True
+[M3] 注入 app/auth.py 7f669c167487 -> 467b71bb3c0d
+[M3] pytest: 2 failed, 7 passed, 5 subtests passed in 32.48s
+[M3]   RED tests/test_password_lifecycle_contract.py::TokenRevocationTests::test_a_bumped_version_invalidates_the_previously_issued_token
+[M3]   RED tests/test_password_lifecycle_contract.py::TokenRevocationTests::test_a_forged_cv_does_not_outlive_the_table
+[M3] 还原后 sha1 相同 = True
+[M4] 注入 app/auth.py 7f669c167487 -> 417ee373667c
+[M4] pytest: 1 failed, 4 passed in 26.42s
+[M4]   RED tests/test_authentication_leg_contract.py::UnifiedFailureTests::test_all_four_states_consume_exactly_one_argon2_run_each
+[M4] 还原后 sha1 相同 = True
+[M5] 注入 app/main.py 4232af1b4bf7 -> 04469f2b07b7
+[M5] pytest: 1 failed, 1 passed in 26.84s
+[M5]   RED tests/test_authentication_leg_contract.py::LockedHttpFaceTests::test_locked_wrong_password_and_unknown_account_are_the_same_http_face
+[M5] 还原后 sha1 相同 = True
+[M6] 注入 app/login_throttle.py e4c243fe70e4 -> d27d9ffdbbc6
+[M6] pytest: 3 failed, 5 passed in 25.79s
+[M6]   RED tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_reaping_does_not_depend_on_the_clock_the_test_injects
+[M6]   RED tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_stale_buckets_are_reaped_while_live_ones_survive
+[M6]   RED tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_two_source_addresses_on_the_same_username_have_independent_buckets
+[M6] 还原后 sha1 相同 = True
+[M7] 注入 app/auth.py 7f669c167487 -> 9b0189780496
+[M7] pytest: 1 failed, 7 passed in 20.78s
+[M7]   RED tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_many_source_addresses_on_one_username_share_the_account_lock
+[M7] 还原后 sha1 相同 = True
+[M8] 注入 app/security.py 3881153812f7 -> 5978250f6f3c
+[M8] pytest: 6 failed, 39 passed in 25.99s
+[M8]   RED tests/test_secret_hygiene_contract.py::test_the_persistence_deny_set_matches_case_insensitively
+[M8]   RED tests/test_secret_hygiene_contract.py::test_persistence_redaction_kills_sensitive_keys_by_exact_name
+[M8]   RED tests/test_secret_hygiene_contract.py::test_persistence_redaction_covers_the_full_deny_set_not_just_the_spec_sample
+[M8]   RED tests/test_secret_hygiene_contract.py::test_persistence_redaction_does_not_collateral_damage_observability_keys
+[M8]   RED tests/test_secret_hygiene_contract.py::test_persistence_redaction_recurses_and_never_sniffs_value_content
+[M8]   RED tests/test_secret_hygiene_contract.py::LoginResponseVsPersistenceBoundaryTests::test_real_login_token_is_usable_yet_erased_in_a_persistence_row
+[M8] 还原后 sha1 相同 = True
+[M9] 注入 app/user_store.py 4dc81c438268 -> 84bfa96cf456
+[M9] pytest: 1 failed, 4 passed in 0.78s
+[M9]   RED tests/test_credentials_contract.py::UserStoreSchemaTests::test_created_rows_are_always_argon2id
+[M9] 还原后 sha1 相同 = True
+[M10] 注入 app/user_store.py 4dc81c438268 -> ffc3ae5f70ea
+[M10] pytest: 1 failed, 4 passed in 1.08s
+[M10]   RED tests/test_credentials_contract.py::UserStoreTransactionTests::test_password_change_bumps_version_and_clears_lock_state_together
+[M10] 还原后 sha1 相同 = True
+
+| 变异 | 判据 | 结果 | 红掉的节点 | 定向节点 | sha1 还原 |
+| --- | --- | --- | --- | --- | --- |
+| M1 | SECA-01 | KILLED | tests/test_credentials_contract.py::Argon2ProfileTests::test_a_wrong_password_does_not_verify,tests/test_credentials_contract.py::Argon2ProfileTests::test_hashed_password_is_a_verifiable_argon2id_phc_string | tests/test_credentials_contract.py::Argon2ProfileTests | OK |
+| M2 | SECA-10 | KILLED | tests/test_password_lifecycle_contract.py::SelfServiceChangeTests::test_changing_password_logs_in_clears_the_gate_and_kills_old_tokens | tests/test_password_lifecycle_contract.py::SelfServiceChangeTests | OK |
+| M3 | SECA-09 | KILLED | tests/test_password_lifecycle_contract.py::TokenRevocationTests::test_a_bumped_version_invalidates_the_previously_issued_token,tests/test_password_lifecycle_contract.py::TokenRevocationTests::test_a_forged_cv_does_not_outlive_the_table | tests/test_password_lifecycle_contract.py::TokenRevocationTests | OK |
+| M4 | SECA-13 | KILLED | tests/test_authentication_leg_contract.py::UnifiedFailureTests::test_all_four_states_consume_exactly_one_argon2_run_each | tests/test_authentication_leg_contract.py::UnifiedFailureTests | OK |
+| M5 | SECA-14 | KILLED | tests/test_authentication_leg_contract.py::LockedHttpFaceTests::test_locked_wrong_password_and_unknown_account_are_the_same_http_face | tests/test_authentication_leg_contract.py::LockedHttpFaceTests | OK |
+| M6 | SECA-16a | KILLED | tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_reaping_does_not_depend_on_the_clock_the_test_injects,tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_stale_buckets_are_reaped_while_live_ones_survive,tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_two_source_addresses_on_the_same_username_have_independent_buckets | tests/test_authentication_leg_contract.py::ThrottleLayerTests | OK |
+| M7 | SECA-16b | KILLED | tests/test_authentication_leg_contract.py::ThrottleLayerTests::test_many_source_addresses_on_one_username_share_the_account_lock | tests/test_authentication_leg_contract.py::ThrottleLayerTests | OK |
+| M8 | SECA-17 | KILLED | tests/test_secret_hygiene_contract.py::test_the_persistence_deny_set_matches_case_insensitively,tests/test_secret_hygiene_contract.py::test_persistence_redaction_kills_sensitive_keys_by_exact_name,tests/test_secret_hygiene_contract.py::test_persistence_redaction_covers_the_full_deny_set_not_just_the_spec_sample | tests/test_secret_hygiene_contract.py | OK |
+| M9 | SECA-17 + SECA-03 | KILLED | tests/test_credentials_contract.py::UserStoreSchemaTests::test_created_rows_are_always_argon2id | tests/test_credentials_contract.py::UserStoreSchemaTests | OK |
+| M10 | SECA-11 | KILLED | tests/test_credentials_contract.py::UserStoreTransactionTests::test_password_change_bumps_version_and_clears_lock_state_together | tests/test_credentials_contract.py::UserStoreTransactionTests | OK |
+
+10/10 KILLED
+[M11] 注入 app/user_store.py 4dc81c438268 -> f9250b8f199e
+[M11] pytest: 1 failed, 8 passed in 22.26s
+[M11]   RED tests/test_password_lifecycle_contract.py::AdminResetTests::test_admin_reset_clears_a_stale_lock_in_the_same_transaction
+[M11] 还原后 sha1 相同 = True
+[M12] 注入 app/directory.py 80edfd90b724 -> 47f0fe46641f
+[M12] pytest: 1 failed, 52 passed, 47 subtests passed in 19.91s
+[M12]   RED tests/test_user_directory_contract.py::IdentityFileTests::test_unknown_extra_fields_are_rejected_not_ignored
+[M12] 还原后 sha1 相同 = True
+[M13] 注入 app/auth.py 7f669c167487 -> c0a3d2dc7a76
+[M13] pytest: 2 failed, 3 passed, 9 subtests passed in 1.33s
+[M13]   RED tests/test_credentials_contract.py::CentralisationScanTests::test_only_credentials_module_hashes_passwords
+[M13]   RED tests/test_credentials_contract.py::CentralisationScanTests::test_the_exemption_table_is_equal_to_the_hit_set
+[M13] 还原后 sha1 相同 = True
+[M14] 注入 app/auth.py 7f669c167487 -> 459957d3f65e
+[M14] pytest: 3 failed, 11 passed in 22.03s
+[M14]   RED tests/test_authentication_leg_contract.py::LegacyUpgradeTests::test_a_rehash_that_loses_the_version_race_leaves_the_concurrent_winner_alone
+[M14]   RED tests/test_authentication_leg_contract.py::LegacyUpgradeTests::test_a_rehash_write_failure_still_logs_in_and_records_degraded
+[M14]   RED tests/test_authentication_leg_contract.py::LegacyUpgradeTests::test_capacity_loss_at_the_rehash_hop_degrades_instead_of_refusing_the_login
+[M14] 还原后 sha1 相同 = True
+[M15] 注入 config/users.demo.json ef83f16b11ff -> 9adbc0282287
+[M15] pytest: 3 failed, 51 passed, 46 subtests passed in 23.52s
+[M15]   RED tests/test_user_directory_contract.py::ShippedIdentityFilesTests::test_both_files_ship_and_pass_their_own_validator
+[M15]   RED tests/test_user_directory_contract.py::ShippedIdentityFilesTests::test_demo_mode_ships_exactly_the_demo_accounts
+[M15] 还原后 sha1 相同 = True
+[M16] 注入 app/credentials.py 6ebbbb4ffdc0 -> 7564d3ab9f54
+[M16] pytest: 1 failed, 4 passed in 0.90s
+[M16]   RED tests/test_credentials_contract.py::Argon2ProfileTests::test_the_profile_does_not_budge_when_the_environment_is_poisoned
+[M16] 还原后 sha1 相同 = True
+[M17] 注入 app/auth.py 7f669c167487 -> 579aea0176a0
+[M17] pytest: 2 failed, 8 passed, 4 subtests passed in 19.89s
+[M17]   RED tests/test_password_lifecycle_contract.py::TokenRevocationTests::test_a_pre_seca_token_without_cv_is_rejected_not_allowed
+[M17] 还原后 sha1 相同 = True
+[M18] 注入 app/directory.py 80edfd90b724 -> ebb299fe3740
+[M18] pytest: 3 failed, 50 passed, 47 subtests passed in 19.87s
+[M18]   RED tests/test_user_directory_contract.py::IdentityFileTests::test_duplicate_username_across_files_fails_instead_of_letting_demo_override
+[M18]   RED tests/test_user_directory_contract.py::MergeInvariantTests::test_duplicates_inside_one_file_are_rejected_too
+[M18]   RED tests/test_user_directory_contract.py::MergeInvariantTests::test_the_conflict_message_names_the_clashing_identity_and_who_tried
+[M18] 还原后 sha1 相同 = True
+[M19] 注入 app/auth.py 7f669c167487 -> 9a10d027939e
+[M19] pytest: 1 failed, 7 passed, 7 subtests passed in 20.22s
+[M19]   RED tests/test_authentication_leg_contract.py::SourceRemovalTests::test_a_missing_credential_row_never_imports_the_upgrade_artifact
+[M19] 还原后 sha1 相同 = True
+
+| 变异 | 判据 | 结果 | 红掉的节点 | 定向节点 | sha1 还原 |
+| --- | --- | --- | --- | --- | --- |
+| M11 | SECA-12 | KILLED | tests/test_password_lifecycle_contract.py::AdminResetTests::test_admin_reset_clears_a_stale_lock_in_the_same_transaction | tests/test_password_lifecycle_contract.py::AdminResetTests | OK |
+| M12 | SECA-07 | KILLED | tests/test_user_directory_contract.py::IdentityFileTests::test_unknown_extra_fields_are_rejected_not_ignored | tests/test_user_directory_contract.py | OK |
+| M13 | SECA-05 | KILLED | tests/test_credentials_contract.py::CentralisationScanTests::test_only_credentials_module_hashes_passwords,tests/test_credentials_contract.py::CentralisationScanTests::test_the_exemption_table_is_equal_to_the_hit_set | tests/test_credentials_contract.py::CentralisationScanTests | OK |
+| M14 | SECA-21 | KILLED | tests/test_authentication_leg_contract.py::LegacyUpgradeTests::test_a_rehash_that_loses_the_version_race_leaves_the_concurrent_winner_alone,tests/test_authentication_leg_contract.py::LegacyUpgradeTests::test_a_rehash_write_failure_still_logs_in_and_records_degraded,tests/test_authentication_leg_contract.py::LegacyUpgradeTests::test_capacity_loss_at_the_rehash_hop_degrades_instead_of_refusing_the_login | tests/test_authentication_leg_contract.py::LegacyUpgradeTests | OK |
+| M15 | SECA-07 / SECA-04 扫描面 | KILLED | tests/test_user_directory_contract.py::ShippedIdentityFilesTests::test_both_files_ship_and_pass_their_own_validator,tests/test_user_directory_contract.py::ShippedIdentityFilesTests::test_demo_mode_ships_exactly_the_demo_accounts | tests/test_user_directory_contract.py | OK |
+| M16 | SECA-19 / SEC-A-008 | KILLED | tests/test_credentials_contract.py::Argon2ProfileTests::test_the_profile_does_not_budge_when_the_environment_is_poisoned | tests/test_credentials_contract.py::Argon2ProfileTests | OK |
+| M17 | SECA-09b | KILLED | tests/test_password_lifecycle_contract.py::TokenRevocationTests::test_a_pre_seca_token_without_cv_is_rejected_not_allowed | tests/test_password_lifecycle_contract.py::TokenRevocationTests | OK |
+| M18 | SECA-23 | KILLED | tests/test_user_directory_contract.py::IdentityFileTests::test_duplicate_username_across_files_fails_instead_of_letting_demo_override,tests/test_user_directory_contract.py::MergeInvariantTests::test_duplicates_inside_one_file_are_rejected_too,tests/test_user_directory_contract.py::MergeInvariantTests::test_the_conflict_message_names_the_clashing_identity_and_who_tried | tests/test_user_directory_contract.py | OK |
+| M19 | SECA-04b | KILLED | tests/test_authentication_leg_contract.py::SourceRemovalTests::test_a_missing_credential_row_never_imports_the_upgrade_artifact | tests/test_authentication_leg_contract.py::SourceRemovalTests | OK |
+
+9/9 KILLED

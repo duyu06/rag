@@ -1,0 +1,16 @@
+# SEC-A Task 10e — 全新安装 + 冷启动容器探针（追加一 第 2 项）
+# 时间 2026-09-27 00:22:41 | 镜像 3f14b3de77a4 | 命令:
+# docker volume rm rag-seca-fresh && docker compose run --rm --no-deps -T -i -v rag-seca-fresh:/app/data backend python - < /c/tmp/seca10e/fresh_boot_probe.py
+ Container rag-backend-run-9d374411d871 Creating 
+ Container rag-backend-run-9d374411d871 Created 
+cwd=/app
+CONVERSATION_DB_PATH='data/conversations.db' SECURITY_ENTERPRISE_MODE=None
+PRE  {"db_file_present": false}
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+STATUS_KNOWN_USER_WITHOUT_ROW=401
+STATUS_UNKNOWN_USER=401
+NOT_500=True
+BODIES_IDENTICAL=True
+BODY={"detail": "用户名或密码错误"}
+POST {"db_file_present": true, "tables": ["conversations", "llm_request_logs", "message_sources", "messages", "sqlite_sequence", "user_credentials"], "credential_rows": 0}
+rc=0

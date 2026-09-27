@@ -1,0 +1,35 @@
+{
+  "profile": {
+    "time_cost": 2,
+    "memory_cost": 19456,
+    "parallelism": 1
+  },
+  "environment": "linux",
+  "serial": {
+    "runs": 50,
+    "p50_ms": 50.3,
+    "p95_ms": 55.3
+  },
+  "concurrent": {
+    "runs": 32,
+    "workers": 2,
+    "p95_ms": 66.7
+  },
+  "peak_rss_delta_kib": 39280,
+  "budget": {
+    "serial_p95_ms": 1500.0,
+    "concurrent_p95_ms": 3000.0,
+    "rss_delta_kib": 262144
+  },
+  "environment_detail": {
+    "python": "3.12.14",
+    "peak_rss_delta_unit": "KiB on Linux (ru_maxrss); macOS reports bytes — container is the criterion",
+    "rss_delta_meaning": "process peak RSS high-water mark minus baseline, not per-op footprint"
+  },
+  "budget_checks": {
+    "serial_p95": true,
+    "concurrent_p95": true,
+    "peak_rss_delta": true
+  },
+  "verdict": "GREEN"
+}

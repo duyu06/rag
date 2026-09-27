@@ -1,0 +1,21 @@
+OK	M1	[1]	app/credentials.py
+OK	M2	[1]	app/auth.py
+OK	M3	[1]	app/auth.py
+OK	M4	[1]	app/auth.py
+OK	M5	[1]	app/main.py
+OK	M6	[1]	app/login_throttle.py
+OK	M7	[1]	app/auth.py
+OK	M8	[1]	app/security.py
+OK	M9	[1]	app/user_store.py
+OK	M10	[1, 1]	app/user_store.py
+OK	M11	[1]	app/user_store.py
+OK	M12	[1]	app/directory.py
+OK	M13	[1]	app/auth.py
+OK	M14	[1]	app/auth.py
+OK	M15	[1]	config/users.demo.json
+OK	M16	[1, 1]	app/credentials.py
+OK	M17	[1]	app/auth.py
+OK	M18	[1]	app/directory.py
+OK	M19	[1]	app/auth.py
+
+19/19 锚点唯一

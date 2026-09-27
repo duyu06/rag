@@ -48,6 +48,7 @@ const ROLE_LABELS: Record<string, string> = {
 const ACTION_LABELS: Record<string, string> = {
   LOGIN: "登录",
   LOGOUT: "登出",
+  PASSWORD: "口令变更",
   SIGN_IN: "登录",
   SIGN_OUT: "登出",
   AUTHORIZATION: "授权",

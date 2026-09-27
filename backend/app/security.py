@@ -285,3 +285,50 @@ def _is_measurement(value: Any) -> bool:
 
 def public_exception_detail(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {redact_text(exc)}"
+
+
+# SEC-A-009 落盘面（持久化域）的**精确全词键名**黑名单。与响应面 `redact_secrets` 是两个
+# 作用域：这一张表只喂 `redact_for_persistence`（审计 / trace / 日志 / 遥测表），既不改
+# `redact_secrets` 的语义、也不作用于任何响应出口。刻意用整词等值匹配、绝不做子串——子串
+# `token` 会顺手抹掉 `input_tokens` / `output_tokens` / `total_tokens`（观测数据，非秘密）
+# 以及登录响应的 `token_type`，那等于砸掉 observability 契约（SECA-17 反方向）。
+# 入选理由（逐族）：口令族 `password` / `password_hash` / `plaintext_password` /
+# `current_password` / `new_password`；Bearer 令牌族 `access_token` / `refresh_token` /
+# `authorization`；provider / 集成凭据族 `api_key` / `app_secret` / `tenant_access_token` /
+# `secret`；泛用名 `credentials`。`tenant_access_token` 该抹却**不靠**子串兜——它自己进全词集。
+# 授权凭据库（`user_store` 写 hash 那一层）根本不经过这里（结构钉：它不 import `app.security`）；
+# 把这张表罩到凭据写入面上，落库的 hash 会被抹成占位符、下次登录必失败（M9）。
+PERSISTENCE_SENSITIVE_KEYS = frozenset(
+    {
+        "password", "password_hash", "plaintext_password", "current_password", "new_password",
+        "access_token", "refresh_token", "authorization", "api_key", "app_secret",
+        "tenant_access_token", "secret", "credentials",
+    }
+)
+
+
+def redact_for_persistence(value: Any) -> Any:
+    """落盘面（审计 / trace / 日志 / 遥测表）脱敏：形态匹配 + **精确键名**匹配。
+
+    刻意不做子串匹配：`token` 命中 tenant_access_token 也命中 input_tokens，
+    后者是观测数据不是秘密。授权凭据库（user_store）不经过这里（SEC-A-009）。
+
+    与 `redact_secrets` 的唯一差别就是那一步整词键名判定；形态脱敏（`redact_text`）
+    沿用同一枚函数，因此两域对"值里嵌着 apikey_/Bearer 形态"的处理一字不差。键名判定
+    只看 Mapping 的**键**（整词等值），不嗅探值内容——值里出现 "password" 这个词不会被误抹。
+    """
+    if isinstance(value, str):
+        return redact_text(value)
+    if isinstance(value, Mapping):
+        return {
+            redact_text(key): (
+                REDACTED if str(key).lower() in PERSISTENCE_SENSITIVE_KEYS
+                else redact_for_persistence(item)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_for_persistence(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_for_persistence(item) for item in value)
+    return value

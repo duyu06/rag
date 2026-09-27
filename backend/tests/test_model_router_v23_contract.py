@@ -35,6 +35,18 @@ from unittest import mock
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
+#: 与本仓库另一处同款（`test_credentials_contract.py`）：`tests/` 没有 `__init__.py`，
+#: 测试地基模块只能按顶层名字 import。
+TESTS_DIR = BACKEND_DIR / "tests"
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
+
+import app.user_store as user_store  # noqa: E402
+from sec_a_seed import (  # noqa: E402
+    DEMO_TEST_CREDENTIALS,
+    ensure_demo_credentials,
+    install_demo_credentials,
+)
 
 import httpx  # noqa: E402
 from fastapi import HTTPException  # noqa: E402  #18/D2 的 HTTP 面兜底语义
@@ -4106,6 +4118,14 @@ class _RagMigrationFixture(_EgressFixture):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.db_path = Path(directory.name) / "conversations.db"
+        # 凭据行与账本同库（规格 §6.1），所以本夹具把生效路径换成临时库的那一刻起，会话级
+        # seed 的那五行就不在场了：登录腿要读口令行，`require_user` 每个请求还要再读一次
+        # `must_change`。这件事收在**基类**、收在换库的同一处：任何子类（含以后新加的）都不
+        # 必自己记，漏记的形状是「真 HTTP 面上每次登录都 401」而报错点离病因隔着整条登录腿。
+        # 复制模板而不是每例补种——Argon2 是内存硬哈希，本族 131 枚用例每例重算 5 次会把
+        # 套件拖成分钟级（`sec_a_seed` 开头那句预算说的正是这件事），模板每进程只付一次。
+        # 位置在 `init_usage_db` 之前：那时目标文件还不存在，整份搬过来后账本表再往上加。
+        install_demo_credentials(self.db_path)
         usage_module.reset_usage_state()
         self.addCleanup(usage_module.reset_usage_state)
         usage_module.init_usage_db(self.db_path)
@@ -4118,6 +4138,11 @@ class _RagMigrationFixture(_EgressFixture):
         env = mock.patch.dict(os.environ, {"CONVERSATION_DB_PATH": str(self.db_path)})
         env.start()
         self.addCleanup(env.stop)
+        # 凭据表与账本同库（规格 §6.1），所以本类换到临时库的那一步也得把它的 schema 带上：
+        # `user_store` 的读路径**刻意不建表**（没初始化就报 `no such table`，指向漏调初始化的
+        # 人），而真 HTTP 面上每个请求都要读一次凭据状态。建表是 DDL、零行，不影响本类
+        # 对账本行数的任何断言。
+        user_store.ensure_user_credentials_schema()
 
     def use_settings(self, **overrides) -> Settings:
         base = dict(self.RAG_SETTINGS_DEFAULTS)
@@ -4576,6 +4601,8 @@ class RagFailureFaceTests(_RagMigrationFixture):
         self.healthy_providers(ollama=False)
         self.serve(_response(200, json_body=ollama_body("x")))
         client = TestClient(fastapi_app)
+        # 口令字面量与调用形式都不改（§16 第一组）：脚下换成本类临时库里的 argon2id 行。
+        ensure_demo_credentials("admin")
         login = client.post("/api/auth/login",
                             json={"username": "admin", "password": "admin123"})
         self.assertEqual(200, login.status_code, login.text)
@@ -4626,6 +4653,18 @@ class RagModelFaceTests(_RagMigrationFixture):
         from app.main import app as fastapi_app
 
         client = TestClient(fastapi_app)
+        # 凭据行的出处只有基类 setUp 那一次模板复制，这里把它当成**断言**而不是第二次补种：
+        # helper 自己兜一份等于把洞原地抹平，"基类那一处没了"从此不再有症状，而两份种子
+        # 同时在场时也看不出哪一份在承重。缺行的形状必须是自报的——登录腿对"没有行"和
+        # "口令错了"回的是同一句「用户名或密码错误」（§7.3 的四态合一），从响应面上分不开。
+        missing = [
+            name for name in DEMO_TEST_CREDENTIALS if user_store.get_record(name) is None
+        ]
+        self.assertEqual(
+            [], missing,
+            "生效库里没有 demo 凭据行 ⇒ `_RagMigrationFixture.setUp` 里的 "
+            "install_demo_credentials(self.db_path) 那一处没了（本 helper 不代为补种）",
+        )
         login = client.post("/api/auth/login",
                             json={"username": "admin", "password": "admin123"})
         self.assertEqual(200, login.status_code, login.text)

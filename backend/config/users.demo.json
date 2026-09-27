@@ -1,0 +1,9 @@
+{
+  "identities": [
+    { "username": "admin", "display_name": "系统管理员", "role": "ADMIN" },
+    { "username": "sales01", "display_name": "销售演示账号", "role": "SALES" },
+    { "username": "hr01", "display_name": "HR 演示账号", "role": "HR" },
+    { "username": "user", "display_name": "普通用户演示账号", "role": "USER" },
+    { "username": "viewer", "display_name": "只读访客演示账号", "role": "VIEWER" }
+  ]
+}

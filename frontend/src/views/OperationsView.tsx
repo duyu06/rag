@@ -31,6 +31,7 @@ const ACTION_LABELS: Record<string, string> = {
   ALL: "全部",
   LOGIN: "登录",
   LOGOUT: "登出",
+  PASSWORD: "口令变更",
   QUERY: "问答",
   ASK: "问答",
   SEARCH: "搜索",
@@ -111,7 +112,7 @@ export default function OperationsView({ navigate }: ViewProps) {
     return () => { cancelled = true; };
   }, []);
 
-  const logTypes = ["ALL", "QUERY", "LOGIN", "UPLOAD", "DELETE", "DOWNLOAD", "DENIED"];
+  const logTypes = ["ALL", "QUERY", "LOGIN", "PASSWORD", "UPLOAD", "DELETE", "DOWNLOAD", "DENIED"];
   const shownLogs = logFilter === "ALL" ? logs : logs.filter((event) => event.action.toUpperCase().includes(logFilter));
 
   return (

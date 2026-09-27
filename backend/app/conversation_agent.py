@@ -475,8 +475,9 @@ def _local_fast_path(
     # detail——现成的字符串例子是 `fusion`（`str(data.get("fusion") or "rrf")`），而 detail 顺着
     # trace 与 SSE 一路到前端 TraceView；判定层的四枚子观测（触发/缓存/熔断/跳过）在这条路上
     # 同样是**未过白名单的原始值**，这也是本地快路径仍能在重排行里显示它们的原因。
-    # 唯一的兜底是 `save_trace`/`get_trace` 的 `redact_secrets()`，它按"密钥形态"（apikey_、
-    # Bearer）脱敏，挡不住"看着不像密钥"的内部字符串。
+    # 唯一的兜底是 `save_trace`/`get_trace` 的 `redact_for_persistence()`（形态脱敏 + 精确键名
+    # 黑名单），它按"密钥形态"（apikey_、Bearer）与敏感**键名**抹，挡不住"看着不像密钥、键名也
+    # 不像密钥"的内部字符串。
     # ⇒ 检索层给 breakdown 新增**字符串型键**时：先过 `public_timings()` 的白名单口径
     #   （`PUBLIC_TIMING_KEYS` 逐条枚举）再进这里，或让它只进 `timings`。
     stage_timings = dict(retrieval_breakdown or {})

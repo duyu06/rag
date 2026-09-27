@@ -1,0 +1,63 @@
+# SEC-A Task 10e — 四场景 compose smoke 在终态镜像上的复跑（追加一 第 3 项）
+# 镜像 3f14b3de77a4 | 时间 2026-09-27 00:26:37 | API http://localhost:8001
+# 脚本 C:/tmp/seca10e/smoke_http.py（仓库外）+ docker compose exec（容器内只读）
+== S1 登录（有身份、must_change=1 的账号）==
+POST /api/auth/login admin         http=200 bytes=666 sha1=d2e9b29cb4cf
+   top_keys = ['access_token', 'password_change_required', 'token_type', 'user']
+   user_keys = ['access_role', 'display_name', 'permissions', 'role', 'username']
+   password_change_required = True
+
+== S2 错口令 vs 未知账号（必须是同一张脸）==
+wrong password on admin            http=401 bytes=37 sha1=3b9054717ae8
+unknown account                    http=401 bytes=37 sha1=3b9054717ae8
+   status_equal = True
+   BODIES_IDENTICAL = True
+   detail == §9.1 冻结字面值 = True
+
+== S3 must_change 的数据面阻断（S1 那枚 token）==
+GET /api/knowledge-bases           http=403 bytes=43 sha1=09e99fa0a685
+   detail == 「当前账号需先修改口令」 = True
+GET /api/auth/me（白名单腿）             http=200 bytes=340 sha1=1087e57a9639
+   me_keys = ['access_role', 'display_name', 'password_change_required', 'permissions', 'role', 'username']
+   password_change_required = True
+
+== S4 锁定：viewer 连错五次，再用正确口令 ==
+   five wrong = [401, 401, 401, 401, 401]
+   correct password while locked   http=401 bytes=37 sha1=3b9054717ae8
+   locked face identical to the unified failure face = True
+   detail == §9.1 冻结字面值 = True
+   响应体里没有「锁定」字样 = True
+http_face_rc=0
+
+-- 容器内 DB 面（user_credentials 全表，只读） --
+   ('admin', 'argon2id', 1, 1, 1, None)
+   ('hr01', 'argon2id', 1, 1, 0, None)
+   ('sales01', 'argon2id', 1, 1, 0, None)
+   ('user', 'argon2id', 2, 0, 0, None)
+   ('viewer', 'argon2id', 1, 1, 6, '2026-09-26T16:40:12.979814+00:00')
+   algorithm distribution: [('argon2id', 5)]
+   legacy rows: 0
+   must_change=1 rows: 4
+
+-- 容器内审计尾段：本轮 smoke 产生的 AUTH_LOGIN_LOCKED --
+   2026-09-26T16:25:13.002163+00:00 viewer LOGIN DENIED invalid_credentials
+   2026-09-26T16:25:13.110684+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:25:13.220835+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:25:13.317237+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:25:13.409078+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:25:13.505090+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:26:38.225917+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:26:38.268293+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:26:38.310948+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:26:38.357759+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:26:38.399321+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+   2026-09-26T16:26:38.440630+00:00 viewer LOGIN DENIED AUTH_LOGIN_LOCKED
+
+== credentials migration-status（终态镜像）==
+legacy_count=0 argon2id_count=5
+admin	argon2id	v1	must_change=1	locked=-	last_login=2026-09-26T16:26:37.735737+00:00	updated_at=2026-09-26T16:26:37.862751+00:00
+hr01	argon2id	v1	must_change=1	locked=-	last_login=2026-09-26T09:52:38.277947+00:00	updated_at=2026-09-26T09:52:38.218456+00:00
+sales01	argon2id	v1	must_change=1	locked=-	last_login=2026-09-26T09:52:37.889083+00:00	updated_at=2026-09-26T09:52:37.832844+00:00
+user	argon2id	v2	must_change=0	locked=-	last_login=2026-09-26T09:52:38.662833+00:00	updated_at=2026-09-26T09:54:11.592520+00:00
+viewer	argon2id	v1	must_change=1	locked=2026-09-26T16:40:12.979814+00:00	last_login=2026-09-26T12:39:08.004915+00:00	updated_at=2026-09-26T16:25:12.958274+00:00
+migration_status_rc=0

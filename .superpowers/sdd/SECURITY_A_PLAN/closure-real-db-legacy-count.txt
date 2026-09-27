@@ -1,0 +1,15 @@
+REAL_DB argon2id=5
+REAL_DB legacy_count=0
+
+--- same query, run inside the release container against /app/data/conversations.db ---
+--- (docker inspect shows backend/data is a bind mount => THIS IS THE SAME FILE as the host reading above, not a second database; see task-10a-report.md section 0.2) ---
+container cwd: /app | resolved db: data/conversations.db | inode-ish size: 57344
+REAL_DB(container) argon2id=5
+REAL_DB(container) legacy_count=0
+REAL_DB(container) must_change=1 rows: 4
+REAL_DB(container) must_change=0 rows: 1
+  admin: algorithm=argon2id credentials_version=1 must_change=1
+  hr01: algorithm=argon2id credentials_version=1 must_change=1
+  sales01: algorithm=argon2id credentials_version=1 must_change=1
+  user: algorithm=argon2id credentials_version=2 must_change=0
+  viewer: algorithm=argon2id credentials_version=1 must_change=1

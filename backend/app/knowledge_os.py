@@ -21,8 +21,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.audit import AUDIT_PATH, recent_events, record_event
-from app.auth import CurrentUser, USERS, require_permission, require_user
+from app.auth import CurrentUser, require_permission, require_user
 from app.config import settings
+from app.directory import identities as directory_identities, get_identity
 from app.ingestion import DOC_DIR, document_path, parse_document
 from app.knowledge import get_base, resolve_for
 from app.llm import usage as llm_usage
@@ -546,6 +547,12 @@ def feedback_list(
 
 @router.get("/operations/usage")
 def usage_summary(user: CurrentUser = Depends(require_permission("audit:read"))):
+    """运营观测：分母是身份目录的人数。
+
+    已知口径边界（写明，不擅自重定义治理页已经在渲染的指标）：`active_users` 取自审计面上
+    出现过的用户名，**不**按目录过滤——历史上查询过的人可能已经不在目录里，所以分子可以大于
+    分母。目录为空时没有分母可用：采用率按 0 计，而不是硬造一个 1 出来把百分比推过 100。
+    """
     events = recent_events(20000)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     today = datetime.now(timezone.utc).date().isoformat()
@@ -557,16 +564,17 @@ def usage_summary(user: CurrentUser = Depends(require_permission("audit:read")))
     latencies = [float(e["latency_ms"]) for e in queries if e.get("latency_ms") is not None]
     dept_counter: Counter[str] = Counter()
     for event in queries:
-        record = USERS.get(str(event.get("username")))
-        if record:
-            dept_counter[ROLE_DEPARTMENT.get(str(record.get("role")), "其他")] += 1
+        identity = get_identity(str(event.get("username")))
+        if identity:
+            dept_counter[ROLE_DEPARTMENT.get(identity.role, "其他")] += 1
     top = dept_counter.most_common(1)
-    total_users = max(len(USERS), 1)
+    members = directory_identities()
+    total_users = len(members)
     return {
         "active_users": len(active_users),
-        "total_users": len(USERS),
+        "total_users": total_users,
         "queries_30d": len(queries),
-        "adoption_pct": round(len(active_users) / total_users * 100, 1),
+        "adoption_pct": round(len(active_users) / total_users * 100, 1) if total_users else 0.0,
         "top_department": {"name": top[0][0], "queries": top[0][1]} if top else None,
         "queries_today": sum(1 for e in queries if str(e.get("timestamp", "")).startswith(today)),
         "avg_latency_ms": round(sum(latencies) / len(latencies), 1) if latencies else None,
@@ -691,16 +699,20 @@ def list_users(user: CurrentUser = Depends(require_permission("audit:read"))):
             ts = str(event.get("timestamp", ""))
             if ts >= last_login.get(name, ""):
                 last_login[name] = ts
+    # 名册是**身份侧的投影**：在册与否、启用与否都逐字取自身份文件的 `enabled`（身份的唯一真源），
+    # 最后一次登录从审计面派生，展示面不自己发明第三种状态。登录面对同一个字段的处理是另一件事：
+    # 停用账号在那里与根本不认识的账号不可分辨（同一个 401、同一段文案），而名册要如实显示停用者——
+    # 两处读的是同一份文件里的同一个字段，谁也不另存"这个人现在是什么状态"。
     users = [
         {
-            "username": record["username"],
-            "display_name": record["display_name"],
-            "role": record["role"],
-            "department": ROLE_DEPARTMENT.get(str(record["role"]), "其他"),
-            "status": "ACTIVE",
-            "last_login": last_login.get(record["username"]),
+            "username": identity.username,
+            "display_name": identity.display_name,
+            "role": identity.role,
+            "department": ROLE_DEPARTMENT.get(identity.role, "其他"),
+            "status": "ACTIVE" if identity.enabled else "DISABLED",
+            "last_login": last_login.get(identity.username),
         }
-        for record in USERS.values()
+        for identity in directory_identities().values()
     ]
     return {"users": users}
 
