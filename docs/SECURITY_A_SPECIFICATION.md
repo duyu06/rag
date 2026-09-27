@@ -806,3 +806,9 @@ Task 10f（给 V2.3 P0 补凭据接缝）报回一条它自己没敢裁的事实
 - **本地等价执行取证**（干净 venv，零历史依赖，仓库根 cwd，命令与 CI 逐字相同）：基线 `5 passed in 1.05s` → 植一枚真形状假凭据（`JWT_SECRET = "plaintext-material-…"` + 一枚 `sk-live-…`）`2 failed / rc=1` → 删除探针后 `5 passed / rc=0`，探针文件不存在且 `git status --porcelain` 无残留。
 - **取证过程本身暴露一条门的性质，值得留档**：第一次植入我用了测试夹具惯用的**拼接**写法（`"plaintext-" + "material…"`），门**不红**——那正是夹具躲门的合法形状，也是 §18 坚持要一枚带 git 历史的第三方扫描器的理由。任何"门能红"的声明都必须用连续字面量取证，否则证的是夹具的豁免通道。
 - 仍然成立的部分诚实保留：其余 5 枚 SEC-A 契约文件（认证腿/改密/目录/凭据/closure）**不在 CI 里跑**——它们模块级 import `app.main`/`app.auth`，需要完整 `requirements.txt`（含模型栈），且那枚既有 `unittest discover` 步在 main 上早已红。⇒ §18 的 SEC-B 前置改写为"把 `backend-contracts` 换成 pytest runner 并装齐依赖，让六枚契约门全进 CI；同时修既有步的红（早于 SEC-A）"。
+- **卡 D 的远端往返（必须留档，因为它证伪的是控制器自己的取证方法）**：首版接入在 `f6c67b5` 的远端运行里把
+  这一步跑红 —— `ModuleNotFoundError: No module named 'httpx'`（收集期 `conftest` 会话夹具 → `sec_a_seed` →
+  `app.llm.*`）。原因不是 CI 特别挑剔，而是**我写进 `ci.yml` 的安装清单与我本地干净 venv 实测时那一包集合不是
+  同一份**：本地那一份恰好带 `httpx`，CI 那一份没写。修正清单后（`e5ff798`）远端该步 `success`，其后既有
+  `unittest discover` 步仍 failure（早于 SEC-A，见验收文档 §9.2 L21）。⇒ 规矩补一条：**凡"本地与 CI 等价"的
+  取证，等价对象必须包含安装清单本身**；否则绿的是本地环境，不是那一步门禁。

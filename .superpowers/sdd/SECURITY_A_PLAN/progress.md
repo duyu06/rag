@@ -303,3 +303,12 @@
 - 规格第八轮回写 **§20.7**：三处"规格式过度声称"（L6 旧口令永久失效 / SECA-20 的 CI 同一道门 / §9.3 漏两张落盘面）全部**把声称缩回实测范围**，判据一字未动。§20.5、§20.6、§20.7 三轮都标注**待用户确认**。
 - 提交清单在 `.superpowers/sdd/SECURITY_A_PLAN/task-10e-report.md` §D/§D2：**42 条 = 20 改 + 22 未跟踪**，含排除项与"V2.3 曾对 `.superpowers/` 用 `add -f` 精选 41 枚"这个岔口。**全程零 git 写命令、零 tag、未动 `model-router-v2.3-rc1`。**
 - 欠账（不阻塞发布，已登记）：①"有记录 ⇒ 收尾行必打印"的**用例级**钉（§11）；②`docs/SECURITY_A_ACCEPTANCE_*.md` §5 一处既有的表格竖线排版小瑕；③前端改密 UI 入口（L20/SEC-B/C）；④`backend-contracts` 的 pip install + pytest runner（SEC-B 前置）；⑤`knowledge_os.py:86/92` 纳入持久化脱敏（§18）。
+
+## 封版（rev 3 / tag security-a-rc1）
+
+- 用户裁定：§20.5–20.7 回写批准（性质 = conformance correction，须按"原规格→实测反例→修订规范→判据是否变化→回归证据"五段留痕 ⇒ 已补 §20.8 卡 A/B/C）；CI 扫描门 **MUST FIX**；提交 APPROVED（选择性 `add -f` 证据，禁 `git add -A`）；单枚原子提交；tag `security-a-rc1`，**判据改为"SECA-20 那一步在远端真跑绿"**，不等整条 workflow（三枚 job 的红早于 SEC-A）。
+- 封版前复测（控制器亲自）：两 cwd 各一遍 `1316 passed / 36 warnings / 1133 subtests` 逐位相同；SEC-A 六门 353/117、回归四门 461/21/452、CI 等价扫描子集 5 passed、变异台锚点 `--check` 19/19 唯一。
+- **复测抓到我自己写的测试是坏的**：rev 2 报"两 cwd 相同"，但仓库根那一发实际 `1 failed` —— `AuditSinkIsolationTests` 用相对 `Path("data")/audit.jsonl`（两种 cwd 指向两枚不同文件）且 marker 跨运行不唯一。改成绝对 `BACKEND_DIR/...` + `uuid4()`，复测两 cwd 各 2 passed，随后全套件逐位相同。
+- **第一版 CI 接入被远端证伪**：`f6c67b5` 该步 `ModuleNotFoundError: No module named 'httpx'`（收集期 conftest → sec_a_seed → app.llm），因为我写进 `ci.yml` 的安装清单 ≠ 我本地干净 venv 实测那一包集合。补全（`e5ff798`）后远端 **step success**，其后既有 `unittest discover` 仍 failure（L21 记的就是这件事）。新增规矩：**"本地与 CI 等价"必须连安装清单一起等价。**
+- 取证/聚合哈希口径教训：文档 §14 那句"34 枚文件聚合 sha1"在五种合理写法下给出五个值，本轮定位为**只串文件字节**（`b57fa3366a09…` 完全复现）⇒ 基线读数必须连命令一起写。
+- 提交：`f6c67b5`（96 文件，SEC-A 全量）+ `e5ff798`（CI 依赖修正）+ 本轮 docs/ledger；`backend/app/identity/*` 两枚**未提交**（属飞书桥接的既有未提交工作，不在 SEC-A 范围）；镜像别名 `rag-backend:security-a-rc1 → 3f14b3de77a4`（本地产物别名，不替代 Git tag；旧镜像无回滚点）。
