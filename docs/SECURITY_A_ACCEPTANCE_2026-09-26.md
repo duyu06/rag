@@ -13,9 +13,37 @@
 `task-10d-report.md`、`task-10f-report.md`、`task-10g-report.md`、`task-10e-report.md`
 版式：`docs/MODEL_ROUTER_V23_ACCEPTANCE_2026-09-24.md`
 
+> **SECURITY-A RC1 ERRATA — 2026-09-28（紧随元数据，按用户裁定置于结论之前）**
+>
+> **Status：`security-a-rc1` 不是可交付的 release candidate。**
+>
+> - **本报告原来的声称**：§3 / §7 / §14 那批"全量套件 1316 passed / 36 warnings / 1133 subtests，
+>   两个 cwd 逐位相同"，以及 §1 的 `CONDITIONAL PASS` 与 tag `security-a-rc1`。
+>   **这些数字没有被删除，也不该被删除**——它们是本会话真实量到的读数。
+> - **更正**：那批读数是在**带着未提交修复的工作树**上量的。已提交树里
+>   `backend/app/identity/__init__.py` 的 `resolve_for_user()` 仍按 dict 接口取
+>   `record.get("feishu_open_id")`，而 SEC-A 自己已把 `record` 换成
+>   `app/directory.py` 里 `extra="forbid"` 的 pydantic 模型 `UserIdentity` ⇒ 该调用抛
+>   `AttributeError`。工作树里那句 `getattr(record, "feishu_open_id", "")` 属飞书权限桥接的
+>   未完成改动，**从未进入 `7cc5efc`**。
+> - **干净签出复现**：`git clone` 后 `git checkout 7cc5efc`，
+>   `python -m pytest backend/tests/test_rbac_contract.py -q -k login_payload` ⇒ **FAILED**
+>   （`AttributeError: 'UserIdentity' object has no attribute 'get'`，traceback 落在
+>   `pydantic/main.py` 的 `__getattr__`）。控制器 2026-09-28 于 `%TEMP%` 独立复跑取证。
+>   远端第二次证据：B0 的主门 run `36436145777` 里 113 条红/错有 **111 条**是这一句。
+> - **影响**：本报告的验收结论对**该 tag 所指的树不成立**。判据本身、Argon2 档位、认证面语义、
+>   扫描门与 §20 的八轮回写都不因此作废——缺陷是一行接口失配，不是一批判据。
+>   但"两 cwd 全绿"这句话描述的不是被认证的那棵树。
+> - **处置**：tag `security-a-rc1` **保持不可变、不 amend、不移位**，作为可审计的历史记录留在
+>   `7cc5efc`；本缺陷由 **`SEC-A-CORR-01`** 修正，修正后另行签发 `security-a-rc2`。
+>   独立卡：`docs/SECURITY_A_RC1_ERRATA_2026-09-28.md`。
+> - **对本报告其余结论的连带限制**：凡引用"本地全量读数"作为证据的行（§3 矩阵、§7.1.1、§14 基线），
+>   其有效性同等受限——它们量的是工作树，不是 tag。**方法论教训**：封版读数必须来自
+>   干净签出，而不是"当前工作树 + 我记得改了什么"。这条已写进 B0 侧台账（R24）。
+
 ## 1. 结论
 
-**CONDITIONAL PASS。**
+**CONDITIONAL PASS。**（← 原文照录。**2026-09-28 起对本 tag 失效，见上方 ERRATA；状态应为 ERRATA ISSUED / SUPERSEDED / NOT SHIPPABLE。**）
 
 | 判据 | 结果 |
 | --- | --- |

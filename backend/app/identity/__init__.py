@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 from app.identity.base import FeishuGrant
 
 # 裁决C：飞书故障期降级产物的复用窗口（秒）。故意不做成 Settings 键——
@@ -56,11 +58,16 @@ def warmup() -> None:
     get_resolver()
 
 
-def resolve_for_user(username: str, role: str, record: dict) -> FeishuGrant | None:
-    """Grant for one local account. None keeps today's local-only semantics."""
+def resolve_for_user(username: str, role: str, record: Any) -> FeishuGrant | None:
+    """授予解析。`record` 是 `directory.UserIdentity`（SEC-A 后不再是从常量表里取的 dict）。
+
+    用 `getattr` 而非 `isinstance`：身份类型由 `directory` 拥有，这一层反过来依赖它的
+    字段集就成了第二个认身份的地方——`directory` 加字段时不必回来改这里，缺字段时
+    照旧退成"没接飞书"（None = 本地语义），不是异常。
+    """
     from app.config import settings
 
-    open_id = str(record.get("feishu_open_id") or "")
+    open_id = str(getattr(record, "feishu_open_id", "") or "")
     if not settings.feishu_permissions_enabled or not open_id:
         return None
     return get_resolver().resolve(username, role, open_id)

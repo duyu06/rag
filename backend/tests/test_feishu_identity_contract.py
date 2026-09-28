@@ -566,6 +566,145 @@ class ResolveForUserTests(unittest.TestCase):
         self.assertEqual(grant.knowledge_base_ids, ["kb_hr"])
 
 
+#: SEC-A-CORR-01 结构钉的扫描目标：飞书桥接包入口那一个文件。`security-a-rc1` 的缺陷
+#: 本体就住在它的 `resolve_for_user` 里（对 pydantic 模型用 dict 接口），所以钉也下在这里。
+_IDENTITY_PACKAGE_FILE = BACKEND_DIR / "app" / "identity" / "__init__.py"
+
+
+class RecordInterfaceShapeTests(unittest.TestCase):
+    """SEC-A-CORR-01（errata §5）的结构钉：钉的是**接口形状**，不是再跑一遍 happy path。
+
+    为什么必须钉形状而不是钉行为：rc1 能带着一个必炸的调用出厂，是因为签名写
+    `record: dict`、运行时传的却是 `directory.UserIdentity`。类型提示不是运行时契约，
+    `pytest` 不会因为签名撒谎而失败，仓库里也没有 mypy 门——于是"这一层对 `record`
+    只许做属性读取"只剩一种可执行表达：扫 AST，一次 `Mapping.get` 形状的调用都不许有
+    （连 `record.model_dump().get(...)` 这种"先转 dict 再取"的写法也一并落网，
+    它的调用形状仍是 `.get`）。行为面（None / 空串 / 有值三态）另各留一枚：形状钉只说
+    "不许怎么取"，说不出"取到之后该怎么办"，后者漂了照样是登录炸。
+    """
+
+    def setUp(self):
+        import app.identity as identity
+
+        self.identity = identity
+        self.state = _saved_identity_state()
+        self.provider_calls: list[tuple[str, str, str]] = []
+        self.assembly_calls: list[int] = []
+
+    def tearDown(self):
+        _restore_identity_state(self.state)
+
+    class _SpyResolver:
+        """记录每一次"真要发给飞书"的解析请求；不碰网络。"""
+
+        def __init__(self, sink: list):
+            self.sink = sink
+
+        def resolve(self, username, role, open_id):
+            self.sink.append((username, role, open_id))
+            return FeishuGrant()
+
+    def _bridge_open_with_spy(self) -> None:
+        """开关置开，并把唯一装配缝换成 spy：本地语义一条请求都不许发出去。
+
+        spy 挂在 `get_resolver()` 上而不是 `_resolver` 单例上——委派必须走这条缝才叫
+        "装配一次、每请求解析一次"；直写单例会绕过本层唯一可控的入口。
+        """
+        from app.config import settings
+
+        settings.feishu_permissions_enabled = True
+        self.identity._resolver = None
+        self.identity.get_resolver = self._spy_resolver
+
+    def _spy_resolver(self):
+        self.assembly_calls.append(1)
+        return self._SpyResolver(self.provider_calls)
+
+    def test_resolve_for_user_carries_no_mapping_get_call_site(self):
+        # 钉 1：`resolve_for_user` 函数体内不得出现 `<expr>.get(...)` 这一族调用形状。
+        source = _IDENTITY_PACKAGE_FILE.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        func = next((node for node in tree.body
+                     if isinstance(node, ast.FunctionDef) and node.name == "resolve_for_user"),
+                    None)
+        # 扫不到目标的结构钉就是空断言——先把它钉红。
+        self.assertIsNotNone(func, "app/identity/__init__.py 里找不到模块级 `resolve_for_user`")
+        body = ast.unparse(func)
+        # 反向锚：函数体必须还在读那个字段。否则"一个 .get 都没有"会因为
+        # "整段实现被删空"而假绿——那不等于修好了，那是把桥接整个摘了。
+        self.assertIn("feishu_open_id", body)
+
+        def mapping_get_calls(scope: ast.AST) -> list[str]:
+            return sorted(ast.unparse(node) for node in ast.walk(scope)
+                          if isinstance(node, ast.Call)
+                          and isinstance(node.func, ast.Attribute)
+                          and node.func.attr == "get")
+
+        offenders = mapping_get_calls(func)
+        self.assertEqual(
+            offenders, [],
+            "`resolve_for_user` 又用回 dict 接口了：`record` 自 SEC-A 起是 "
+            "`directory.UserIdentity`（pydantic BaseModel，`extra=\"forbid\"`，没有 `.get`），"
+            f"这种调用每次必抛 AttributeError：{offenders}")
+        # 同一族调用的"搬家版"：把取值挪进一个接收 `record` 的私有助手也不行。
+        # 这一半只盯"接收者就叫 record"，不去禁全模块的 `.get`——解析飞书响应体的那些
+        # 模块真拿 dict 用 `.get`，那不属于这一层的契约。
+        moved = [call for call in mapping_get_calls(tree) if call.startswith("record.get(")]
+        self.assertEqual(moved, [], f"dict 接口换了个函数躲，仍是同一个缺陷：{moved}")
+
+    def test_pydantic_record_with_none_open_id_takes_local_semantics(self):
+        # 钉 2：`feishu_open_id=None` 的**真实 pydantic 记录** ⇒ 返回 None 且不抛。
+        # 走正常构造路径（不是 `model_construct`）：真实数据形状才配叫回归锚。
+        from app.directory import UserIdentity
+
+        self._bridge_open_with_spy()
+        record = UserIdentity(username="staff", display_name="职员", role="USER",
+                              feishu_open_id=None)
+        self.assertIsNone(record.feishu_open_id)          # 前提成立：字段在、值为 None
+        self.assertIsNone(self.identity.resolve_for_user("staff", "USER", record))
+        self.assertEqual(self.provider_calls, [])         # 不发请求
+        self.assertEqual(self.assembly_calls, [])         # 连装配缝都没被问一次
+
+    def test_missing_attribute_and_blank_open_id_neither_sends_a_request(self):
+        # 钉 3：`getattr` 的默认值不许把"账号没有该字段"和"字段存在但是空串"混成同一件事，
+        # 更不许顺手放过本该拒的形态。判据落在行为上：两形都不得发出一次请求，
+        # 而"字段有值"那一臂必须照常发（否则三态全折叠成静默本地也能骗过前一句）。
+        from app.directory import UserIdentity
+        from pydantic import ValidationError
+
+        self._bridge_open_with_spy()
+        no_attribute: object = object()
+        blank = _blank_open_id_record("staff", "USER")     # 绕开校验器硬造的空串
+        none_record = _identity_record("staff", "USER")    # 校验器正常路径：字段是 None
+        # 三形各自仍是它自己：只许在"要不要发请求"上折叠，不许在类型上折叠。
+        self.assertFalse(hasattr(no_attribute, "feishu_open_id"))
+        self.assertIsNone(none_record.feishu_open_id)
+        self.assertEqual(blank.feishu_open_id, "")
+        for label, record in (("no-attribute", no_attribute),
+                              ("open-id-none", none_record),
+                              ("open-id-blank", blank)):
+            with self.subTest(record=label):
+                self.assertIsNone(self.identity.resolve_for_user("staff", "USER", record))
+        self.assertEqual(self.provider_calls, [])           # 三形都零外呼
+        self.assertEqual(self.assembly_calls, [])           # 且一次都没问装配缝
+
+        # 正向对照：有值必须真的走桥，取值原样透传。少了这一臂，"把三态全折叠成静默本地"
+        # 那种实现能骗过上面每一句断言。
+        grant = self.identity.resolve_for_user(
+            "staff", "USER", _identity_record("staff", "USER", feishu_open_id="ou_pin_probe"))
+        self.assertEqual(self.provider_calls, [("staff", "USER", "ou_pin_probe")])
+        self.assertEqual(self.assembly_calls, [1])           # 每请求装配一次，不重复
+        self.assertIsNotNone(grant)
+
+        # "字段为空串"与"键拼错"在身份层就被 `UserIdentity` 自己的校验器拒掉，
+        # 所以 `getattr` 的默认值没有机会把这两形读成"没接飞书"而静默放过。
+        with self.assertRaises(ValidationError):
+            UserIdentity(username="staff", display_name="职员", role="USER", feishu_open_id="")
+        with self.assertRaises(ValidationError):
+            UserIdentity(username="staff", display_name="职员", role="USER",
+                         feishu_open_idd="ou_typo")
+
+
 class AuthWiringTests(unittest.TestCase):
     """Task 4：`CurrentUser` 消费 grant —— 开关关闭时与今日逐字一致，有授予时角色/权限以 grant 为准。"""
 
