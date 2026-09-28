@@ -1,0 +1,44 @@
+.........F.....                        [100%]
+================================== FAILURES ===================================
+_ P0MatrixStatusLockedToEvidenceTests.test_p0_row_status_matches_the_evidence _
+
+self = <test_real_llm_failover_gate.P0MatrixStatusLockedToEvidenceTests testMethod=test_p0_row_status_matches_the_evidence>
+
+    def test_p0_row_status_matches_the_evidence(self):
+        status = kit.matrix_p0_status()
+        self.assertIsNotNone(status, "矩阵里没有 P0 行了（§10 的『+1』被删）")
+        verdict = kit.p0_evidence_verdict(manifest_sha256_pin=PORTABLE_MANIFEST_SHA256)
+        problems = verdict["problems"]
+        print(_verdict_branch_line(verdict))
+        if problems:
+>           self.assertEqual(
+                P0_STATUS_WITHOUT_EVIDENCE, status,
+                f"P0 的证据不成立（{len(problems)} 条问题，逐条点名见下），矩阵那一行却写着 "
+                f"{status!r}。唯一合法取值是 {P0_STATUS_WITHOUT_EVIDENCE!r}——"
+                "改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh"
+                "（它会在 sha1 回打之后重新导出 bundle）\n"
+                + _problem_list_block(problems)
+                + _portable_failure_note(verdict)
+                + _evidence_absence_note(verdict["raw_evidence_error"]))
+E           AssertionError: 'BLOCKED' != 'GREEN'
+E           - BLOCKED
+E           + GREEN
+E            : P0 的证据不成立（3 条问题，逐条点名见下），矩阵那一行却写着 'GREEN'。唯一合法取值是 'BLOCKED'——改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh（它会在 sha1 回打之后重新导出 bundle）
+E             · [T-传输层] 原始证据 JSON 里**没有 provider_transport 这枚键**：缺键不等于为 null，非彩排的正面凭据必须是『键在场且写着 null』（简报『反彩排件』里点名的『不是靠读不到就算过』）
+E             · [X] bundle 与原始证据不同源（provider_transport_present）：bundle 说 'True'，原始件说 'False'——载体与真源不是同一次运行，或者有人改了其中一份
+E             · [X] bundle 与原始证据不同源（source_run_flags.provider_transport_key_present）：bundle 说 'True'，原始件说 'False'——载体与真源不是同一次运行，或者有人改了其中一份
+E           
+E           
+E           —— portable 层（3B 之后 P0 的唯一 CI 判据载体）——
+E           - bundle 目录：C:\Users\zhang\AppData\Local\Temp\p03bfix1-1NyId7\raglf\docs\evidence\model-router-v23\real-llm-failover-001
+E           - 读包结果：None（'missing' = 六枚一枚都没读到；其余 = 读到了但某几枚不成立）
+E           - 外部锚（闸文件常量 PORTABLE_MANIFEST_SHA256）期望 manifest 的 sha256 = c39a09f83b6abdab475cbf3527b2d92ba5459dbbaa55535c1f26b9f634308508
+E           - raw 层分支 = json-only ⇒ 原始件不在场**不是**这一格红的原因；红的原因只在上面那条问题清单里
+E           - 出路按问题标签分诊：[I1] 缺件 / [I2] hash 不配 ⇒ 重跑 runner 重导 bundle（`.superpowers/scripts/run_p0_failover_acceptance.sh` 的 [4/4] 会调 `kit.write_portable_bundle`）；[I3]–[I7] ⇒ 那次运行本身不成立，只能重跑真机；锚对不上 ⇒ 同一批里把闸文件常数与 bundle 一起改（可见的代码改动），**不是**把矩阵改成 BLOCKED 来消红。
+
+tests\test_real_llm_failover_gate.py:617: AssertionError
+---------------------------- Captured stdout call -----------------------------
+[P0 闸③ 分支] portable 层：0 条问题（bundle 目录 C:\Users\zhang\AppData\Local\Temp\p03bfix1-1NyId7\raglf\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 None） | [T-*] 真值层：1 条（无条件执行） | raw 层状态 = json-only（full = §6 validate_evidence() 实跑；json-only = provenance/blob 腿 + 面对面核对，§6 因本体不入库而不跑；absent = 证据 JSON 自己不在场，[T-*] 直接响） | raw 问题 2 条 | 原始件双条件定位：trace_jsonl=缺席, ledger_db=缺席, primary_probe=缺席, acceptance_module=在场 | acceptance_module 的 git blob 腿：blob 记录=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 HEAD=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 工作树重算=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 一致=True
+=========================== short test summary info ===========================
+FAILED tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+1 failed, 14 passed, 34 subtests passed in 9.14s

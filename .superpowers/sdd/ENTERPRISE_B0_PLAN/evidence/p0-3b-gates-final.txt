@@ -1,0 +1,15 @@
+=== SEC-A (after matrix/gate/kit edits) ===
+..............................................                           [100%]
+46 passed in 32.94s
+=== git diff on scan file ===
+GIT-DIFF-EMPTY rc=0
+=== scan face + hits (用扫描门自己的 face) ===
+面文件数 = 407 | 命中文件 = 16 | 命中处数 = 31
+    docs/evidence/model-router-v23/real-llm-failover-001/manifest.json 命中处数 = 0
+    docs/MODEL_ROUTER_V23_MATRIX.md 命中处数 = 0
+    backend/tests/test_real_llm_failover_gate.py 命中处数 = 0
+    backend/tests/real_llm_failover_kit.py 命中处数 = 0
+=== B0 门模块 16 + 收集数 1335 ===
+................                                                         [100%]
+16 passed in 32.19s
+1335 tests collected in 22.91s

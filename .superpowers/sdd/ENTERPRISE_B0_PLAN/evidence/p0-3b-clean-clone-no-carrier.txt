@@ -1,0 +1,23 @@
+....u..uu...[P0 闸③ 分支] portable 层：1 条问题（bundle 目录 C:\Users\zhang\AppData\Local\Temp\tmp.NFhXqizM0r\ragclone\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 missing） | raw 层状态 = json-only（full = §6 validate_evidence() 实跑；json-only = 只跑面对面核对；absent = 完全不参与）| raw 问题 0 条 | 原始件双条件定位：（manifest 不在场 ⇒ 无 provenance 可定位）
+FuuuuF.uuuu...
+================================== FAILURES ===================================
+E   AssertionError: 'BLOCKED' != 'GREEN'
+    - BLOCKED
+    + GREEN
+     : P0 的证据不成立（1 条问题，逐条点名见下），矩阵那一行却写着 'GREEN'。唯一合法取值是 'BLOCKED'——改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh（它会在 sha1 回打之后重新导出 bundle）
+      · [I1] bundle 整包不在场（docs/evidence/model-router-v23/real-llm-failover-001 下一枚都没读到）：可移植证据包是 3B 之后 P0 的唯一 CI 判据载体
+    
+    
+    —— portable 层（3B 之后 P0 的唯一 CI 判据载体）——
+    - bundle 目录：C:\Users\zhang\AppData\Local\Temp\tmp.NFhXqizM0r\ragclone\docs\evidence\model-router-v23\real-llm-failover-001
+    - 读包结果：'missing'（'missing' = 六枚一枚都没读到；其余 = 读到了但某几枚不成立）
+    - 外部锚（闸文件常量 PORTABLE_MANIFEST_SHA256）期望 manifest 的 sha256 = 68749a00e2e2a848d80aee054084df6b085a948683a775af13e79024dde4f7c1
+    - raw 层分支 = json-only ⇒ 原始件不在场**不是**这一格红的原因；红的原因只在上面那条问题清单里
+    - 出路按问题标签分诊：[I1] 缺件 / [I2] hash 不配 ⇒ 重跑 runner 重导 bundle（`.superpowers/scripts/run_p0_failover_acceptance.sh` 的 [4/4] 会调 `kit.write_portable_bundle`）；[I3]–[I7] ⇒ 那次运行本身不成立，只能重跑真机；锚对不上 ⇒ 同一批里把闸文件常数与 bundle 一起改（可见的代码改动），**不是**把矩阵改成 BLOCKED 来消红。
+C:\Users\zhang\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py:732: AssertionError: 'BLOCKED' != 'GREEN'
+E   AssertionError: unexpectedly None : portable 层探针取不到 bundle：分层判据无从验证
+C:\Users\zhang\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py:732: AssertionError: unexpectedly None : portable 层探针取不到 bundle：分层判据无从验证
+=========================== short test summary info ===========================
+FAILED tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+FAILED tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade
+2 failed, 13 passed, 11 subtests passed in 7.05s

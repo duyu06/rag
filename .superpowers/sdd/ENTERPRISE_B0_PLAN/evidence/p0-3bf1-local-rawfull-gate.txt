@@ -1,0 +1,3 @@
+....u..uu...[P0 闸③ 分支] portable 层：0 条问题（bundle 目录 E:\xiangmu\rag\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 None） | [T-*] 真值层：0 条（无条件执行） | raw 层状态 = full（full = §6 validate_evidence() 实跑；json-only = provenance/blob 腿 + 面对面核对，§6 因本体不入库而不跑；absent = 证据 JSON 自己不在场，[T-*] 直接响） | raw 问题 0 条 | 原始件双条件定位：trace_jsonl=在场, ledger_db=在场, primary_probe=在场, acceptance_module=在场 | acceptance_module 的 git blob 腿：blob 记录=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 HEAD=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 工作树重算=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 一致=True
+.uuuuuuuuuuuuuuuuuuuuuuuuuuu..uuuu...
+15 passed, 34 subtests passed in 8.60s

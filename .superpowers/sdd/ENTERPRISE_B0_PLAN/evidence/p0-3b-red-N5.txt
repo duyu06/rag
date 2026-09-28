@@ -1,0 +1,152 @@
+.........F.....                        [100%]
+================================== FAILURES ===================================
+_ P0MatrixStatusLockedToEvidenceTests.test_p0_row_status_matches_the_evidence _
+
+self = <test_real_llm_failover_gate.P0MatrixStatusLockedToEvidenceTests testMethod=test_p0_row_status_matches_the_evidence>
+
+    def test_p0_row_status_matches_the_evidence(self):
+        status = kit.matrix_p0_status()
+        self.assertIsNotNone(status, "矩阵里没有 P0 行了（§10 的『+1』被删）")
+        verdict = kit.p0_evidence_verdict(manifest_sha256_pin=PORTABLE_MANIFEST_SHA256)
+        problems = verdict["problems"]
+        print(_verdict_branch_line(verdict))
+        if problems:
+>           self.assertEqual(
+                P0_STATUS_WITHOUT_EVIDENCE, status,
+                f"P0 的证据不成立（{len(problems)} 条问题，逐条点名见下），矩阵那一行却写着 "
+                f"{status!r}。唯一合法取值是 {P0_STATUS_WITHOUT_EVIDENCE!r}——"
+                "改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh"
+                "（它会在 sha1 回打之后重新导出 bundle）\n"
+                + _problem_list_block(problems)
+                + _portable_failure_note(verdict)
+                + _evidence_absence_note(verdict["raw_evidence_error"]))
+E           AssertionError: 'BLOCKED' != 'GREEN'
+E           - BLOCKED
+E           + GREEN
+E            : P0 的证据不成立（1 条问题，逐条点名见下），矩阵那一行却写着 'GREEN'。唯一合法取值是 'BLOCKED'——改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh（它会在 sha1 回打之后重新导出 bundle）
+E             · [I6] trace_id_source.pointers 里有指针为 null：{'trace.trace_id': 'p0-failover-6146ff1417d7', 'ledger.row.trace_id': 'p0-failover-6146ff1417d7', 'request.trace_id': None}——三处同源要的是三条腿都在，缺腿不等于一致
+E           
+E           
+E           —— portable 层（3B 之后 P0 的唯一 CI 判据载体）——
+E           - bundle 目录：C:\Users\zhang\AppData\Local\Temp\p03bfix1-1NyId7\raglf\docs\evidence\model-router-v23\real-llm-failover-001
+E           - 读包结果：None（'missing' = 六枚一枚都没读到；其余 = 读到了但某几枚不成立）
+E           - 外部锚（闸文件常量 PORTABLE_MANIFEST_SHA256）期望 manifest 的 sha256 = cb84c1f4db84ff97d0d362fb64ffef1ce2b07d0e156d60e067b688768fa1e3ee
+E           - raw 层分支 = json-only ⇒ 原始件不在场**不是**这一格红的原因；红的原因只在上面那条问题清单里
+E           - 出路按问题标签分诊：[I1] 缺件 / [I2] hash 不配 ⇒ 重跑 runner 重导 bundle（`.superpowers/scripts/run_p0_failover_acceptance.sh` 的 [4/4] 会调 `kit.write_portable_bundle`）；[I3]–[I7] ⇒ 那次运行本身不成立，只能重跑真机；锚对不上 ⇒ 同一批里把闸文件常数与 bundle 一起改（可见的代码改动），**不是**把矩阵改成 BLOCKED 来消红。
+
+tests\test_real_llm_failover_gate.py:617: AssertionError
+---------------------------- Captured stdout call -----------------------------
+[P0 闸③ 分支] portable 层：1 条问题（bundle 目录 C:\Users\zhang\AppData\Local\Temp\p03bfix1-1NyId7\raglf\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 None） | [T-*] 真值层：0 条（无条件执行） | raw 层状态 = json-only（full = §6 validate_evidence() 实跑；json-only = provenance/blob 腿 + 面对面核对，§6 因本体不入库而不跑；absent = 证据 JSON 自己不在场，[T-*] 直接响） | raw 问题 0 条 | 原始件双条件定位：trace_jsonl=缺席, ledger_db=缺席, primary_probe=缺席, acceptance_module=在场 | acceptance_module 的 git blob 腿：blob 记录=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 HEAD=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 工作树重算=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 一致=True
+_ P0MatrixStatusLockedToEvidenceTests.test_the_evidence_judgment_does_not_degrade (portable_mutation='trace_id 三处里改一处（ledger-row 顶层）') _
+
+self = <test_real_llm_failover_gate.P0MatrixStatusLockedToEvidenceTests testMethod=test_the_evidence_judgment_does_not_degrade>
+
+    def test_the_evidence_judgment_does_not_degrade(self):
+        """判据自身的变异探针：每缺一枚关键事实，判据必须**点名**它（raw 层 + portable 层各一批）。
+    
+        为什么单独钉这一枚（Task 9 复审的教训形状）：闸③读的是采集器的判据，判据退化成
+        「数一数有没有 10 条」时，本文件一切照常绿。四枚变异各打一枪，打的就是
+        「模型序 / 服务端错误体 / 账本行数 / 落盘指纹」这四枚最容易被糊弄的位。
+    
+        3B 追加 portable 层那一批（同一枚 node-id，**不新增用例**，免得动 B0 的收集数钉）：
+        分层之后最怕的就是「portable 层是一枚摆设」，所以七条 interlock 与搬过来的 `[C-*]`
+        逐条都要有一发「改它 ⇒ 它自己点名」的枪。每发先验 baseline 不含该标签，
+        再验改后必含 ⇒ 杀掉它的确实是这一枚判据，不是别处顺带红。
+        """
+        base = _valid_looking_evidence()
+        mutations = [
+            ("外呼模型序被换（primary 直接给 phi3）",
+             lambda e: e.__setitem__("provider_calls",
+                                     [e["provider_calls"][1], e["provider_calls"][0]]),
+             "外呼模型序"),
+            ("错误体换成了不含加载特征的文字",
+             lambda e: e["provider_calls"][0].__setitem__(
+                 "error_body_excerpt", "upstream temporarily unavailable, please retry"),
+             "不含 §6 的加载失败特征"),
+            ("账本写成两行",
+             lambda e: e["ledger"].__setitem__("rows", 2),
+             "临时库行数"),
+            ("sha1 表里写一枚对不上的摘要",
+             lambda e: e.__setitem__("files_sha1", {str(kit.PROBE_FILE): "0" * 40}),
+             "sha1 对不上"),
+        ]
+        for label, mutate, expected in mutations:
+            with self.subTest(mutation=label):
+                candidate = json.loads(json.dumps(base, ensure_ascii=False))
+                mutate(candidate)
+                problems = kit.validate_evidence(candidate)
+                self.assertTrue(any(expected in problem for problem in problems),
+                                f"该判据没红（退化）：{expected} ⇒ {problems}")
+    
+        baseline = _portable_payload_copy()
+        self.assertIsNotNone(baseline, "portable 层探针取不到 bundle：分层判据无从验证")
+        base_problems = kit.validate_portable_bundle(
+            baseline, manifest_sha256_pin=PORTABLE_MANIFEST_SHA256)
+        for label, mutate, expected in _portable_mutations():
+            with self.subTest(portable_mutation=label):
+                candidate = _portable_payload_copy()
+>               self.assertFalse(any(expected in problem for problem in base_problems),
+                                 f"baseline 已经带着 {expected}：bundle 本身就不成立，"
+                                 "这发探针证明不了任何事（先看闸③那一枚的红因清单）")
+E               AssertionError: True is not false : baseline 已经带着 [I6]：bundle 本身就不成立，这发探针证明不了任何事（先看闸③那一枚的红因清单）
+
+tests\test_real_llm_failover_gate.py:678: AssertionError
+_ P0MatrixStatusLockedToEvidenceTests.test_the_evidence_judgment_does_not_degrade (portable_mutation='trace_id_source.pointers 里一枚改成 null（M2：少一条腿不许算一致）') _
+
+self = <test_real_llm_failover_gate.P0MatrixStatusLockedToEvidenceTests testMethod=test_the_evidence_judgment_does_not_degrade>
+
+    def test_the_evidence_judgment_does_not_degrade(self):
+        """判据自身的变异探针：每缺一枚关键事实，判据必须**点名**它（raw 层 + portable 层各一批）。
+    
+        为什么单独钉这一枚（Task 9 复审的教训形状）：闸③读的是采集器的判据，判据退化成
+        「数一数有没有 10 条」时，本文件一切照常绿。四枚变异各打一枪，打的就是
+        「模型序 / 服务端错误体 / 账本行数 / 落盘指纹」这四枚最容易被糊弄的位。
+    
+        3B 追加 portable 层那一批（同一枚 node-id，**不新增用例**，免得动 B0 的收集数钉）：
+        分层之后最怕的就是「portable 层是一枚摆设」，所以七条 interlock 与搬过来的 `[C-*]`
+        逐条都要有一发「改它 ⇒ 它自己点名」的枪。每发先验 baseline 不含该标签，
+        再验改后必含 ⇒ 杀掉它的确实是这一枚判据，不是别处顺带红。
+        """
+        base = _valid_looking_evidence()
+        mutations = [
+            ("外呼模型序被换（primary 直接给 phi3）",
+             lambda e: e.__setitem__("provider_calls",
+                                     [e["provider_calls"][1], e["provider_calls"][0]]),
+             "外呼模型序"),
+            ("错误体换成了不含加载特征的文字",
+             lambda e: e["provider_calls"][0].__setitem__(
+                 "error_body_excerpt", "upstream temporarily unavailable, please retry"),
+             "不含 §6 的加载失败特征"),
+            ("账本写成两行",
+             lambda e: e["ledger"].__setitem__("rows", 2),
+             "临时库行数"),
+            ("sha1 表里写一枚对不上的摘要",
+             lambda e: e.__setitem__("files_sha1", {str(kit.PROBE_FILE): "0" * 40}),
+             "sha1 对不上"),
+        ]
+        for label, mutate, expected in mutations:
+            with self.subTest(mutation=label):
+                candidate = json.loads(json.dumps(base, ensure_ascii=False))
+                mutate(candidate)
+                problems = kit.validate_evidence(candidate)
+                self.assertTrue(any(expected in problem for problem in problems),
+                                f"该判据没红（退化）：{expected} ⇒ {problems}")
+    
+        baseline = _portable_payload_copy()
+        self.assertIsNotNone(baseline, "portable 层探针取不到 bundle：分层判据无从验证")
+        base_problems = kit.validate_portable_bundle(
+            baseline, manifest_sha256_pin=PORTABLE_MANIFEST_SHA256)
+        for label, mutate, expected in _portable_mutations():
+            with self.subTest(portable_mutation=label):
+                candidate = _portable_payload_copy()
+>               self.assertFalse(any(expected in problem for problem in base_problems),
+                                 f"baseline 已经带着 {expected}：bundle 本身就不成立，"
+                                 "这发探针证明不了任何事（先看闸③那一枚的红因清单）")
+E               AssertionError: True is not false : baseline 已经带着 [I6] trace_id_source.pointers 里有指针为 null：bundle 本身就不成立，这发探针证明不了任何事（先看闸③那一枚的红因清单）
+
+tests\test_real_llm_failover_gate.py:678: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+SUBFAILED(portable_mutation='trace_id 三处里改一处（ledger-row 顶层）') tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade
+SUBFAILED(portable_mutation='trace_id_source.pointers 里一枚改成 null（M2：少一条腿不许算一致）') tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade
+3 failed, 14 passed, 32 subtests passed in 9.24s

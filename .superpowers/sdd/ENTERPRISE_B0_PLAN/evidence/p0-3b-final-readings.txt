@@ -1,0 +1,21 @@
+=== 1) 本机闸模块（终态代码）===
+....u..uu...[P0 闸③ 分支] portable 层：0 条问题（bundle 目录 E:\xiangmu\rag\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 None） | raw 层状态 = full（full = §6 validate_evidence() 实跑；json-only = 只跑面对面核对；absent = 完全不参与）| raw 问题 0 条 | 原始件双条件定位：trace_jsonl=在场, ledger_db=在场, primary_probe=在场, acceptance_module=在场
+15 passed, 26 subtests passed in 6.03s
+=== 2) CR 判据自证（纯内存，盘上不动）===
+盘上六枚 has_cr = {'result.json': False, 'response.json': False, 'ledger-row.json': False, 'trace-attempts.json': False, 'primary-probe.json': False, 'manifest.json': False}
+注入 CRLF（只在内存）后响的判据 = ['[I2] result.json 含 CR：bundle 的六枚是纯 LF，混行尾会让 hash 随机器漂。若这是 `g']
+盘上 result.json 未被触碰 = True ca9f7a4e22e6
+=== 3) SEC-A 扫描门（终态）+ 该文件 git diff ===
+..............................................                           [100%]
+46 passed in 35.79s
+SEC-A 文件 GIT-DIFF-EMPTY rc=0
+扫描面文件数 = 407 | 命中文件 = 16 | 命中处数 = 31
+    docs/MODEL_ROUTER_V23_MATRIX.md 命中处数 = 0
+    backend/tests/real_llm_failover_kit.py 命中处数 = 0
+    backend/tests/test_real_llm_failover_gate.py 命中处数 = 0
+=== 4) B0 门册 16 + EXPECTED_COLLECTED 未被改 + 收集数 ===
+................                                                         [100%]
+16 passed in 37.08s
+ci_gate 有 M（开工前既有，见 §0）
+104:EXPECTED_COLLECTED = 1335
+1335 tests collected in 37.54s

@@ -490,3 +490,80 @@
   干净 checkout 必然 missing ⇒ 闸要求 `BLOCKED` 而矩阵写 `GREEN` ⇒ 恒红。
   彻底解需入库一次真机运行的 sqlite + trace 原文（`.db` 还会新增一枚 `i/-text`，撞 §6.4 枚举钉），
   或改该闸语义 ⇒ **两条都在 B0 白名单之外**，已停手交用户裁。
+
+- **R26（用户 2026-09-28 三条裁定，B0 停止扩面）**：
+  - **① `UserIdentity.get()` 另开 `SEC-A-CORR-01`，不归 B0**。不得把两份未提交的飞书文件整体带进去，
+    也不得让 B0 越权改 `backend/app/**`。修正面 = `backend/app/identity/__init__.py` + 直接需要的测试/文档；
+    patch 必须**从已提交树重新生成最小形**（工作树 `__init__.py` 的 diff 恰为 `Any` 导入 + 签名 +
+    docstring + 一处 `getattr`，即最小面；README 那堆 diff 属飞书未完成工作，**不带**）。
+    须加结构钉：`resolve_for_user(UserIdentity(...))` 不得调用 `Mapping.get`（AST 级，不是只跑 happy path）。
+    `security-a-rc1` = immutable / known-invalid；`security-a-rc2` 只在 ③ 也闭合且远端主门真绿后签发。
+  - **② errata 两层同时做**：原验收文档顶部追加醒目 ERRATA（**保留**原"1316 passed"读数，
+    改成"原测量 + 为什么它描述的不是那棵树"），另立 `docs/SECURITY_A_RC1_ERRATA_2026-09-28.md`。
+    不 amend、不移 tag、明确 superseded。项目状态与 Obsidian 把 `security-a-rc1 = CONDITIONAL PASS`
+    改为 `ERRATA ISSUED / SUPERSEDED / NOT SHIPPABLE`（不是删历史）。
+  - **③ P0 证据改"载体"不改"含义"**：不批准把 `.db` + trace 原件整体入库（除撞 `i/-text` 枚举钉外，
+    更因它把运行态库/trace/本机 probe 变成仓库长期发布物）；也不批准退回"验收 markdown 说 GREEN 就算 GREEN"
+    （那会取消逐文件重算 hash 的反造假性，Task 5 已正确回退过一次）。
+    裁定 = 建立 **Portable P0 Evidence Bundle**：真机仍产原始 db/trace/probe，验收 runner 从**原始真源自动导出**
+    最小文本化可跟踪包（`docs/evidence/model-router-v23/real-llm-failover-001/` 下
+    result/response/ledger-row/trace-attempts/primary-probe/manifest，全 JSON/JSONL）。
+    manifest 固定 `evidence_schema_version / trace_id / source_tree_hash / release_image / generated_at /
+    portable_files(path+sha256) / raw_provenance(name+sha256)`；
+    **portable_files 的 sha256 是 P0 判定事实**（干净签出必须可重算），raw 件 hash 只作 provenance、本体继续 ignored。
+    闸在 CI 验七条 interlock（bundle 齐 / manifest hash 全配 / response.model_used == ledger.model ==
+    成功 trace attempt.model == phi3:mini / planned primary == ornith-1.5:9b-text / probe == 文档化的
+    retryable|model-unavailable 失败 / trace_id 跨文件一致 / 矩阵 P0 行 == GREEN）。
+    语义边界：`raw provenance 不在 ⇒ 不影响 portable validation`；`portable 缺失/畸形/hash 不配 ⇒ BLOCKED`。
+    **改表示层，不改验收事实层。** 必须配独立八发变异（逐枚改 model_used / ledger.model / trace 成功枚 /
+    planned primary / probe result / 删一枚 portable 件 / 改文件不更 manifest hash / 矩阵 GREEN→BLOCKED 全须红）。
+    因涉 P0 闸语义代码，**实现后必须独立评审，不得自写自裁**。
+- **执行序（用户指定，B0 不参与扩面）**：1 errata → 2 CORR-01 → 3 P0 portability amendment →
+  4 两项各自动回归 → 5 全量两 cwd → 6 干净签出 → 7 push → 8 远端 backend-contracts GREEN →
+  9 compose/pwsh 首次真执行 → 10 独立终审 → 11 `security-a-rc2`。两枚既有 tag 均不碰。
+
+- **R27（3B 独立评审 = spec ❌ 部分 / 质量 findings；评审为用户裁定的强制席位，非自写自裁）**：
+  干净签出转绿这条**已由评审与控制器各自独立复现**（评审自建克隆：`15 passed`、`portable 层 0 问题`、
+  `raw_state=json-only`；负控：删 bundle 目录 ⇒ 2 红点名 `[I1]`。控制器自跑副本同样 15 passed）。
+  `validate_evidence()` 本体确认未被弱化（§6 内唯一改动是 4 枚标记字面量提成 `MODEL_UNAVAILABLE_MARKERS`，
+  逐字节等价）；矩阵 P0 行**逐字节等同 HEAD**、状态字未动；SEC-A 扫描文件 `git diff` 空、零新增豁免。
+  **但四条点名条款不成立，全部要修**：
+  - **H1** `rehearsal` / `completed` 两条判据在分层时**静默丢失**：往已跟踪的 evidence JSON 注入
+    `"rehearsal": true` 或 `"completed": false` ⇒ 仍 `15 passed`（而 `assertions[0].pass=false` 会红，
+    说明不是比较器坏了，是这两枚字段没人比）。简报原本写"必须保留"。且它不在 §5 映射表里 ⇒ 属于未申报的放宽。
+  - **H2** 唯一的"非彩排正面凭据" `provider_transport` 在**源端退化成"读不到就算过"**：
+    `evidence.get(...)` 让"键不存在"与"显式 null"不可区分；删键 + bundle 写 null ⇒ 15 passed。
+  - **M1** raw 层是全有或全无：`agent_traces.jsonl` 被篡改 **且** `conversations.db` 被删 ⇒ `15 passed` 静默；
+    四枚都在场时同样篡改则红。违反用户钉的"raw 在场但对不上 ⇒ 红"。一行修：`json-only` 分支也要调
+    `raw_layer_problems(resolved)`，顺带让 `acceptance_module` 这枚 sha1 在 CI 里第一次获得真重算腿。
+  - **M2** interlock 6 可被"字段缺失"满足（`set(...) - {None}` 的写法放过 None）。
+  **另有两条一并修（同为加强，成本一行级）**：L6 `green_permission()` 仍只看 `validate_evidence()`
+  而 runner 以它退出 ⇒ 3B 重新制造了"闸与 runner 两个口径"，而那正是共享 kit 注释当初要防的事；
+  L1 变异台的 anchor 唯一性互锁**是死的**（`shot()` 从不传 needle ⇒ `check()` 恒 None ⇒
+  "锚点全 ANCHOR-OK" 是同义反复，与 B0 那枚 `spec["node"]` 同类病）。
+  **登记不修的两条**：M3 manifest 外部锚"对同一 diff 内改三处"不设防 —— 评审判为
+  "对抗意义上更弱、可用意义上不更弱（3B 前 CI 根本产不出 GREEN，恒红的判据吓不住任何人）"，
+  接受但**必须记成残余信任根**，同 diff 不可变锚（CI 变量 / 双独立钉）列 B1 义务；
+  L5 报告里"第一轮 9×INCIDENTAL 的原文保留在…"不实（bench 产物与 final 逐字节相同，那轮没留档）——
+  披露本身可信（docstring 记了两处仪表缺陷），但这句话要改。
+- **提交切分裁定（回 L10）**：本工作树同时带着 CORR-01（identity 面）与 3B（P0 载体面）两批改动，
+  评审在零提交会话里无法归因。故**分两枚窄提交**：`fix(sec-a-corr-01)` = `identity/__init__.py` +
+  飞书契约钉 + errata 两文件；`fix(v2.3-p0)` = kit + 闸 + bundle + runner + 矩阵说明。
+  `backend/app/identity/README.md` **两枚都不带**（飞书未完成文档）。
+
+- **R28（3B 修复轮 1 的控制器独立复测，不采信返回摘要）**：
+  - 我**先错两次、都是自己探针的错**，都记下来免得下次再犯：① 第一次"干净签出 1 failed"是因为
+    我只拷文件没建 git 仓库，而 M1 新加的 git-blob 腿需要 `git rev-parse`；② 注入轮失败是因为副本里
+    `git add -A` 尊重 `.gitignore`，那枚 evidence JSON 压根没被跟踪 ⇒ 注入无对象。修正为
+    `git init` + `git add -f -A`（406 枚跟踪、evidence 已跟踪）后重打。
+  - **带 git 的真副本实测（raw 不在场 = CI 形态）**：baseline **15 passed**；
+    注入 `rehearsal:true` ⇒ **1 failed**；注入 `completed:false` ⇒ **1 failed**；
+    删 `provider_transport` 键 ⇒ **1 failed**。⇒ R27 的 **H1 / H2 已修好且是我自己复现的**，不是转述。
+  - 锚与载体：`PORTABLE_MANIFEST_SHA256` == 盘上 manifest sha256（`c39a09f83b6a…` 全串等）；
+    五枚 portable 件的 sha256+bytes **全部重算相符**；kit 与闸文件语法完好、本地闸 15 passed（34 subtests，
+    比修复前 26 多 8 枚 = 新增的退化探针）。
+  - **仍未由我复现、不得当作已验**：M1（篡改 jsonl + 删 db ⇒ 红）需要 raw 在场，我不在真证据上动手；
+    M2（interlock 6 指针置 null ⇒ 红）；以及九发变异在**anchor 互锁已接通**后的重跑。
+    这三项挂在待办，谁主张谁取证。
+  - **流程事实**：最近四次派单里三次撞 150 回合上限（活干了、摘要没写回），一次刚开始就死。
+    后续这类"改代码 + 跑全套 + 写长报告"的活我自己按小步做，不再整单外包。

@@ -1,0 +1,116 @@
+M1 改 response.model_used（answer.model）
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = phi3:mini-M1
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M2 改 ledger.row.model
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = phi3:mini-M2
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M3 改成功那枚 trace attempt 的 model
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = phi3:mini-M3
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M4 改 planned primary（manifest.plan.primary_model）
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = ornith-M4:latest
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M5 probe result 换成非文档化失败
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = 不含 §6 那族加载失败特征
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M6 删掉一枚 portable 件
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [I1] bundle 件缺失：trace-attempts.json
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M7 改 portable 件但不更 manifest hash
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [I2] sha256 不配：response.json
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M8 矩阵 GREEN → BLOCKED
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = 矩阵还写着
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+M9 bundle 来源指向彩排 run dir
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = 指向彩排目录
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N1 H1：已跟踪的原始 JSON 注入 rehearsal=true
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [T-彩排]
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N2 H1：已跟踪的原始 JSON 的 completed 改成 false
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [T-收尾]
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N3 H2：已跟踪的原始 JSON 删掉 provider_transport 键
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [T-传输层]
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N4 M1：篡改 trace_jsonl 且删掉 ledger_db 本体
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [I7] 原始件 sha1 与 bundle 声明不等：trace_jsonl
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N5 M2：trace_id_source.pointers 里一枚改成 null
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [I6] trace_id_source.pointers 里有指针为 null
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+
+== 台账 ==
+  M1: KILLED-ASSIGNED-RESTORED-OK
+  M2: KILLED-ASSIGNED-RESTORED-OK
+  M3: KILLED-ASSIGNED-RESTORED-OK
+  M4: KILLED-ASSIGNED-RESTORED-OK
+  M5: KILLED-ASSIGNED-RESTORED-OK
+  M6: KILLED-ASSIGNED-RESTORED-OK
+  M7: KILLED-ASSIGNED-RESTORED-OK
+  M8: KILLED-ASSIGNED-RESTORED-OK
+  M9: KILLED-ASSIGNED-RESTORED-OK
+  N1: KILLED-ASSIGNED-RESTORED-OK
+  N2: KILLED-ASSIGNED-RESTORED-OK
+  N3: KILLED-ASSIGNED-RESTORED-OK
+  N4: KILLED-ASSIGNED-RESTORED-OK
+  N5: KILLED-ASSIGNED-RESTORED-OK
+  计数: {'KILLED': 14}
+  park 目录已删 = True

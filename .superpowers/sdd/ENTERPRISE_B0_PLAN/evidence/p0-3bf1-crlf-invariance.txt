@@ -1,0 +1,14 @@
+临时目录（仓库外）：C:\Users\zhang\AppData\Local\Temp\p03b-crlf-6jo2yq_b
+源工作树字节：40517 B / CR 0
+  acc_lf.py: 40517 B / CR 0  工作树 sha1=da92cdf51de5dbfad3107f1dc744d18e4173e07c  git hash-object=d8f4ceb5f798b91201bf3db1b92f1f112d87e137
+  acc_crlf.py: 41232 B / CR 715  工作树 sha1=189a6e3b5330e8db599e424b20d920b0d6037260  git hash-object=d8f4ceb5f798b91201bf3db1b92f1f112d87e137
+manifest 记录：sha1=da92cdf51de5dbfad3107f1dc744d18e4173e07c git_blob=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 repo_path=backend/tests/test_real_llm_failover_acceptance.py
+git rev-parse HEAD:<repo_path> = d8f4ceb5f798b91201bf3db1b92f1f112d87e137
+
+== 把 kit.ACCEPTANCE_FILE 逐枚指到 LF / CRLF 两份临时副本，看 raw 层的结论会不会翻 ==
+  acc_lf.py    工作树 blob=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 HEAD blob=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 一致=True blob 腿问题=0 条 
+  acc_crlf.py  工作树 blob=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 HEAD blob=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 一致=True blob 腿问题=0 条 （按工作树 sha1 的老口径：会红）
+  test_real_llm_failover_acceptance.py 工作树 blob=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 HEAD blob=d8f4ceb5f798b91201bf3db1b92f1f112d87e137 一致=True blob 腿问题=0 条 
+
+三份（LF 副本 / CRLF 副本 / 源工作树）的 blob 腿结论逐枚相同 = True
+对照：同一批字节按工作树 sha1 判，CRLF 副本会给出 189a6e3b… ≠ 记录值 ⇒ 冤枉一次真话。

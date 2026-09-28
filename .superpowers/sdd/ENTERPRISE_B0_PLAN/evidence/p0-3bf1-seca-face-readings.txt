@@ -1,0 +1,7 @@
+扫描面文件数 = 407 | 命中文件 = 16 | 命中处数 = 31    （3A/3B 初版读数 407 / 16 / 31 —— 一字未动）
+  backend/tests/real_llm_failover_kit.py                     在面上=True 命中处数=0
+  backend/tests/test_real_llm_failover_gate.py               在面上=True 命中处数=0
+  docs/MODEL_ROUTER_V23_MATRIX.md                            在面上=True 命中处数=0
+  .superpowers/scripts/run_p0_failover_acceptance.sh         在面上=True 命中处数=0
+  docs/evidence/**  在面上 = True ⇒ 载体未跟踪 ⇒ 还没进面（与 3B 初版 §11⑥ 同一条边界；入库后命中仍应为 0，六枚逐枚 0 已由 3A 量过）
+闸门点名红面 = （空 ⇒ 零新增豁免行、命中集与豁免表逐文件对账通过）

@@ -1,0 +1,4 @@
+== 锚点互锁自证（不写盘、不动树）==
+  needle 命中 0 次（目标不在场）: result.json needle=b'"no-such-key-NOT-IN-BUNDLE"' 实测命中=0 次 ⇒ check() = 'TARGET-NOT-FOUND result.json 自证（不会 apply）'
+  needle 命中 >1 次（锚不唯一）: response.json needle=b'"model"' 实测命中=3 次 ⇒ check() = 'ANCHOR-NOT-UNIQUE response.json 自证（不会 apply） ×3'
+  两枚都响 = True ⇒ 这台子的锚互锁是活的（修复轮 1 之前它一枚都不接 needle）

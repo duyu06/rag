@@ -1,0 +1,19 @@
+=== 实验 E1：absent 分支（在克隆里把已跟踪的原始证据 JSON 也拿走）===
+....u..uu...[P0 闸③ 分支] portable 层：0 条问题（bundle 目录 C:\Users\zhang\AppData\Local\Temp\tmp.wUO774FrqB\ragclone\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 None） | raw 层状态 = absent（full = §6 validate_evidence() 实跑；json-only = 只跑面对面核对；absent = 完全不参与）| raw 问题 0 条 | 原始件双条件定位：trace_jsonl=缺席, ledger_db=缺席, primary_probe=缺席, acceptance_module=在场
+15 passed, 26 subtests passed in 6.06s
+--- 还原后复跑 ---
+15 passed, 26 subtests passed in 5.72s
+=== 实验 E2：把六枚 bundle 全转成 CRLF（模拟 Windows autocrlf 签出形态）===
+六枚已写成 CRLF；manifest 字节变了 ⇒ 闸锚必然不配
+      · [I2] sha256 不配：result.json（manifest 说 ca9f7a4e22e615c6cf648b3f05fc00d9e85ef1dc02dc4f3962399444bc55b247，盘上 56b61a7a4f7e96a7d8464d2c8f3e0f852fceed4d1d77c9a19cfc18c5d913b95b）
+      · [I2] 字节数不配：result.json（manifest 说 8150，盘上 8450）
+      · [I2] sha256 不配：response.json（manifest 说 c0aa6c9f0b1465b14960879fd81a48e3c2cf14f90812c159859cc1691df64ae0，盘上 9777a7e6778d8376021f6ca8b40ca2644d115a0e7ee72e0d17e7a76b32ed5c11）
+      · [I2] 字节数不配：response.json（manifest 说 2505，盘上 2597）
+      · [I2] sha256 不配：ledger-row.json（manifest 说 a87b7178aab096a57a2fe23a8f224da3eca6a0126f101d0ff00a5a2bac4b6ad4，盘上 0adc625a43f4be87af6ce2d7aca21b7db149fc840164e52f0a7f8964be38fa1b）
+      · [I2] 字节数不配：ledger-row.json（manifest 说 2117，盘上 2194）
+      · [I2] sha256 不配：trace-attempts.json（manifest 说 1aa8a1dbfb6bb12bc67fbe188196e612896e8ed10cc02439047e032f4b911293，盘上 4f493a2b19e198d87ef6fe52ca5d44b356c0aa10b5a1dd96c032d3d212122e1e）
+      · [I2] 字节数不配：trace-attempts.json（manifest 说 1326，盘上 1386）
+      · [I2] sha256 不配：primary-probe.json（manifest 说 9084df5502c6d58b9ce343f485436788b251a3411bf1e1ebb7f4d4069caabbe9，盘上 da34cd561218a6e23e8c02ba537277d2976da2e4eec63df17fefc99d84ee511e）
+      · [I2] 字节数不配：primary-probe.json（manifest 说 3160，盘上 3266）
+      · [I2] manifest 自己的 sha256 对不上闸里的外部锚（载体之外那枚锚）：锚 68749a00e2e2a848d80aee054084df6b085a948683a775af13e79024dde4f7c1，盘上 39bf3c622ffee7b5310bcc7e12513d03bfa25b39c39dfa766c017f94993554d1。改了 bundle 就必须同时改闸上的锚——那是一处可见的代码改动，不是改一枚 JSON 里的自述
+      · [I2] result.json 含 CR：bundle 的六枚是纯 LF，混行尾会让 hash 随机器漂。若这是 `git checkout` 干的：本机 `core.autocrlf` 与 `.gitattributes` 的 `* text=auto` 会把签出的文本件转成 CRLF，而闸钉的 sha256 量的是仓里那枚 LF 字节（CI 用 ubuntu-latest，签出即 LF；Windows 上请让这枚路径保持 LF 再跑）

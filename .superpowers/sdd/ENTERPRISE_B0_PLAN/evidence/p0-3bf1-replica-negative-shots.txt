@@ -1,0 +1,36 @@
+N1 H1：已跟踪的原始 JSON 注入 rehearsal=true
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [T-彩排]
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N2 H1：已跟踪的原始 JSON 的 completed 改成 false
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [T-收尾]
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N3 H2：已跟踪的原始 JSON 删掉 provider_transport 键
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [T-传输层]
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+N5 M2：trace_id_source.pointers 里一枚改成 null
+    计划钉住的判据 = P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+    期望的哨兵串   = [I6] trace_id_source.pointers 里有指针为 null
+    实测红面       = ['P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence', 'P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade']
+    计划外附带红   = []
+    还原           = sha256 同 + 外部 cmp rc=0 + 基线核对
+    判决           = KILLED-ASSIGNED-RESTORED-OK
+
+== 台账 ==
+  N1: KILLED-ASSIGNED-RESTORED-OK
+  N2: KILLED-ASSIGNED-RESTORED-OK
+  N3: KILLED-ASSIGNED-RESTORED-OK
+  N5: KILLED-ASSIGNED-RESTORED-OK
+  计数: {'KILLED': 4}
+  park 目录已删 = True

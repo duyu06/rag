@@ -1,0 +1,23 @@
+== 基线（不注入；根 = E:\xiangmu\rag）==
+序列化口径可逆（六枚逐字节相同）：True
+  [RESTORED-OK] result.json            ca9f7a4e22e615c6cf648b3f05fc00d9e85ef1dc02dc4f3962399444bc55b247
+  [RESTORED-OK] response.json          dc5fee2215a7a0a0d7da0e74939874a87186d8a1c3d17c9971772f2ad03074d0
+  [RESTORED-OK] ledger-row.json        a87b7178aab096a57a2fe23a8f224da3eca6a0126f101d0ff00a5a2bac4b6ad4
+  [RESTORED-OK] trace-attempts.json    1aa8a1dbfb6bb12bc67fbe188196e612896e8ed10cc02439047e032f4b911293
+  [RESTORED-OK] primary-probe.json     9084df5502c6d58b9ce343f485436788b251a3411bf1e1ebb7f4d4069caabbe9
+  [RESTORED-OK] manifest.json          c39a09f83b6abdab475cbf3527b2d92ba5459dbbaa55535c1f26b9f634308508
+  [RESTORED-OK] 闸文件外部锚在场且唯一=True
+  锚点 M1: ANCHOR-OK（needle 3/3 枚 op 带锚）
+  锚点 M2: ANCHOR-OK（needle 3/3 枚 op 带锚）
+  锚点 M3: ANCHOR-OK（needle 3/3 枚 op 带锚）
+  锚点 M4: ANCHOR-OK（needle 2/2 枚 op 带锚）
+  锚点 M5: ANCHOR-OK（needle 3/3 枚 op 带锚）
+  锚点 M6: ANCHOR-OK（needle 1/1 枚 op 带锚）
+  锚点 M7: ANCHOR-OK（needle 1/1 枚 op 带锚）
+  锚点 M8: ANCHOR-OK（needle 1/1 枚 op 带锚）
+  锚点 M9: ANCHOR-OK（needle 2/2 枚 op 带锚）
+  锚点 N1: ANCHOR-OK（needle 1/1 枚 op 带锚）
+  锚点 N2: ANCHOR-OK（needle 1/1 枚 op 带锚）
+  锚点 N3: ANCHOR-OK（needle 1/1 枚 op 带锚）
+  锚点 N4: ANCHOR-OK（needle 2/2 枚 op 带锚）
+  锚点 N5: ANCHOR-OK（needle 2/2 枚 op 带锚）

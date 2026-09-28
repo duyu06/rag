@@ -89,7 +89,7 @@ BASELINE_SHA1 = {
     "backend/tests/conftest.py": "b0c5eee33ccdb49824405a10b8e282b4d52ab36d",
     ".github/workflows/ci.yml": "931846cba8575e2e994633abc39a48492c1ea029",
     ".gitattributes": "5738e2743ea768943e083cb1ff85fd9793ee7f57",
-    "backend/tests/test_ci_gate_contract.py": "a0b9f37f32bbab9580023b230a79a206ad1e0cbf",
+    "backend/tests/test_ci_gate_contract.py": "4bba148e804dcb81fe97ce7a632f649e9414e3e6",
 }
 
 # ---------------------------------------------------------------------------

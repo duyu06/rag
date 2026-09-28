@@ -1,0 +1,11 @@
+green_permission 用的锚 = c39a09f83b6abdab475cbf3527b2d92ba5459dbbaa55535c1f26b9f634308508
+闸文件的锚               = c39a09f83b6abdab475cbf3527b2d92ba5459dbbaa55535c1f26b9f634308508
+层计数 = {'portable': 0, 'truth': 0, 'raw': 0} raw_state = full
+matrix_status_now = GREEN green_permitted_by_evidence = False
+  [满足] 证据 JSON 存在于约定路径 —— E:\xiangmu\rag\.superpowers\sdd\MODEL_ROUTER_V23_PLAN\task10\real-llm-failover-001.json（读包结果 已解析，raw_state=ful
+  [满足] 闸的外部锚常数可读（否则 [I2] 的锚校验会被静默关掉） —— 锚 = c39a09f83b6abdab475cbf3527b2d92ba5459dbbaa55535c1f26b9f634308508
+  [满足] P0 判定成立 = portable 层 + [T-*] 真值层 + raw 层三条腿一起过（与闸同一份口径） —— portable 层 0 条、[T-*] 0 条、raw 层 0 条（逐层计数见 verdict）
+  [满足] 矩阵 P0 行当前状态 ∈ {BLOCKED, GREEN} —— 现读状态 = GREEN
+同一口径核对：verdict.problems == green_permission.evidence_problems ⇒ True
+problems 条数 = 0
+载体缺席时：green_permitted = False 条数 = 1 首条 = [I1] bundle 整包不在场（docs/evidence/model-router-v23/real-llm-failover-001 下一枚都没读到）：

@@ -1,0 +1,21 @@
+=== 干净签出（终态代码）：克隆只带已跟踪文件 + 本轮交付面（cmp 逐字节相同）===
+ M backend/tests/real_llm_failover_kit.py
+ M backend/tests/test_real_llm_failover_gate.py
+?? docs/evidence/
+--- raw 形态（克隆里只有被跟踪的证据 JSON，run 目录整层缺席）---
+real-llm-failover-001.json
+--- A) 载体在场：应当绿，且分支是 json-only ---
+....u..uu...[P0 闸③ 分支] portable 层：0 条问题（bundle 目录 C:\Users\zhang\AppData\Local\Temp\tmp.wUO774FrqB\ragclone\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 None） | raw 层状态 = json-only（full = §6 validate_evidence() 实跑；json-only = 只跑面对面核对；absent = 完全不参与）| raw 问题 0 条 | 原始件双条件定位：trace_jsonl=缺席, ledger_db=缺席, primary_probe=缺席, acceptance_module=在场
+15 passed, 26 subtests passed in 7.25s
+--- B) 反证：把载体挪走（只动克隆，源仓不动）---
+      · [I1] bundle 整包不在场（docs/evidence/model-router-v23/real-llm-failover-001 下一枚都没读到）：可移植证据包是 3B 之后 P0 的唯一 CI 判据载体
+FAILED tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+FAILED tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_the_evidence_judgment_does_not_degrade
+2 failed, 13 passed, 11 subtests passed in 6.31s
+--- C) 还原后复跑 ---
+cmp 全部通过（无输出即相同）
+...............                                [100%]
+15 passed, 26 subtests passed in 6.84s
+--- D) 同一棵克隆里默认配置的 CRLF 事实（ autocrlf=true 会把 text=auto 的跟踪件签成 CRLF ）---
+false
+克隆里矩阵 bytes 25424 CR 163 (源仓工作树 26505 / CR 0)

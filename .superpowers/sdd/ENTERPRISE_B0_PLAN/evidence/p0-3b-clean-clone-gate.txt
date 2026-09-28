@@ -1,0 +1,3 @@
+....u..uu...[P0 闸③ 分支] portable 层：0 条问题（bundle 目录 C:\Users\zhang\AppData\Local\Temp\tmp.NFhXqizM0r\ragclone\docs\evidence\model-router-v23\real-llm-failover-001，读包结果 None） | raw 层状态 = json-only（full = §6 validate_evidence() 实跑；json-only = 只跑面对面核对；absent = 完全不参与）| raw 问题 0 条 | 原始件双条件定位：trace_jsonl=缺席, ledger_db=缺席, primary_probe=缺席, acceptance_module=在场
+.uuuuuuuuuuuuuuuuuuu..uuuu...
+15 passed, 26 subtests passed in 5.94s

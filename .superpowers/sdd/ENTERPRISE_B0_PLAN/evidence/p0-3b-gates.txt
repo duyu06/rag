@@ -1,0 +1,11 @@
+=== SEC-A scan module ===
+..............................................                           [100%]
+46 passed in 33.16s
+=== git diff on the scan file (must be empty) ===
+GIT-DIFF-EMPTY rc=0
+=== B0 gate module (16) ===
+................                                                         [100%]
+16 passed in 33.71s
+=== collect-only count ===
+
+1335 tests collected in 24.20s
