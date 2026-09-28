@@ -131,6 +131,17 @@ node-id，闸只回答「这个文件里有这个类和方法吗」。于是「�
   临时库恰好一行且零 canary 命中、以及**逐枚重算的 sha1**。本表文案自己不算数；
   `test_the_evidence_judgment_does_not_degrade` 再拿四枚变异（模型序 / 错误体 / 行数 / 指纹）
   打这枚判据自己，防它退化成「数一数有没有 10 条」。
+  **3B 的载体分层（2026-09-29，用户裁定 = SDD 台账 R26 ③：改载体不改含义）**：上面那句
+  「逐枚重算 sha1」重算的是原始件（sqlite / trace jsonl / 现场 probe）的绝对路径，三枚本体按
+  `.gitignore:25` 不进交付面 ⇒ 干净签出算不出 ⇒ 这枚闸在任何 CI 形态恒红（远端实测 run
+  `36436145777`）。现在判据分两层取数（`kit.p0_evidence_verdict()`）：**portable 层**
+  （`kit.validate_portable_bundle`，`docs/evidence/model-router-v23/real-llm-failover-001/`
+  六枚纯文本件 + manifest 的 sha256 由闸文件常数 `PORTABLE_MANIFEST_SHA256` 从外部钉住）
+  **无条件必须过**；**raw 层**= `validate_evidence()` 本体一字未改，只在四枚原始件能按
+  `manifest.source_run_dir` + `raw_provenance[].sha1` **双条件**定位得到时才跑（在场才校验，
+  不在场是干净签出的正常形态、**不构成红**）。原始件**不许**按 basename 或字节大小定位——
+  同名的离线彩排件与真机件字节数相同、sha1 不同。本行**状态字未动**；两层判据的逐条映射表写在
+  `backend/tests/test_real_llm_failover_gate.py` 模块 docstring 的「③ 的载体分层」一节。
 - **`P0GateSelfIntegrityTests`**：闸自己也在判据内——本文件零 skip 令牌、四枚类逐枚挂在本表上
   （反向耦合，口径同 §前言第 ④ 条），且闸自己在默认套件里**必须**被收集到 ≥8 枚
   （否则「把闸藏起来」也是一种通关方式）。

@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # run_p0_failover_acceptance.sh —— REAL-LLM-FAILOVER-001（§10 P0）的一键真跑器。
 #
-# 出处：Model Router V2.3 Task 10 段 A（A-4）。它做且只做三件事：
+# 出处：Model Router V2.3 Task 10 段 A（A-4）。它做且只做四件事：
 #   1) 跑 `backend/tests/test_real_llm_failover_acceptance.py` 那枚 P0 例
 #      （真 Ollama：primary=ornith-1.5:9b-text 真加载失败 → fallback=phi3:mini 真回答）；
 #   2) 让用例自己把 JSON 证据落到
 #      `.superpowers/sdd/MODEL_ROUTER_V23_PLAN/task10/real-llm-failover-001.json`，
 #      跑完在终端回打十枚断言的实测值、临时库路径与行数、sha1 表；
-#   3) 打印「矩阵 P0 行改 GREEN 的许可条件是否全部满足」。
+#   3) 打印「矩阵 P0 行改 GREEN 的许可条件是否全部满足」；
+#   4) 把这次运行的原始件**机械导出**成
+#      `docs/evidence/model-router-v23/real-llm-failover-001/` 下六枚可重算文本件
+#      （`real_llm_failover_kit.write_portable_bundle()`；P0-EVIDENCE-PORTABILITY 3A：
+#      换的是载体，判据一字不改；导出对不上就当红，不交出坏 bundle）。
 #
 # **它不改矩阵文件**：`docs/MODEL_ROUTER_V23_MATRIX.md` 那一行状态字段由主 agent 落笔，
 # 本脚本只给判据（`real_llm_failover_kit.green_permission()`），也不 `sed`、也不 patch。
@@ -179,9 +183,25 @@ print("耗时：", json.dumps(evidence.get("timings_ms"), ensure_ascii=False))
 print("sha1：")
 for path, digest in (evidence.get("files_sha1") or {}).items():
     print(f"  {digest}  {path}")
+
+print("可移植证据包（3A：只换载体，判据一字未改）：")
+bundle = kit.write_portable_bundle(evidence)
+print(f"  generated_at={bundle['generated_at']}  "
+      f"source_run_generated_at={bundle['source_run_generated_at']}")
+print(f"  trace_id={bundle['trace_id']}  source_tree_hash={bundle['source_tree_hash']}  "
+      f"release_image={bundle['release_image']}")
+for entry in bundle["portable_files"]:
+    print(f"  {entry['sha256']}  {entry['bytes']:>7}B  {entry['path']}")
+for provenance in bundle["raw_provenance"]:
+    print(f"  raw {provenance['role']:<17} sha1={provenance['sha1']} "
+          f"bytes={provenance['bytes']} 对得上记录值={provenance['matches_recorded']}")
+
 permission = kit.green_permission()
 print("矩阵改 GREEN 的许可条件（当前状态 "
       f"{permission['matrix_status_now']}）：")
+print(f"  判定分支 raw_state={permission['raw_state']}；逐层问题计数 "
+      f"{permission['layer_problem_counts']}；闸的外部锚（本脚本与闸同读一份常数）="
+      f"{str(permission['manifest_sha256_pin'])[:16]}…")
 for condition in permission["conditions"]:
     print(f"  [{'满足' if condition['ok'] else '不满足'}] {condition['name']}"
           f" —— {condition['detail']}")

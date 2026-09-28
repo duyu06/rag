@@ -1,0 +1,60 @@
+{
+  "case_id": "REAL-LLM-FAILOVER-001",
+  "trace_id": "p0-failover-6146ff1417d7",
+  "trace_id_pointers": {
+    "trace.trace_id": "p0-failover-6146ff1417d7",
+    "ledger.row.trace_id": "p0-failover-6146ff1417d7",
+    "request.trace_id": "p0-failover-6146ff1417d7"
+  },
+  "trace_id_consistent": true,
+  "trace_source": {
+    "path_basename": "agent_traces.jsonl",
+    "lines": 1
+  },
+  "model_route_stage": "fallback",
+  "model_route_selected_index": 1,
+  "model_route_keys": [
+    "attempts",
+    "context_dropped",
+    "fallbacks",
+    "mode",
+    "primary",
+    "requirements",
+    "selected_index",
+    "selected_reason_codes",
+    "stage"
+  ],
+  "model_route_attempts": [
+    {
+      "model": "ornith-1.5:9b-text",
+      "result": "failed",
+      "error_type": "model_unavailable"
+    },
+    {
+      "model": "phi3:mini",
+      "result": "success",
+      "error_type": null
+    }
+  ],
+  "chain": {
+    "selected_index": 1,
+    "reason_codes": [
+      "CAPABILITY_MATCH",
+      "LOCAL_PREFERRED",
+      "HIGHER_PRIORITY"
+    ],
+    "attempts": [
+      {
+        "model_id": "ollama-ornith",
+        "result": "failed",
+        "error_type": "model_unavailable"
+      },
+      {
+        "model_id": "ollama-phi3",
+        "result": "success",
+        "error_type": null
+      }
+    ],
+    "response_model": "phi3:mini"
+  }
+}

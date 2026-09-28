@@ -1,0 +1,77 @@
+{
+  "case_id": "REAL-LLM-FAILOVER-001",
+  "ledger_source": {
+    "path_basename": "conversations.db",
+    "rows": 1,
+    "tables": [
+      "llm_request_logs",
+      "sqlite_sequence"
+    ]
+  },
+  "row": {
+    "id": 1,
+    "trace_id": "p0-failover-6146ff1417d7",
+    "request_id": "p0-req-89b55677",
+    "route_mode": "rag",
+    "route_reason": "[\"CAPABILITY_MATCH\", \"LOCAL_PREFERRED\", \"HIGHER_PRIORITY\"]",
+    "provider": "ollama",
+    "model": "phi3:mini",
+    "fallback_index": 1,
+    "input_tokens": 713,
+    "output_tokens": 90,
+    "total_tokens": 803,
+    "ttft_ms": null,
+    "latency_ms": 61633.808,
+    "estimated_cost": 0.0,
+    "currency": "USD",
+    "success": 1,
+    "error_type": null,
+    "status_code": null,
+    "created_at": "2026-09-24T13:53:17Z"
+  },
+  "trace_id": "p0-failover-6146ff1417d7",
+  "canary_needles": [
+    "CANARY-9c1f4e7a-6b0d-4e2f-8a13-zhengju",
+    "请用中文分点回答：员工出差住宿需要注意哪三件事？每条一句话，依据上面给出的资料。",
+    "CANARY-9c1f4e7a-6b0d-4e2",
+    "你是 yaoke 企业知识助手。\n你可以使用两类",
+    "请依据以下证据回答问题"
+  ],
+  "canary_hits": [],
+  "forbidden_column_proof": {
+    "columns_checked": [
+      "prompt",
+      "context",
+      "messages",
+      "reasoning"
+    ],
+    "columns_present_in_row": [],
+    "row_columns": [
+      "created_at",
+      "currency",
+      "error_type",
+      "estimated_cost",
+      "fallback_index",
+      "id",
+      "input_tokens",
+      "latency_ms",
+      "model",
+      "output_tokens",
+      "provider",
+      "request_id",
+      "route_mode",
+      "route_reason",
+      "status_code",
+      "success",
+      "total_tokens",
+      "trace_id",
+      "ttft_ms"
+    ],
+    "canary_hit_count": 0,
+    "protected_repo_ledgers": {
+      "backend/data/conversations.db": 0,
+      "data/conversations.db": null
+    },
+    "note": "禁存列清单与 validate_evidence() 里那枚 inline 清单逐字相同；判定仍只在 validate_evidence() 一处，本件只是把「当时确实没有这些列」写成干净签出可重算的事实。"
+  }
+}

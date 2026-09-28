@@ -1,0 +1,93 @@
+{
+  "case_id": "REAL-LLM-FAILOVER-001",
+  "source_run_generated_at": "2026-09-24T13:52:06+00:00",
+  "answer": {
+    "text": "1. 员工出差住宿的金额上限为每晚600元。\n\n2. 出差住宿需经经部门经理的审批。\n\n3. 出差住宿发票需在30天内提交给财务。",
+    "chars": 65,
+    "cjk_chars": 44,
+    "model": "phi3:mini",
+    "finish_reason": "stop",
+    "input_tokens": 713,
+    "output_tokens": 90,
+    "usage_estimated": false
+  },
+  "provider_calls": [
+    {
+      "entry_id": "ollama-ornith",
+      "provider": "ollama",
+      "model": "ornith-1.5:9b-text",
+      "request_bytes": 1619,
+      "request_bytes_method": "adapter.payload 序列化重建（非 wire 抓包）",
+      "timeout_s": 300.0,
+      "message_roles": [
+        "system",
+        "user"
+      ],
+      "elapsed_ms": 41596.4,
+      "ok": false,
+      "error_kind": "model_unavailable",
+      "http_status": 500,
+      "no_fallback": false,
+      "error_body_excerpt": "模型不可用（alloc）：{\"error\":\"llama-server reported out-of-memory during startup: ggml_vulkan: Failed to allocate pinned memory (vk::Device::allocateMemory: ErrorOutOfDeviceMemory)\\nggml_gallocr_reserve_n_impl: failed to"
+    },
+    {
+      "entry_id": "ollama-phi3",
+      "provider": "ollama",
+      "model": "phi3:mini",
+      "request_bytes": 1610,
+      "request_bytes_method": "adapter.payload 序列化重建（非 wire 抓包）",
+      "timeout_s": 300.0,
+      "message_roles": [
+        "system",
+        "user"
+      ],
+      "elapsed_ms": 20032.8,
+      "ok": true,
+      "answer_chars": 65,
+      "finish_reason": "stop",
+      "input_tokens": 713,
+      "output_tokens": 90,
+      "usage_estimated": false,
+      "error_body_excerpt": null,
+      "error_kind": null,
+      "http_status": 200
+    }
+  ],
+  "provider_transport": null,
+  "provider_transport_present": true,
+  "summary": {
+    "calls": 2,
+    "entry_id_in_order": [
+      "ollama-ornith",
+      "ollama-phi3"
+    ],
+    "model_in_order": [
+      "ornith-1.5:9b-text",
+      "phi3:mini"
+    ],
+    "ok_in_order": [
+      false,
+      true
+    ],
+    "http_status_in_order": [
+      500,
+      200
+    ],
+    "error_kind_in_order": [
+      "model_unavailable",
+      null
+    ],
+    "request_bytes_in_order": [
+      1619,
+      1610
+    ],
+    "elapsed_ms_in_order": [
+      41596.4,
+      20032.8
+    ],
+    "elapsed_ms_sum": 61629.2,
+    "request_bytes_method": "adapter.payload 序列化重建（非 wire 抓包）",
+    "answer_chars": 65,
+    "answer_cjk_chars": 44
+  }
+}

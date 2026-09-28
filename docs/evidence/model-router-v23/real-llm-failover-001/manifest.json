@@ -1,0 +1,219 @@
+{
+  "evidence_schema_version": 1,
+  "case_id": "REAL-LLM-FAILOVER-001",
+  "generated_at": "2026-09-28T18:14:22+00:00",
+  "source_run_generated_at": "2026-09-24T13:52:06+00:00",
+  "trace_id": "p0-failover-6146ff1417d7",
+  "trace_id_source": {
+    "pointers": {
+      "trace.trace_id": "p0-failover-6146ff1417d7",
+      "ledger.row.trace_id": "p0-failover-6146ff1417d7",
+      "request.trace_id": "p0-failover-6146ff1417d7"
+    },
+    "consistent": true,
+    "note": "原始证据**顶层没有 `trace_id` 这枚键**（实测：absent，不是 null）；值取自 trace.trace_id，并与 ledger.row.trace_id、request.trace_id 同源核对。"
+  },
+  "source_tree_hash": "7923ee47955197406ee0dd498f74587d8915a7d8",
+  "source_tree_hash_origin": "导出当场跑的只读命令 `git rev-parse HEAD`；取不到（无 git / 非仓库 / 命令失败）时写 null，不猜、不缓存。",
+  "release_image": null,
+  "environment": {
+    "before": {
+      "base_url": "http://localhost:11434",
+      "reachable": true,
+      "tags": [
+        {
+          "name": "ornith-1.5:9b-text",
+          "size_gib": 5.24
+        },
+        {
+          "name": "ornith-1.5:9b",
+          "size_gib": 6.1
+        },
+        {
+          "name": "phi3:mini",
+          "size_gib": 2.03
+        }
+      ],
+      "loaded": [],
+      "error": null,
+      "has_primary": true,
+      "has_fallback": true
+    },
+    "memory_before": {
+      "platform": "Windows",
+      "total_gib": 15.22,
+      "available_gib": 0.44,
+      "memory_load_percent": 97,
+      "phi3_load_floor_gib": 3.2,
+      "enough_for_phi3": false,
+      "verdict": "不够：可用 0.44 GiB < 3.2 GiB ⇒ 加载 phi3:mini 有把机器打进 paging 的风险"
+    },
+    "probe_reference": "ornith-primary-load-probe.json",
+    "after": {
+      "base_url": "http://localhost:11434",
+      "reachable": true,
+      "tags": [
+        {
+          "name": "ornith-1.5:9b-text",
+          "size_gib": 5.24
+        },
+        {
+          "name": "ornith-1.5:9b",
+          "size_gib": 6.1
+        },
+        {
+          "name": "phi3:mini",
+          "size_gib": 2.03
+        }
+      ],
+      "loaded": [],
+      "error": null,
+      "has_primary": true,
+      "has_fallback": true
+    },
+    "memory_after": {
+      "platform": "Windows",
+      "total_gib": 15.22,
+      "available_gib": 4.4,
+      "memory_load_percent": 71,
+      "phi3_load_floor_gib": 3.2,
+      "enough_for_phi3": true,
+      "verdict": "够：可用 4.40 GiB ≥ 3.2 GiB"
+    }
+  },
+  "plan": {
+    "primary_entry": "ollama-ornith",
+    "primary_model": "ornith-1.5:9b-text",
+    "fallback_entries": [
+      "ollama-phi3"
+    ],
+    "fallback_models": [
+      "phi3:mini"
+    ],
+    "reason_codes": [
+      "CAPABILITY_MATCH",
+      "LOCAL_PREFERRED",
+      "HIGHER_PRIORITY"
+    ]
+  },
+  "config_overrides": {
+    "llm_total_budget_ms": 900000,
+    "llm_model_timeout_seconds": 300,
+    "llm_router_enabled": true,
+    "llm_registry_file": "llm_registry.json",
+    "why": "§12 出厂预算（30 s / 20 s）装不下 2 GiB 冷加载；只改测试进程内的 Settings 实例，产品默认值与 .env 不动。需要主 agent 裁决是否给真机 验收另立一档配置键。",
+    "frozen_range_note": "llm_total_budget_ms 出厂约束是 5000..120000，900000 越界（测试侧 patch 绕过 Field 校验）"
+  },
+  "registry_file": "backend/config/llm_registry.json",
+  "registry_mutated": "未改（本用例只读注册表；config/llm_registry.json 一字未动）",
+  "exported_by": {
+    "function": "backend/tests/real_llm_failover_kit.py::build_portable_bundle",
+    "source_basenames": [
+      "real-llm-failover-001.json",
+      "ornith-primary-load-probe.json",
+      "agent_traces.jsonl",
+      "conversations.db",
+      "test_real_llm_failover_acceptance.py"
+    ]
+  },
+  "portable_files": [
+    {
+      "path": "docs/evidence/model-router-v23/real-llm-failover-001/result.json",
+      "sha256": "ca9f7a4e22e615c6cf648b3f05fc00d9e85ef1dc02dc4f3962399444bc55b247",
+      "bytes": 8150
+    },
+    {
+      "path": "docs/evidence/model-router-v23/real-llm-failover-001/response.json",
+      "sha256": "dc5fee2215a7a0a0d7da0e74939874a87186d8a1c3d17c9971772f2ad03074d0",
+      "bytes": 2543
+    },
+    {
+      "path": "docs/evidence/model-router-v23/real-llm-failover-001/ledger-row.json",
+      "sha256": "a87b7178aab096a57a2fe23a8f224da3eca6a0126f101d0ff00a5a2bac4b6ad4",
+      "bytes": 2117
+    },
+    {
+      "path": "docs/evidence/model-router-v23/real-llm-failover-001/trace-attempts.json",
+      "sha256": "1aa8a1dbfb6bb12bc67fbe188196e612896e8ed10cc02439047e032f4b911293",
+      "bytes": 1326
+    },
+    {
+      "path": "docs/evidence/model-router-v23/real-llm-failover-001/primary-probe.json",
+      "sha256": "9084df5502c6d58b9ce343f485436788b251a3411bf1e1ebb7f4d4069caabbe9",
+      "bytes": 3160
+    }
+  ],
+  "raw_provenance": [
+    {
+      "name": "agent_traces.jsonl",
+      "role": "trace_jsonl",
+      "sha1": "356826f73d7c9f8a839a7089f77d023f7feef21f",
+      "recorded_sha1": "356826f73d7c9f8a839a7089f77d023f7feef21f",
+      "matches_recorded": true,
+      "present": true,
+      "bytes": 845
+    },
+    {
+      "name": "conversations.db",
+      "role": "ledger_db",
+      "sha1": "b93ce392a1d7c4c1c9aa89ff81e852f4643ef0b1",
+      "recorded_sha1": "b93ce392a1d7c4c1c9aa89ff81e852f4643ef0b1",
+      "matches_recorded": true,
+      "present": true,
+      "bytes": 16384
+    },
+    {
+      "name": "ornith-primary-load-probe.json",
+      "role": "primary_probe",
+      "sha1": "961985e87a275677bfa23fa02f3eef6f7cd51380",
+      "recorded_sha1": "961985e87a275677bfa23fa02f3eef6f7cd51380",
+      "matches_recorded": true,
+      "present": true,
+      "bytes": 3010
+    },
+    {
+      "name": "test_real_llm_failover_acceptance.py",
+      "role": "acceptance_module",
+      "sha1": "da92cdf51de5dbfad3107f1dc744d18e4173e07c",
+      "recorded_sha1": "da92cdf51de5dbfad3107f1dc744d18e4173e07c",
+      "matches_recorded": true,
+      "present": true,
+      "bytes": 40517,
+      "repo_path": "backend/tests/test_real_llm_failover_acceptance.py",
+      "git_blob": "d8f4ceb5f798b91201bf3db1b92f1f112d87e137",
+      "git_blob_origin": "导出当场跑的只读命令 `git hash-object <工作树文件>`（过 clean 过滤器 ⇒ 与签出 EOL 形态无关）"
+    }
+  ],
+  "source_run_flags": {
+    "completed_is_true": true,
+    "rehearsal_present": false,
+    "rehearsal_truthy": false,
+    "provider_transport_key_present": true,
+    "provider_transport_is_null": true
+  },
+  "source_run_dir": ".superpowers/sdd/MODEL_ROUTER_V23_PLAN/task10/run/20260924-215206",
+  "absent_source_fields": [
+    {
+      "field": "release_image",
+      "checked_pointers": [
+        "<顶层>",
+        "environment",
+        "environment.before",
+        "environment.after",
+        "answer",
+        "ledger.row",
+        "plan"
+      ],
+      "written_as": null,
+      "why": "原始件从未记录镜像名：本轮跑的是宿主 Ollama（environment.before.base_url 为现场地址），不存在镜像这一事实。不造一个名字。"
+    },
+    {
+      "field": "trace_id（顶层键）",
+      "checked_pointers": [
+        "<顶层 trace_id>"
+      ],
+      "written_as": "取自 trace.trace_id",
+      "why": "顶层不是 null 而是**键本身不存在**；值另有三处同源指针，已核对一致。"
+    }
+  ]
+}

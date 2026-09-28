@@ -1,0 +1,106 @@
+{
+  "case_id": "REAL-LLM-FAILOVER-001",
+  "source_file_basename": "ornith-primary-load-probe.json",
+  "stage": "A-2 primary load probe (segment A, pre-P0)",
+  "started_at": "2026-09-24T12:55:24+00:00",
+  "inventory_before": {
+    "base_url": "http://127.0.0.1:11434",
+    "reachable": true,
+    "tags": [
+      {
+        "name": "ornith-1.5:9b-text",
+        "size_gib": 5.24
+      },
+      {
+        "name": "ornith-1.5:9b",
+        "size_gib": 6.1
+      },
+      {
+        "name": "phi3:mini",
+        "size_gib": 2.03
+      }
+    ],
+    "loaded": [],
+    "error": null,
+    "has_primary": true,
+    "has_fallback": true
+  },
+  "inventory_after": {
+    "base_url": "http://127.0.0.1:11434",
+    "reachable": true,
+    "tags": [
+      {
+        "name": "ornith-1.5:9b-text",
+        "size_gib": 5.24
+      },
+      {
+        "name": "ornith-1.5:9b",
+        "size_gib": 6.1
+      },
+      {
+        "name": "phi3:mini",
+        "size_gib": 2.03
+      }
+    ],
+    "loaded": [],
+    "error": null,
+    "has_primary": true,
+    "has_fallback": true
+  },
+  "memory_before": {
+    "platform": "Windows",
+    "total_gib": 15.22,
+    "available_gib": 0.52,
+    "memory_load_percent": 96,
+    "phi3_load_floor_gib": 3.2,
+    "enough_for_phi3": false,
+    "verdict": "不够：可用 0.52 GiB < 3.2 GiB ⇒ 加载 phi3:mini 有把机器打进 paging 的风险"
+  },
+  "memory_after": {
+    "platform": "Windows",
+    "total_gib": 15.22,
+    "available_gib": 3.46,
+    "memory_load_percent": 77,
+    "phi3_load_floor_gib": 3.2,
+    "enough_for_phi3": true,
+    "verdict": "够：可用 3.46 GiB ≥ 3.2 GiB"
+  },
+  "probe": {
+    "case_note": "A-2 有界探针：primary 的真实加载尝试（本机 Ollama，非 mock）",
+    "model": "ornith-1.5:9b-text",
+    "url": "http://127.0.0.1:11434/api/chat",
+    "request_bytes": 211,
+    "request_payload": {
+      "model": "ornith-1.5:9b-text",
+      "stream": false,
+      "keep_alive": "0",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Reply with exactly one word: pong"
+        }
+      ],
+      "tools": [],
+      "options": {
+        "temperature": 0.2,
+        "num_predict": 1
+      }
+    },
+    "timeout_seconds": 120,
+    "started_at": "2026-09-24T12:55:24+00:00",
+    "status_code": 500,
+    "raw_error_body": "{\"error\":\"llama-server reported out-of-memory during startup: alloc_tensor_range: failed to allocate Vulkan0 buffer of size 820943872\\nerror loading model: unable to allocate Vulkan0 buffer\"}",
+    "raw_error_body_chars": 191,
+    "answer_content": null,
+    "probe_result": "load_failed",
+    "classification": {
+      "kind": "model_unavailable",
+      "status_code": 500,
+      "no_fallback": false,
+      "message": "模型不可用（alloc）：{\"error\":\"llama-server reported out-of-memory during startup: alloc_tensor_range: failed to allocate Vulkan0 buffer of size 820943872\\nerror loading model: unable to allocate Vulkan0 buffer\"}"
+    },
+    "elapsed_ms": 22465.5,
+    "error": null
+  },
+  "projection": "文本化投影：字段值逐字来自原始 probe；本件不含原始件的绝对路径，也不是指向原始件的路径引用。"
+}

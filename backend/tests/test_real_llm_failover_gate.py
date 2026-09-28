@@ -20,10 +20,45 @@
    开 ⇒ 收集数 **恰好 1**（否则「永远不可能被跑」也是一种造假）。
 
 ③ 文档面：矩阵 P0 行的状态字段的合法取值**写死在本文件里**——
-   没有成立的证据 JSON ⇒ 只许 `BLOCKED`；证据成立 ⇒ 只许 `GREEN`。
+   没有成立的证据 ⇒ 只许 `BLOCKED`；证据成立 ⇒ 只许 `GREEN`。
    判据是 `real_llm_failover_kit.validate_evidence()`：十枚断言各带实测值、真外呼两次的
    模型名/字节数/耗时、primary 错误体里的服务端原文、临时库恰好一行且零 canary 命中、
    以及**逐枚重算的 sha1**。矩阵文案自己不算数。
+
+③ 的**载体分层**（P0-EVIDENCE-PORTABILITY 3B，用户 2026-09-28 裁定 = 台账 R26 第 ③ 条）：
+   上面那句「逐枚重算 sha1」重算的是原始件（sqlite / trace jsonl / 现场 probe）的**绝对路径**，
+   而那三枚本体按裁定不入库（`.gitignore:25` 整目录挡住）⇒ 干净签出里永远算不出 ⇒ 这枚闸
+   在任何 CI 形态下恒红（远端实测 run `36436145777`）。3A 已经把它换成**可移植载体**：
+   `docs/evidence/model-router-v23/real-llm-failover-001/` 下六枚纯文本 JSON，每条 hash
+   都能在干净签出重算。于是 ③ 现在分两层判：
+
+   - **portable 层**（`kit.validate_portable_bundle`）：无条件必须过。七条 interlock +
+     凡 bundle 载得出的 §6 逐条判据（`[C-*]`）全部仍是「必须」，一条没松。
+   - **raw 层**（`kit.validate_evidence`，判据本体一字未改）：只在四枚原始件能按
+     `manifest.source_run_dir` + `raw_provenance[].sha1` **双条件**定位到时才跑（在场才校验）。
+     原始件不在场 = 干净签出的正常形态，**不构成红**；在场又对不上 = 红。
+   - **`[T-*]` 真值层**（`kit.tracked_evidence_truth_problems`，3B 修复轮 1 的 H1/H2）：
+     无条件必须过，读的就是**已跟踪的那枚原始证据 JSON**。管三件事——`rehearsal` 的真值、
+     `completed is True`、`provider_transport` 这枚键**在场且为 null**（成员判定，不是 `.get()`，
+     所以「缺键」不许冒充「null」）。这三条过去只长在 §6 里，而 §6 被条件成了「四枚运行态
+     本体都在场才跑」⇒ 干净签出（= CI 的形态）里它们一次都没执行过；可它们判的是**这枚入库
+     文本自己写着的事实**，与本体在不在场无关，所以没有任何理由跟着一起条件化。
+   - **provenance/blob 半**（`kit.raw_layer_problems`，M1）：`full` 与 `json-only` **两条分支
+     都跑**，逐枚重算，只有条目本身不在场才跳过该条目。过去它是全有或全无——「篡改一枚
+     运行态件 + 缺席另一枚」会让整层静默不跑。其中唯一被 git 跟踪的 `acceptance_module`
+     改按 **git blob 身份**验（导出记 `git hash-object`，判定比 `git rev-parse HEAD:<path>`，
+     并再比一次当下工作树重算），不再比工作树字节的 sha1——后者随签出 EOL 形态变，
+     是「同一份真话在两台机器上一真一假」的那种判据；blob 身份不变 ⇒ CI 第一次拿到一枚
+     真重算得动的 raw 腿。
+
+   换的是载体，不是验收事实：语义边界（R26 钉死）= portable 缺失/畸形/hash 不配 ⇒ 要求
+   `BLOCKED`；portable 全过 + interlock 齐 ⇒ 允许 `GREEN`。原始件按 basename 或字节大小定位
+   在这一层是被禁止的，因为 `task10/rehearsal/run/20260924-214030/` 里躺着同名、**同字节**、
+   sha1 不同的彩排件（实测）；闸要的正面非彩排凭据是 bundle 里那枚写着 `null` 的
+   `provider_transport`、`response.json` 的 `provider_transport_present`、以及
+   `manifest.source_run_flags` 那五枚布尔位（键在场 / 值为 null / completed 为真 /
+   rehearsal 不为真 / 那枚键在原始件里确实在场），**不是「读不到就算过」**。逐条映射表在
+   `.superpowers/sdd/ENTERPRISE_B0_PLAN/p0-portability-3b-report.md`（§5 + `## 3B 修复轮 1`）。
 
 闸自己也在判据内（`P0GateSelfIntegrityTests`）：本文件同样零 skip 令牌、自己的每枚类都
 挂在矩阵上、并且它自己**必须**在默认套件里被收集到（否则这道闸可以靠「把自己也藏起来」过关）。
@@ -67,6 +102,29 @@ FORBIDDEN_CALLS = frozenset({"exec", "eval", "compile", "__import__", "vars"})
 #: ③ 的**唯一合法取值**（写死，不读文档、不读 env、不读证据里的自述）。
 P0_STATUS_WITHOUT_EVIDENCE = "BLOCKED"
 P0_STATUS_WITH_EVIDENCE = "GREEN"
+
+#: ③ 的 portable 层外部锚：`docs/evidence/model-router-v23/real-llm-failover-001/manifest.json`
+#: 的 **sha256**（由仓根锚定的 `kit.BUNDLE_DIR` 读盘现算，不按 cwd）。
+#:
+#: **为什么需要它**：manifest 是六枚里唯一「声明别人 hash」的那枚，一件东西给自己算 hash 是
+#: 自指（3A《交回控制器的 findings 4》实测：`portable_files` 里刻意不含 manifest 自己）。
+#: 少了外部锚，「改 bundle 不更 hash」这条造假路就只改 manifest 一处即可绕开——正是 R26
+#: 点名要堵的那一格。
+#:
+#: **为什么取「钉进闸文件常量」而不是「落进 docs 规格」**（简报给了两枚候选，取一说明）：
+#: 闸文件是**被执行、被 ① 源码面扫、被 B0 收集数钉**的代码面，改它是一处可见的 diff，
+#: 评审看得见；而把锚落进 markdown 等于让「验收文档说啥算啥」重新长回来——那正是 R26
+#: 第 ③ 条明令不许走的第二条出路。代价也要说平白：真机重跑一次就会换 manifest 的字节，
+#: 于是必须同步更新这枚常数（runner 会打印新锚值；漏更 ⇒ `[I2]` 响亮地红，不是静默放过）。
+#: 锚只钉 manifest，载荷五枚仍由 manifest 逐条声明 + 当场重算（两层互不遮蔽）。
+#:
+#: **3B 修复轮 1 的重钉（要大声说的一句）**：旧值 `68749a00e2e2…` 作废。那一轮为修
+#: H1/H2/M1 三条，bundle 的**载体侧**多了字段（`response.json` 的
+#: `provider_transport_present`、`manifest.source_run_flags` 五枚布尔位、
+#: `raw_provenance[].repo_path` + `git_blob`），全部经 `kit.build_portable_bundle` /
+#: `kit.write_portable_bundle` **重导**得到——没有手改任何一枚 bundle JSON。
+#: manifest 换了字节 ⇒ 这枚锚必须同批改；漏更就是 `[I2]` 响亮地红，不是静默放过。
+PORTABLE_MANIFEST_SHA256 = "c39a09f83b6abdab475cbf3527b2d92ba5459dbbaa55535c1f26b9f634308508"
 
 #: ② 的子进程判定用度。
 COLLECT_TIMEOUT_SECONDS = 180
@@ -393,8 +451,9 @@ class P0CollectionGateTests(unittest.TestCase):
 # ==========================================================================
 REPO_ROOT = BACKEND_DIR.parent
 
-#: 仓库的忽略规则——**只服务于失败文案**（R15 裁定：判据不读它，判的仍是 `kit.read_evidence()`
-#: + `kit.validate_evidence()` 那一条，一个字没动）。
+#: 仓库的忽略规则——**只服务于失败文案**（R15 裁定：判据不读它；3B 之后判的仍是
+#: `kit.p0_evidence_verdict()` = portable 层（§8）+ raw 层（§6 `validate_evidence()`，
+#: 判据本体一字未动）那一条，一个字没松）。
 GITIGNORE_FILE = REPO_ROOT / ".gitignore"
 
 
@@ -457,12 +516,87 @@ def _evidence_absence_note(read_error: str | None) -> str:
         "\n- 出路不是改矩阵（把 GREEN 写成 BLOCKED 等于伪造 V2.3 的真实结论），"
         "而是让证据上交付面：把上面那枚 JSON 以 `git add -f` 精选入库"
         "（B0 计划 Task 7 的 staging 段已登记，需用户明确授权后才能提交）。"
+        "\n- 【订正 3B】上面那条『git add -f 原始件』的出路已被用户 2026-09-28 裁定（台账 R26 ③）"
+        "**作废**：不批准把 `.db` + trace 原件整体入库。交付面改成了**可移植文本载体** "
+        "`docs/evidence/model-router-v23/real-llm-failover-001/`，raw 本体继续 ignored；"
+        "于是本枚的红因只由上面那份 [I*]/[C-*]/[X] 问题清单决定——原始件不在场是干净签出的"
+        "**正常形态**（raw 层按裁定不参与），它自己不再构成红。"
         "\n- 想要本机复算这份证据：跑 .superpowers/scripts/run_p0_failover_acceptance.sh。"
     )
 
 
+def _problem_list_block(problems: list[str], limit: int = 40) -> str:
+    """把问题清单排成一列（判据本身不受影响，只是让第一现场一眼看完不是只看第一条）。"""
+    head = "\n".join(f"  · {item}" for item in problems[:limit])
+    if len(problems) > limit:
+        head += f"\n  ·（另有 {len(problems) - limit} 条同类，见 kit 的 " \
+                "[I*]/[C-*]/[T-*]/[X] 标签）"
+    return head + "\n"
+
+
+def _verdict_branch_line(verdict: dict) -> str:
+    """**走了哪一层**的公告行——3B 的验收要求「raw 层校验确实执行了」必须能被打印出来。
+
+    为什么用 print 而不是只写在断言消息里：绿的时候没有断言消息可读，而『本机跑的是 full 分支、
+    干净签出跑的是 json-only/absent 分支』这件事本身就是判据的一部分（不然分层可以静默降级）。
+
+    3B 修复轮 1 起这行还打印两件事，因为它们都是「分层有没有偷偷降级」的第一现场：
+    - `[T-*]` 那一层的条数（H1/H2：三枚真值判据在**任何**分支都执行，包括干净签出）；
+    - `acceptance_module` 的 **git blob 腿**实测值（M1：唯一被跟踪的那枚 raw 目标，
+      在 `json-only` 里也真的重算了一次——记录值 / HEAD blob / 工作树重算三枚并排打出来，
+      不相等就直接进问题清单，不在这个字符串里藏结论）。
+    """
+    files = verdict.get("resolved_raw") or []
+    located = ", ".join(f"{item['role']}={'在场' if item['present'] else '缺席'}"
+                        for item in files) or "（manifest 不在场 ⇒ 无 provenance 可定位）"
+    blob_rows = [item for item in files if item.get("role") == "acceptance_module"]
+    blob = blob_rows[0] if blob_rows else {}
+    blob_line = (f"blob 记录={blob.get('git_blob_recorded')} "
+                 f"HEAD={blob.get('git_blob_head')} "
+                 f"工作树重算={blob.get('git_blob_worktree')} "
+                 f"一致={blob.get('matches_blob')}")
+    return (f"[P0 闸③ 分支] portable 层：{len(verdict['portable_problems'])} 条问题"
+            f"（bundle 目录 {verdict['bundle_dir']}，读包结果 {verdict['bundle_read_error']}）"
+            f" | [T-*] 真值层：{len(verdict.get('truth_problems') or [])} 条（无条件执行）"
+            f" | raw 层状态 = {verdict['raw_state']}"
+            f"（full = §6 validate_evidence() 实跑；json-only = provenance/blob 腿 + 面对面核对，"
+            f"§6 因本体不入库而不跑；absent = 证据 JSON 自己不在场，[T-*] 直接响）"
+            f" | raw 问题 {len(verdict['raw_problems'])} 条"
+            f" | 原始件双条件定位：{located}"
+            f" | acceptance_module 的 git blob 腿：{blob_line}")
+
+
+def _portable_failure_note(verdict: dict) -> str:
+    """portable 层红的时候，把「缺的是载体还是事实、该动哪一面」说全（只服务于失败文案）。
+
+    与 `_evidence_absence_note` 的分工：那一枚说原始件（本体不入库、干净签出必然不可判），
+    这一枚说 bundle 载体本身。两者都不改判据，只是别让下一个人在『去把矩阵改回 BLOCKED』
+    这条错路上花时间——那是本文件最不肯看到的动作。
+    """
+    lines = [
+        "\n\n—— portable 层（3B 之后 P0 的唯一 CI 判据载体）——",
+        f"- bundle 目录：{verdict['bundle_dir']}",
+        f"- 读包结果：{verdict['bundle_read_error']!r}"
+        "（'missing' = 六枚一枚都没读到；其余 = 读到了但某几枚不成立）",
+        f"- 外部锚（闸文件常量 PORTABLE_MANIFEST_SHA256）期望 manifest 的 sha256 = "
+        f"{PORTABLE_MANIFEST_SHA256}",
+        f"- raw 层分支 = {verdict['raw_state']} ⇒ 原始件不在场**不是**这一格红的原因；"
+        "红的原因只在上面那条问题清单里",
+        "- 出路按问题标签分诊：[I1] 缺件 / [I2] hash 不配 ⇒ 重跑 runner 重导 bundle"
+        "（`.superpowers/scripts/run_p0_failover_acceptance.sh` 的 [4/4] 会调 "
+        "`kit.write_portable_bundle`）；[I3]–[I7] ⇒ 那次运行本身不成立，只能重跑真机；"
+        "锚对不上 ⇒ 同一批里把闸文件常数与 bundle 一起改（可见的代码改动），"
+        "**不是**把矩阵改成 BLOCKED 来消红。",
+    ]
+    return "\n".join(lines)
+
+
 class P0MatrixStatusLockedToEvidenceTests(unittest.TestCase):
-    """闸③：没跑过真机 ⇒ 矩阵 P0 行只许 `BLOCKED`；跑过 ⇒ 只许 `GREEN` 且证据成立。"""
+    """闸③：没跑过真机 ⇒ 矩阵 P0 行只许 `BLOCKED`；跑过 ⇒ 只许 `GREEN` 且证据成立。
+
+    3B 起这条判定分两层取数（module docstring 的『③ 的载体分层』那一节就是判据本体的一部分）：
+    portable 层无条件必须过，raw 层只在原始件按 `source_run_dir` + sha1 双条件定位得到时跑。
+    """
 
     def test_the_two_legal_values_are_pinned_in_the_gate(self):
         """合法取值写在**闸里**这一事实本身也要能被看见（防止有人改常量而不是改判定）。"""
@@ -476,27 +610,38 @@ class P0MatrixStatusLockedToEvidenceTests(unittest.TestCase):
     def test_p0_row_status_matches_the_evidence(self):
         status = kit.matrix_p0_status()
         self.assertIsNotNone(status, "矩阵里没有 P0 行了（§10 的『+1』被删）")
-        evidence, read_error = kit.read_evidence()
-        problems = kit.validate_evidence(evidence)
-        if evidence is None or problems:
+        verdict = kit.p0_evidence_verdict(manifest_sha256_pin=PORTABLE_MANIFEST_SHA256)
+        problems = verdict["problems"]
+        print(_verdict_branch_line(verdict))
+        if problems:
             self.assertEqual(
                 P0_STATUS_WITHOUT_EVIDENCE, status,
-                f"P0 还没跑过真机（证据：{read_error or problems}），矩阵那一行却写着 "
+                f"P0 的证据不成立（{len(problems)} 条问题，逐条点名见下），矩阵那一行却写着 "
                 f"{status!r}。唯一合法取值是 {P0_STATUS_WITHOUT_EVIDENCE!r}——"
                 "改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh"
-                + _evidence_absence_note(read_error))
+                "（它会在 sha1 回打之后重新导出 bundle）\n"
+                + _problem_list_block(problems)
+                + _portable_failure_note(verdict)
+                + _evidence_absence_note(verdict["raw_evidence_error"]))
             return
         self.assertEqual(
             P0_STATUS_WITH_EVIDENCE, status,
-            f"证据已经成立（十枚断言 + sha1 + 服务端错误体齐了），矩阵还写着 {status!r}："
+            f"证据已经成立（portable 七条 interlock + 搬过来的逐条判据 + raw 层"
+            f"{'实跑' if verdict['raw_state'] == 'full' else '不在场，按裁定不参与'}，"
+            f"见上面打印的分支），矩阵还写着 {status!r}："
             "要么把 P0 行改成 GREEN，要么说明这份证据不该存在")
 
     def test_the_evidence_judgment_does_not_degrade(self):
-        """判据自身的四枚变异探针：每缺一枚关键事实，`validate_evidence` 必须**点名**它。
+        """判据自身的变异探针：每缺一枚关键事实，判据必须**点名**它（raw 层 + portable 层各一批）。
 
         为什么单独钉这一枚（Task 9 复审的教训形状）：闸③读的是采集器的判据，判据退化成
         「数一数有没有 10 条」时，本文件一切照常绿。四枚变异各打一枪，打的就是
         「模型序 / 服务端错误体 / 账本行数 / 落盘指纹」这四枚最容易被糊弄的位。
+
+        3B 追加 portable 层那一批（同一枚 node-id，**不新增用例**，免得动 B0 的收集数钉）：
+        分层之后最怕的就是「portable 层是一枚摆设」，所以七条 interlock 与搬过来的 `[C-*]`
+        逐条都要有一发「改它 ⇒ 它自己点名」的枪。每发先验 baseline 不含该标签，
+        再验改后必含 ⇒ 杀掉它的确实是这一枚判据，不是别处顺带红。
         """
         base = _valid_looking_evidence()
         mutations = [
@@ -522,6 +667,179 @@ class P0MatrixStatusLockedToEvidenceTests(unittest.TestCase):
                 problems = kit.validate_evidence(candidate)
                 self.assertTrue(any(expected in problem for problem in problems),
                                 f"该判据没红（退化）：{expected} ⇒ {problems}")
+
+        baseline = _portable_payload_copy()
+        self.assertIsNotNone(baseline, "portable 层探针取不到 bundle：分层判据无从验证")
+        base_problems = kit.validate_portable_bundle(
+            baseline, manifest_sha256_pin=PORTABLE_MANIFEST_SHA256)
+        for label, mutate, expected in _portable_mutations():
+            with self.subTest(portable_mutation=label):
+                candidate = _portable_payload_copy()
+                self.assertFalse(any(expected in problem for problem in base_problems),
+                                 f"baseline 已经带着 {expected}：bundle 本身就不成立，"
+                                 "这发探针证明不了任何事（先看闸③那一枚的红因清单）")
+                mutate(candidate)
+                problems = kit.validate_portable_bundle(
+                    candidate, manifest_sha256_pin=PORTABLE_MANIFEST_SHA256)
+                self.assertTrue(any(expected in problem for problem in problems),
+                                f"portable 层判据没红（退化）：{expected} ⇒ {problems}")
+
+
+def _portable_payload_copy() -> dict | None:
+    """从盘上读一份**全新的** bundle 并深拷贝（探针改的是内存副本，绝不落盘）。
+
+    为什么不落盘：`docs/evidence/` 是 P0 的交付面，证伪只能在**副本**上做（原地证伪由
+    `p0-portability-3b-mutations.py` 那枚字节安全台另跑一遍，每发 `finally` 原字节还原）。
+    """
+    payload, _error = kit.read_portable_bundle()
+    if payload is None:
+        return None
+    return json.loads(json.dumps(payload, ensure_ascii=False))
+
+
+def _drop_portable_file(payload: dict, name: str) -> None:
+    """内存里把某枚件变成「不在场」。"""
+    payload["files"][name] = {"path": payload["files"][name]["path"], "present": False,
+                              "bytes": None, "sha256": "<missing>", "data": None,
+                              "parse_error": None}
+
+
+def _edit_portable(payload: dict, name: str, mutate, restamp: bool = True) -> None:
+    """改某枚件的 dict 内容，再按 §7 的序列化口径重算它的 text/bytes/sha256。
+
+    `restamp=True` 会把 manifest 的 `portable_files` 声明跟着改（**故意**让 `[I2]` 那一关先过）：
+    只有喂平了 hash，杀掉这一发的才可能是语义判据本身。`restamp=False` 就是简报点名的
+    那枚造假：「改 portable 件但不更 manifest hash」。
+    """
+    entry = payload["files"][name]
+    mutate(entry["data"])
+    kit.dump_portable_payload(payload, name)
+    if restamp:
+        kit.restamp_portable_manifest(payload)
+
+
+def _edit_manifest(payload: dict, mutate) -> None:
+    """改 manifest 的内容并重算它自己的 sha256（外部锚那一关会另外响，互不遮蔽）。"""
+    mutate(payload["files"][kit.BUNDLE_MANIFEST_FILE]["data"])
+    kit.dump_portable_payload(payload, kit.BUNDLE_MANIFEST_FILE)
+
+
+def _manifest_provenance(manifest: dict, role: str) -> dict:
+    """取 manifest.raw_provenance 里指定 role 的那一枚条目（只给下面的探针用）。"""
+    for item in manifest.get("raw_provenance") or []:
+        if isinstance(item, dict) and item.get("role") == role:
+            return item
+    raise AssertionError(f"raw_provenance 里没有 role={role} 的条目")
+
+
+def _portable_mutations() -> list[tuple[str, object, str]]:
+    """portable 层的逐枚探针：`(说明, 改法, 期望被点名的标签)`，七条 interlock 全覆盖。
+
+    标签出处见 `real_llm_failover_kit` §8；期望的是**那一条**判据自己响，不是随便有条问题。
+    """
+    rehearsal_dir = (kit.EVIDENCE_DIR.relative_to(kit.REPO_ROOT).as_posix()
+                     + "/rehearsal/run/20260924-214030")
+    return [
+        ("删掉一枚 portable 件（ledger-row.json）",
+         lambda p: _drop_portable_file(p, kit.BUNDLE_LEDGER_ROW_FILE), "[I1] bundle 件缺失"),
+        ("改 portable 件但不更 manifest hash",
+         lambda p: _edit_portable(p, kit.BUNDLE_RESPONSE_FILE,
+                                  lambda d: d["answer"].__setitem__("text", "x" * 40),
+                                  restamp=False),
+         "[I2] sha256 不配"),
+        ("manifest 自己被改而闸的锚没更（外部锚那半条）",
+         lambda p: _edit_manifest(p, lambda m: m.__setitem__("trace_id", "p0-tampered")),
+         "闸里的外部锚"),
+        ("改 response 的 model_used（answer.model → primary 的名字）",
+         lambda p: _edit_portable(p, kit.BUNDLE_RESPONSE_FILE,
+                                  lambda d: d["answer"].__setitem__("model",
+                                                                    kit.PRIMARY_MODEL)),
+         "[I3]"),
+        ("改 ledger.row.model（phi3 → 陌生模型）",
+         lambda p: _edit_portable(p, kit.BUNDLE_LEDGER_ROW_FILE,
+                                  lambda d: d["row"].__setitem__("model", "qwen:7b")),
+         "[I3]"),
+        ("改成功那枚 trace attempt 的 model",
+         lambda p: _edit_portable(p, kit.BUNDLE_TRACE_FILE,
+                                  lambda d: d["model_route_attempts"][1].__setitem__(
+                                      "model", kit.PRIMARY_MODEL)),
+         "[I3]"),
+        ("改 planned primary（manifest.plan.primary_model）",
+         lambda p: _edit_manifest(p, lambda m: m["plan"].__setitem__("primary_model",
+                                                                     "llama3:latest")),
+         "[I4]"),
+        ("probe 原文换成非文档化的失败（去掉 alloc 那一族字面）",
+         lambda p: _edit_portable(p, kit.BUNDLE_PROBE_FILE,
+                                  lambda d: (d["probe"].__setitem__(
+                                      "raw_error_body",
+                                      "{\"error\":\"model is busy with another request\"}"),
+                                      d["probe"]["classification"].__setitem__(
+                                          "message", "模型忙：another request"))),
+         "[I5]"),
+        ("trace_id 三处里改一处（ledger-row 顶层）",
+         lambda p: _edit_portable(p, kit.BUNDLE_LEDGER_ROW_FILE,
+                                  lambda d: d.__setitem__("trace_id", "p0-failover-deadbeef")),
+         "[I6]"),
+        ("bundle 的来源指向彩排 run dir（反彩排那一发）",
+         lambda p: _edit_manifest(p, lambda m: m.__setitem__("source_run_dir", rehearsal_dir)),
+         "指向彩排目录"),
+        ("raw_provenance 的当场重算与记录值不等（洗出来的 bundle）",
+         lambda p: _edit_manifest(p, lambda m: m["raw_provenance"][0].__setitem__(
+             "sha1", "0" * 40)), "[I7] "),
+        ("provider_transport 从 null 换成替身字样",
+         lambda p: _edit_portable(p, kit.BUNDLE_RESPONSE_FILE,
+                                  lambda d: d.__setitem__("provider_transport",
+                                                          "httpx.MockTransport")),
+         "[C-传输层]"),
+        ("账本行冒出禁存列 prompt",
+         lambda p: _edit_portable(p, kit.BUNDLE_LEDGER_ROW_FILE,
+                                  lambda d: d["row"].__setitem__("prompt", "x")),
+         "[C-禁存列]"),
+        ("一枚断言的 pass 改成 false",
+         lambda p: _edit_portable(p, kit.BUNDLE_RESULT_FILE,
+                                  lambda d: d["assertions"][0].__setitem__("pass", False)),
+         "[C-断言全过]"),
+        # ---- 3B 修复轮 1 新增：H1 / H2 / M1 / M2 四条加强判据各有一发「改它 ⇒ 它自己点名」 ----
+        ("manifest.source_run_flags.completed_is_true 改成 false（H1 载体侧）",
+         lambda p: _edit_manifest(p, lambda m: m["source_run_flags"].__setitem__(
+             "completed_is_true", False)),
+         "[I7] source_run_flags.completed_is_true"),
+        ("manifest.source_run_flags.rehearsal_truthy 改成 true（H1 反彩排载体侧）",
+         lambda p: _edit_manifest(p, lambda m: m["source_run_flags"].__setitem__(
+             "rehearsal_truthy", True)),
+         "[I7] source_run_flags.rehearsal_truthy"),
+        ("manifest.source_run_flags.provider_transport_key_present 改成 false（H2 载体侧）",
+         lambda p: _edit_manifest(p, lambda m: m["source_run_flags"].__setitem__(
+             "provider_transport_key_present", False)),
+         "[I7] source_run_flags.provider_transport_key_present"),
+        ("response.json 的 provider_transport_present 改成 false（H2 源端成员判定）",
+         lambda p: _edit_portable(p, kit.BUNDLE_RESPONSE_FILE,
+                                  lambda d: d.__setitem__("provider_transport_present", False)),
+         "[C-传输层] response.json 的 provider_transport_present"),
+        ("trace_id_source.pointers 里一枚改成 null（M2：少一条腿不许算一致）",
+         lambda p: _edit_manifest(p, lambda m: m["trace_id_source"]["pointers"].__setitem__(
+             "request.trace_id", None)),
+         "[I6] trace_id_source.pointers 里有指针为 null"),
+        ("trace_id_source.pointers 摘掉一枚键（M2 的另一头：键集合不是那三枚）",
+         lambda p: _edit_manifest(p, lambda m: m["trace_id_source"]["pointers"].pop(
+             "ledger.row.trace_id")),
+         "[I6] trace_id_source.pointers 的键名不是那三枚"),
+        ("raw_provenance 的 git_blob 写成不合规形状（M1 blob 腿的载体侧）",
+         lambda p: _edit_manifest(p, lambda m: _manifest_provenance(
+             m, "acceptance_module").__setitem__("git_blob", "deadbeef")),
+         "[I7] acceptance_module 的 git_blob 不是 40 位十六进制"),
+        ("raw_provenance 的 repo_path 退化成 basename（M1：判据不许变回单机耦合）",
+         lambda p: _edit_manifest(p, lambda m: _manifest_provenance(
+             m, "acceptance_module").__setitem__("repo_path",
+                                                 "test_real_llm_failover_acceptance.py")),
+         "[I7] acceptance_module 的 repo_path 应为仓相对"),
+        ("provider_calls 的模型序被对调",
+         lambda p: _edit_portable(p, kit.BUNDLE_RESPONSE_FILE,
+                                  lambda d: d.__setitem__(
+                                      "provider_calls",
+                                      [d["provider_calls"][1], d["provider_calls"][0]])),
+         "[C-模型序]"),
+    ]
 
 
 def _valid_looking_evidence() -> dict:

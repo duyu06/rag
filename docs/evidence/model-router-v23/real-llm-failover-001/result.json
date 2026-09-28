@@ -1,0 +1,300 @@
+{
+  "case_id": "REAL-LLM-FAILOVER-001",
+  "evidence_schema_version": 1,
+  "source_run_generated_at": "2026-09-24T13:52:06+00:00",
+  "assertion_count": 10,
+  "all_pass": true,
+  "assertions": [
+    {
+      "id": 1,
+      "name": "primary_really_called",
+      "observed": {
+        "attempts": [
+          {
+            "model_id": "ollama-ornith",
+            "provider": "ollama",
+            "result": "failed",
+            "error_type": "model_unavailable",
+            "latency_ms": 41597.5
+          },
+          {
+            "model_id": "ollama-phi3",
+            "provider": "ollama",
+            "result": "success",
+            "error_type": null,
+            "latency_ms": 20036.3
+          }
+        ],
+        "egress_entry_id": "ollama-ornith",
+        "egress_model": "ornith-1.5:9b-text",
+        "egress_request_bytes": 1619,
+        "egress_ok": false
+      },
+      "pass": true,
+      "elapsed_ms": 2.1
+    },
+    {
+      "id": 2,
+      "name": "failure_classified_model_unavailable",
+      "observed": {
+        "attempt_error_type": "model_unavailable",
+        "llm_error_message_verbatim": "模型不可用（alloc）：{\"error\":\"llama-server reported out-of-memory during startup: ggml_vulkan: Failed to allocate pinned memory (vk::Device::allocateMemory: ErrorOutOfDeviceMemory)\\nggml_gallocr_reserve_n_impl: failed to",
+        "http_status": 500,
+        "markers_hit": [
+          "alloc"
+        ],
+        "probe_classification": {
+          "kind": "model_unavailable",
+          "status_code": 500,
+          "no_fallback": false,
+          "message": "模型不可用（alloc）：{\"error\":\"llama-server reported out-of-memory during startup: alloc_tensor_range: failed to allocate Vulkan0 buffer of size 820943872\\nerror loading model: unable to allocate Vulkan0 buffer\"}"
+        }
+      },
+      "pass": true,
+      "elapsed_ms": 0.1
+    },
+    {
+      "id": 3,
+      "name": "fallback_called",
+      "observed": {
+        "attempts_count": 2,
+        "second_attempt": {
+          "model_id": "ollama-phi3",
+          "result": "success",
+          "error_type": null,
+          "latency_ms": 20036.3
+        },
+        "egress_model": "phi3:mini",
+        "egress_request_bytes": 1610,
+        "egress_ok": true
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 4,
+      "name": "phi3_valid_chinese_answer",
+      "observed": {
+        "chars": 65,
+        "cjk_chars": 44,
+        "model_field": "phi3:mini",
+        "answer_head": "1. 员工出差住宿的金额上限为每晚600元。\n\n2. 出差住宿需经经部门经理的审批。\n\n3. 出差住宿发票需在30天内提交给财务。",
+        "min_chars": 8,
+        "min_cjk_chars": 4
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 5,
+      "name": "fallback_index_is_one",
+      "observed": {
+        "selected_index": 1,
+        "reason_codes": [
+          "CAPABILITY_MATCH",
+          "LOCAL_PREFERRED",
+          "HIGHER_PRIORITY"
+        ],
+        "context_dropped": 0
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 6,
+      "name": "trace_id_consistent",
+      "observed": {
+        "entry_trace_id": "p0-failover-6146ff1417d7",
+        "ledger_trace_id": "p0-failover-6146ff1417d7",
+        "trace_file_trace_id": "p0-failover-6146ff1417d7",
+        "request_id": "p0-req-89b55677",
+        "ledger_request_id": "p0-req-89b55677",
+        "trace_file_count": 1
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 7,
+      "name": "model_route_two_attempts",
+      "observed": {
+        "keys": [
+          "attempts",
+          "context_dropped",
+          "fallbacks",
+          "mode",
+          "primary",
+          "requirements",
+          "selected_index",
+          "selected_reason_codes",
+          "stage"
+        ],
+        "attempts": [
+          {
+            "model": "ornith-1.5:9b-text",
+            "result": "failed",
+            "error_type": "model_unavailable"
+          },
+          {
+            "model": "phi3:mini",
+            "result": "success",
+            "error_type": null
+          }
+        ],
+        "stage": "fallback",
+        "selected_index": 1,
+        "primary": {
+          "id": "ollama-ornith",
+          "provider": "ollama",
+          "model": "ornith-1.5:9b-text",
+          "score": 100,
+          "reason_codes": [
+            "CAPABILITY_MATCH",
+            "LOCAL_PREFERRED",
+            "HIGHER_PRIORITY"
+          ]
+        }
+      },
+      "pass": true,
+      "elapsed_ms": 1.1
+    },
+    {
+      "id": 8,
+      "name": "usage_row_landed",
+      "observed": {
+        "rows": 1,
+        "row": {
+          "id": 1,
+          "trace_id": "p0-failover-6146ff1417d7",
+          "request_id": "p0-req-89b55677",
+          "route_mode": "rag",
+          "route_reason": "[\"CAPABILITY_MATCH\", \"LOCAL_PREFERRED\", \"HIGHER_PRIORITY\"]",
+          "provider": "ollama",
+          "model": "phi3:mini",
+          "fallback_index": 1,
+          "input_tokens": 713,
+          "output_tokens": 90,
+          "total_tokens": 803,
+          "ttft_ms": null,
+          "latency_ms": 61633.808,
+          "estimated_cost": 0.0,
+          "currency": "USD",
+          "success": 1,
+          "error_type": null,
+          "status_code": null,
+          "created_at": "2026-09-24T13:53:17Z"
+        },
+        "ledger_path": "conversations.db",
+        "tables_in_temp_db": [
+          "llm_request_logs",
+          "sqlite_sequence"
+        ]
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 9,
+      "name": "zero_prompt_stored",
+      "observed": {
+        "needles": [
+          "CANARY-9c1f4e7a-6b0d-4e2f-8a13-zhengju",
+          "请用中文分点回答：员工出差住宿需要注意哪三件事？每条一句话，依据上面给出的资料。",
+          "CANARY-9c1f4e7a-6b0d-4e2",
+          "你是 yaoke 企业知识助手。\n你可以使用两类",
+          "请依据以下证据回答问题"
+        ],
+        "hits": [],
+        "columns_scanned": [
+          "created_at",
+          "currency",
+          "error_type",
+          "estimated_cost",
+          "fallback_index",
+          "id",
+          "input_tokens",
+          "latency_ms",
+          "model",
+          "output_tokens",
+          "provider",
+          "request_id",
+          "route_mode",
+          "route_reason",
+          "status_code",
+          "success",
+          "total_tokens",
+          "trace_id",
+          "ttft_ms"
+        ],
+        "cells_scanned": 19
+      },
+      "pass": true,
+      "elapsed_ms": 0.1
+    },
+    {
+      "id": 10,
+      "name": "api_face_is_200",
+      "observed": {
+        "caliber": "状态码口径：生成腿回放本次真答案（零第二次外呼），检索腿替身；测的是「fallback 成功不塌成 5xx」",
+        "status_code": 200,
+        "answer_equals_real": true,
+        "model_used_field": "ornith-1.5:9b-text",
+        "response_body_chars": 196
+      },
+      "pass": true,
+      "elapsed_ms": 40642.2
+    }
+  ],
+  "expected_assertion_names": [
+    {
+      "id": 1,
+      "name": "primary_really_called",
+      "zh": "primary 真被调用"
+    },
+    {
+      "id": 2,
+      "name": "failure_classified_model_unavailable",
+      "zh": "失败归类 model_unavailable"
+    },
+    {
+      "id": 3,
+      "name": "fallback_called",
+      "zh": "fallback 被调"
+    },
+    {
+      "id": 4,
+      "name": "phi3_valid_chinese_answer",
+      "zh": "phi3 给出有效中文回答"
+    },
+    {
+      "id": 5,
+      "name": "fallback_index_is_one",
+      "zh": "fallback_index==1"
+    },
+    {
+      "id": 6,
+      "name": "trace_id_consistent",
+      "zh": "trace_id 全链一致"
+    },
+    {
+      "id": 7,
+      "name": "model_route_two_attempts",
+      "zh": "model_route 两枚 attempt"
+    },
+    {
+      "id": 8,
+      "name": "usage_row_landed",
+      "zh": "usage 落库一行"
+    },
+    {
+      "id": 9,
+      "name": "zero_prompt_stored",
+      "zh": "零 prompt 入库"
+    },
+    {
+      "id": 10,
+      "name": "api_face_is_200",
+      "zh": "API 面 200 语义"
+    }
+  ]
+}
