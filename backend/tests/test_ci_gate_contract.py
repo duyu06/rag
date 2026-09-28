@@ -101,7 +101,7 @@ def _per_module(ids: list[str]) -> "dict[str, int]":
 # （卡 H / 卡 I 各加一枚 = 15，R9 ② 的第 16 枚 = 含 `: ` 的 plain scalar 必须加引号）。
 # Task 3 修复轮 1 的读数：`python scripts/b0_collection_probe.py` → TOTAL 1332，
 # `--node-ids | grep test_ci_gate_contract | wc -l` → 16 ⇒ 1316 + 16 = 1332，两侧都是实测量。
-EXPECTED_COLLECTED = 1332
+EXPECTED_COLLECTED = 1335
 
 
 def test_collected_count_matches_the_pinned_number():

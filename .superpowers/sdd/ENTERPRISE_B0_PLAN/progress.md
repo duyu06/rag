@@ -567,3 +567,21 @@
     这三项挂在待办，谁主张谁取证。
   - **流程事实**：最近四次派单里三次撞 150 回合上限（活干了、摘要没写回），一次刚开始就死。
     后续这类"改代码 + 跑全套 + 写长报告"的活我自己按小步做，不再整单外包。
+
+- **R29（我自己的一枚坏提交，如实登记）**：`64ec762` 的 `git add` 里放了一个指向 `mutations/` 下
+  文件的错误 pathspec ⇒ git 整条 add 静默中止（我又把 stderr 丢了），那枚提交**只含台账与证据文件、
+  代码文件数 = 0**，而它的 message 描述的是代码。发现方式：提交后照常看 `git status`，
+  见 kit/闸/bundle/矩阵仍是 ` M`。处置：不 amend、不改历史，追加 `71cc5e1` 真提交并在 message 里
+  点名 `64ec762` 名实不符；两枚合起来才是它所声称的内容。
+- **R30（同一条病的第二次发作，形式不同）**：我随后把"python 追加台账 && git commit && git push"
+  串成一条命令，两个 heredoc 嵌套，shell 把整段 Python 当成了 `git commit -F -` 的输入 ⇒
+  生出一枚 **message 是乱码、内容正确**（只改 `EXPECTED_COLLECTED` 一行）的提交，
+  而台账追加与 push 都没执行。处置：`git reset --soft HEAD~1` 退回重做 message ——
+  目标是**我自己在 30 秒前造的、从未推送**的一枚提交，内容经 `--soft` 完整保留在 index，
+  与"不 amend 他人历史 / 两枚 tag 不动"是两回事；这条区别本身要记在这里，免得下次拿它当借口。
+  **纪律回写（两条）**：① `git add` 多路径必须逐条验、不吞 stderr，提交后用
+  `git show --stat` 核对"message 说的东西在不在里面"（与 B0 的 presence pins ≠ effect pins 同病）；
+  ② **一条 Bash 只做一件事**，含 heredoc 的命令绝不与 `&&` 链式拼接。
+- **B0 侧收口**：`EXPECTED_COLLECTED` 已按实测 1332→**1335** 重锚（CORR-01 新增 3 枚结构钉所致，
+  属"加测试"的合法变化），基线明细同步 1335 行；两枚变异台的字节锚各自重钉（B0 台 `4bba148e804d`）。
+  全量两 cwd 各 **1335 passed / 0 failed**（182.78s / 183.95s，1159 subtests）。
