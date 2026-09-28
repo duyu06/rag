@@ -1,0 +1,4 @@
+cwd= E:\xiangmu\rag | backend/.env present? True
+backend/tests/test_web_security.py::WebSecurityTest::test_userinfo_and_local_suffix_rejected
+
+1332 tests collected in 43.71s

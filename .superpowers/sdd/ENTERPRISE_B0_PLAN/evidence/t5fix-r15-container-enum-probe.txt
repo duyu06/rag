@@ -1,0 +1,42 @@
+warning: The `fitz` API is deprecated and will be removed in future. Use `import pymupdf` instead.
+==========================================================================
+环境事实
+==========================================================================
+python            : 3.12.14
+fastapi           : 0.141.1
+starlette         : 1.7.0
+_IncludedRouter 在 fastapi.routing 里? : True   在 starlette.routing 里? : False
+
+sorted({type(r).__name__ for r in app.routes}) = ['APIRoute', 'Route', '_IncludedRouter']
+顶层 app.routes 条目数                      = 29
+顶层里 APIRoute 的条数                      = 21
+递归走到的条目总数（含容器自己）            = 56
+递归展开后的服务面条目数                    = 52
+==========================================================================
+覆盖面集合：旧走法（只走顶层） vs 新走法（递归展开）
+==========================================================================
+旧走法 authenticated 条数 = 15
+新走法 authenticated 条数 = 42
+新 >= 旧（条数不减）      = True
+旧 ⊆ 新（超集关系）       = True
+新 \ 旧（递归多看见的腿）  = ['DELETE /api/conversations/{conversation_id}', 'GET /api/agent/traces/{trace_id}', 'GET /api/auth/users', 'GET /api/chunks', 'GET /api/conversations', 'GET /api/conversations/{conversation_id}', 'GET /api/evaluation/failures', 'GET /api/evaluation/runs', 'GET /api/evaluation/runs/{run_id}', 'GET /api/feedback', 'GET /api/ingestion/jobs', 'GET /api/operations/usage', 'GET /api/system/status', 'GET /api/tools', 'PATCH /api/conversations/{conversation_id}', 'PATCH /api/evaluation/failures/{case_id}', 'POST /api/access/requests', 'POST /api/agent/query', 'POST /api/agent/query/stream', 'POST /api/conversations', 'POST /api/conversations/{conversation_id}/messages', 'POST /api/conversations/{conversation_id}/messages/stream', 'POST /api/conversations/{conversation_id}/messages/{message_id}/retry', 'POST /api/conversations/{conversation_id}/messages/{message_id}/retry/stream', 'POST /api/documents/{action}', 'POST /api/feedback', 'POST /api/search']
+旧 \ 新（必须为空=放宽）   = []
+两侧完全相同（宿主形态）  = False
+
+MUST_BE_COVERED 条数      = 8
+旧走法漏掉的点名腿        = ['GET /api/auth/users', 'PATCH /api/conversations/{conversation_id}', 'POST /api/agent/query', 'POST /api/agent/query/stream', 'POST /api/conversations/{conversation_id}/messages/stream']  (n=5)
+新走法漏掉的点名腿（须空）= []
+点名腿全部被门覆盖        = True
+本模块仍定义 test_every_authenticated_route_is_gated_or_whitelisted : True
+本模块仍定义 test_the_enumeration_sees_every_service_surface : True
+
+免门腿 旧 = ['GET /api/auth/me', 'POST /api/auth/password/change']
+免门腿 新 = ['GET /api/auth/me', 'POST /api/auth/password/change']
+免门腿集合相同            = True
+
+OpenAPI operations 条数   = 48
+递归清单全量腿数          = 48
+顶层清单全量腿数          = 21
+OpenAPI \ 递归（盲区）     = []
+OpenAPI \ 顶层（旧盲区）   = ['DELETE /api/conversations/{conversation_id}', 'GET /api/agent/traces/{trace_id}', 'GET /api/auth/users', 'GET /api/chunks', 'GET /api/conversations', 'GET /api/conversations/{conversation_id}', 'GET /api/evaluation/failures', 'GET /api/evaluation/runs', 'GET /api/evaluation/runs/{run_id}', 'GET /api/feedback', 'GET /api/ingestion/jobs', 'GET /api/operations/usage', 'GET /api/system/status', 'GET /api/tools', 'PATCH /api/conversations/{conversation_id}', 'PATCH /api/evaluation/failures/{case_id}', 'POST /api/access/requests', 'POST /api/agent/query', 'POST /api/agent/query/stream', 'POST /api/conversations', 'POST /api/conversations/{conversation_id}/messages', 'POST /api/conversations/{conversation_id}/messages/stream', 'POST /api/conversations/{conversation_id}/messages/{message_id}/retry', 'POST /api/conversations/{conversation_id}/messages/{message_id}/retry/stream', 'POST /api/documents/{action}', 'POST /api/feedback', 'POST /api/search']
+==========================================================================

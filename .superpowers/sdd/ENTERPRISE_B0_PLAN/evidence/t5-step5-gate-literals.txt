@@ -1,0 +1,9 @@
+EXPECTED_COLLECTED = 1332
+_OWN_TEST_NAMES    = 16
+parsed eol rows    = 313
+tracked (git ls-files -z, minus trailing) = 313
+i/crlf entries     = 0 []
+i/-text entries    = 3
+    .superpowers/sdd/SECURITY_A_PLAN/task-10d-report.md
+    docs/MODEL_ROUTER_V23_DESIGN.md
+    frontend/public/yaoke-logo.webp

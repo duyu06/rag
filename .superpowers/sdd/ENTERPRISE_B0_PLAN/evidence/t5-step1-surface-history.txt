@@ -1,0 +1,17 @@
+# 258 -> 318 归因的逐 commit 实测（tracked 侧 B0 中性的证明）
+bc43ca3 tracked=236 superpowers_tracked=41
+f6c67b5 tracked=313 superpowers_tracked=96
+7cc5efc tracked=313 superpowers_tracked=96
+--- f6c67b5 里落在 .superpowers/ 下的条目数 ---
+55
+--- f6c67b5 顶层目录分布（含修改，非纯新增）---
+     55 .superpowers
+     32 backend
+      4 docs
+      2 scripts
+      2 frontend
+      1 .github
+--- HEAD 侧对账：ls-tree vs ls-files --cached 同数 ---
+ls-tree HEAD = 313 / ls-files --cached = 313
+--- .superpowers 忽略规则命中（过程件未跟踪时不在面上）---
+.gitignore:25:.superpowers/	.superpowers/sdd/ENTERPRISE_B0_PLAN/evidence/t5-head.txt

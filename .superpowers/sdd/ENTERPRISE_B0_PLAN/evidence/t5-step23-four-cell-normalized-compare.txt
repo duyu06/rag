@@ -1,0 +1,11 @@
+cell1 cwd=repo-root  .env=present :: 1332 passed, 36 warnings, 1133 subtests passed in 211.46s (0:03:31)
+    normalized-sha12 2b20124cc22b  (tmp 路径 / pytest-N 计数 / 耗时 归一后)
+cell2 cwd=backend    .env=present :: 1332 passed, 36 warnings, 1133 subtests passed in 209.89s (0:03:29)
+    normalized-sha12 145ab80e8ea6  (tmp 路径 / pytest-N 计数 / 耗时 归一后)
+cell3 cwd=repo-root  .env=parked  :: 1332 passed, 36 warnings, 1133 subtests passed in 204.31s (0:03:24)
+    normalized-sha12 2b20124cc22b  (tmp 路径 / pytest-N 计数 / 耗时 归一后)
+cell4 cwd=backend    .env=parked  :: 1332 passed, 36 warnings, 1133 subtests passed in 209.84s (0:03:29)
+    normalized-sha12 145ab80e8ea6  (tmp 路径 / pytest-N 计数 / 耗时 归一后)
+
+distinct normalized signatures: 2
+ALL FOUR EQUAL: False

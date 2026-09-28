@@ -1,0 +1,134 @@
+.................................................................................................................................. [  9%]
+.................................................. [ 13%]
+.................................................. [ 17%]
+................................................................................................................................................................................................... [ 31%]
+....................................................................................................................................................................................... [ 45%]
+........................................ [ 48%]
+......................................................... [ 52%]
+...................................................................... [ 58%]
+................................................................. [ 63%]
+.............................................................. [ 67%]
+........F.F...................................................... [ 72%]
+............F................................................ [ 77%]
+........................................................................ [ 82%]
+......................................................................... [ 88%]
+....................................................................................................................................................... [ 99%]
+........                                                        [100%]
+=================================== FAILURES ===================================
+_ MustChangeGateCoverageTests.test_every_authenticated_route_is_gated_or_whitelisted _
+
+self = <test_password_lifecycle_contract.MustChangeGateCoverageTests testMethod=test_every_authenticated_route_is_gated_or_whitelisted>
+
+    def test_every_authenticated_route_is_gated_or_whitelisted(self):
+        """逐条真打 HTTP，而处理器逐条**不可达**：安全判据与覆盖面判据不能是同一件事。
+    
+        这条扫描对 `authenticated - pending` 的每一条端点（今天 41 条；白名单那条走的是免门
+        腿、从来不在 `authenticated` 里，所以不减）发出真请求。它的危险性也在这里：门一退化，
+        这些请求就落在真端点上，其中 `POST /api/demo/reset` 会删演示语料再重建索引。于是先把每
+        条路由的 `dependant.call` 换成绊线桩、再发第一条请求——依赖层照旧跑（403 正是从那儿
+        来的，"这条端点过没过门"判的强度一分不减），业务函数叫不到。桩是否与路由器真正派发的
+        那枚路由对齐逐条核对；绊线有没有响过、demo 入口有没有被叫过、审计有没有逐条落笔，
+        最后各判一次。
+        """
+        index = _route_index(_predicate_using(auth.require_user))
+        index.update(_route_index(_predicate_using(auth.require_permissions)))
+        authenticated = set(index)
+        pending = _routes_using(auth.require_user_pending_password)
+        self.assertEqual(set(self.WHITELIST), pending, "白名单外泄：有端点改走了免门依赖")
+>       self.assertTrue(
+            self.MUST_BE_COVERED <= authenticated,
+            f"枚举漏腿：{sorted(self.MUST_BE_COVERED - authenticated)}",
+        )
+E       AssertionError: False is not true : 枚举漏腿：['GET /api/auth/users', 'PATCH /api/conversations/{conversation_id}', 'POST /api/agent/query', 'POST /api/agent/query/stream', 'POST /api/conversations/{conversation_id}/messages/stream']
+
+backend/tests/test_password_lifecycle_contract.py:917: AssertionError
+_ MustChangeGateCoverageTests.test_the_enumeration_sees_every_service_surface __
+
+self = <test_password_lifecycle_contract.MustChangeGateCoverageTests testMethod=test_the_enumeration_sees_every_service_surface>
+
+    def test_the_enumeration_sees_every_service_surface(self):
+        """`_route_index` 只走顶层 `APIRoute`——这条边界今天成立，所以它得**看得见**。
+    
+        挂载点（`app.mount()`）、子路由、带依赖的非 `APIRoute` 条目都会让一棵子树**静默**退出
+        覆盖面：清单少了条目，剩下的每条照样各得 403，门是绿的而覆盖面已经塌了一块。这里把
+        "没有枚举看不见的服务面"钉成断言。非 `APIRoute` 的条目只允许是文档面那类——不挂依赖、
+        不在 `/api/` 之下。哪天要挂静态资源或子应用，先在这里改判据，再谈覆盖面。
+        """
+        containers = [
+            getattr(route, "path", type(route).__name__)
+            for route in app.routes
+            if isinstance(route, Mount) or hasattr(route, "routes")
+        ]
+        self.assertEqual([], containers, "出现挂载点：顶层枚举会漏掉整棵子树")
+        off_enumeration = [
+            getattr(route, "path", type(route).__name__)
+            for route in app.routes
+            if not isinstance(route, APIRoute)
+            and (
+                str(getattr(route, "path", "")).startswith("/api")
+                or getattr(route, "dependant", None) is not None
+                or getattr(route, "methods", None) is None
+            )
+        ]
+>       self.assertEqual([], off_enumeration, "非 APIRoute 的条目带着服务面：枚举不覆盖它")
+E       AssertionError: Lists differ: [] != ['_IncludedRouter', '_IncludedRouter', '_IncludedRouter', '_IncludedRouter']
+E       
+E       Second list contains 4 additional elements.
+E       First extra element 0:
+E       '_IncludedRouter'
+E       
+E       - []
+E       + ['_IncludedRouter', '_IncludedRouter', '_IncludedRouter', '_IncludedRouter'] : 非 APIRoute 的条目带着服务面：枚举不覆盖它
+
+backend/tests/test_password_lifecycle_contract.py:1034: AssertionError
+_ P0MatrixStatusLockedToEvidenceTests.test_p0_row_status_matches_the_evidence __
+
+self = <test_real_llm_failover_gate.P0MatrixStatusLockedToEvidenceTests testMethod=test_p0_row_status_matches_the_evidence>
+
+    def test_p0_row_status_matches_the_evidence(self):
+        status = kit.matrix_p0_status()
+        self.assertIsNotNone(status, "矩阵里没有 P0 行了（§10 的『+1』被删）")
+        evidence, read_error = kit.read_evidence()
+        problems = kit.validate_evidence(evidence)
+        if evidence is None or problems:
+>           self.assertEqual(
+                P0_STATUS_WITHOUT_EVIDENCE, status,
+                f"P0 还没跑过真机（证据：{read_error or problems}），矩阵那一行却写着 "
+                f"{status!r}。唯一合法取值是 {P0_STATUS_WITHOUT_EVIDENCE!r}——"
+                "改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh")
+E           AssertionError: 'BLOCKED' != 'GREEN'
+E           - BLOCKED
+E           + GREEN
+E            : P0 还没跑过真机（证据：missing），矩阵那一行却写着 'GREEN'。唯一合法取值是 'BLOCKED'——改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh
+
+backend/tests/test_real_llm_failover_gate.py:411: AssertionError
+=============================== warnings summary ===============================
+backend/tests/test_model_router_v23_contract.py::LedgerGuardClassificationTests::test_a_direct_schema_connect_is_classified_write_too
+  /w/backend/tests/conftest.py:404: RuntimeWarning: [ledger-guard] 测试**只读**了仓库真实账本 /tmp/tmpiypheprb/data/conversations.db ⇒ 已改道到 /tmp/tmpiypheprb/isolated/conversations.db（读不判红；写才判红，见 tests/conftest.py N1）
+    return self._real_connect(*args, **kwargs)
+
+backend/tests/test_model_router_v23_contract.py::LedgerGuardClassificationTests::test_a_pure_read_is_classified_read_and_never_pins_red
+  /w/backend/tests/conftest.py:404: RuntimeWarning: [ledger-guard] 测试**只读**了仓库真实账本 /tmp/tmpiegvxhne/data/conversations.db ⇒ 已改道到 /tmp/tmpiegvxhne/isolated/conversations.db（读不判红；写才判红，见 tests/conftest.py N1）
+    return self._real_connect(*args, **kwargs)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+[ledger-guard] 1 次「读保护集下的真实账本」被改道（N1：读不判红）：
+[ledger-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard] 13 次「读保护集下的真实凭据表」被改道（N1：读不判红）：
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   data/conversations.db ⇒ /tmp/pytest-of-root/pytest-0/llm-ledger-isolation0/conversations.db
+[credential-guard]   ……另有 3 次同类读改道
+=========================== short test summary info ============================
+FAILED backend/tests/test_password_lifecycle_contract.py::MustChangeGateCoverageTests::test_every_authenticated_route_is_gated_or_whitelisted
+FAILED backend/tests/test_password_lifecycle_contract.py::MustChangeGateCoverageTests::test_the_enumeration_sees_every_service_surface
+FAILED backend/tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+3 failed, 1329 passed, 2 warnings, 1133 subtests passed in 107.52s (0:01:47)
+inner rc=1

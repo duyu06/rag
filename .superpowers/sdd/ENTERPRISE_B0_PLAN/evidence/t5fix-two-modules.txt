@@ -1,0 +1,10 @@
+### module: test_password_lifecycle_contract.py
+cwd= E:\xiangmu\rag | backend/.env present? True
+............................................................ [ 77%]
+.................                                                        [100%]
+77 passed, 12 subtests passed in 73.12s (0:01:13)
+rc=0
+### module: test_real_llm_failover_gate.py
+...............                                               [100%]
+15 passed, 11 subtests passed in 11.75s
+rc=0

@@ -1,0 +1,92 @@
+[N1] 注入 backend/tests/conftest.py b0c5eee33ccd -> 5fa40bed5e3f（锚点唯一 [1]）
+[N1] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 1 failed, 15 passed in 21.88s
+[N1]   RED test_collected_count_matches_the_pinned_number
+[N1]   计划钉住 ['test_collected_count_matches_the_pinned_number']
+[N1]   实测红面 ['test_collected_count_matches_the_pinned_number']
+[N1]   判决 KILLED-ASSIGNED
+[N1] 还原：sha1 与注入前相同、cmp rc=0
+[N2] 注入 .github/workflows/ci.yml 931846cba857 -> bded7c6c802d（锚点唯一 [1]）
+[N2] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 1 failed, 15 passed in 23.30s
+[N2]   RED test_backend_contracts_has_no_unittest_discover_step
+[N2]   计划钉住 ['test_backend_contracts_has_no_unittest_discover_step']
+[N2]   实测红面 ['test_backend_contracts_has_no_unittest_discover_step']
+[N2]   判决 KILLED-ASSIGNED
+[N2] 还原：sha1 与注入前相同、cmp rc=0
+[N3] 注入 .github/workflows/ci.yml 931846cba857 -> 9985973a1dd5（锚点唯一 [1]）
+[N3] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 2 failed, 14 passed in 22.62s
+[N3]   RED test_install_face_uses_requirements_txt_as_the_source
+[N3]   RED test_extra_pip_arguments_are_exactly_the_exemption_table
+[N3]   计划钉住 ['test_install_face_uses_requirements_txt_as_the_source']
+[N3]   实测红面 ['test_install_face_uses_requirements_txt_as_the_source', 'test_extra_pip_arguments_are_exactly_the_exemption_table']
+[N3]   判决 KILLED-ASSIGNED
+[N3] 还原：sha1 与注入前相同、cmp rc=0
+[N4] 注入 .github/workflows/ci.yml 931846cba857 -> 7bbab2f31091（锚点唯一 [1]）
+[N4] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 1 failed, 15 passed in 23.04s
+[N4]   RED test_extra_pip_arguments_are_exactly_the_exemption_table
+[N4]   计划钉住 ['test_extra_pip_arguments_are_exactly_the_exemption_table']
+[N4]   实测红面 ['test_extra_pip_arguments_are_exactly_the_exemption_table']
+[N4]   判决 KILLED-ASSIGNED
+[N4] 还原：sha1 与注入前相同、cmp rc=0
+[N5] 注入 .gitattributes 5738e2743ea7 -> 90885abbf68d（锚点唯一 [1]）
+[N5] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 1 failed, 15 passed in 22.17s
+[N5]   RED test_gitattributes_carries_the_required_rules
+[N5]   计划钉住 ['test_gitattributes_carries_the_required_rules']
+[N5]   实测红面 ['test_gitattributes_carries_the_required_rules']
+[N5]   判决 KILLED-ASSIGNED
+[N5] 还原：sha1 与注入前相同、cmp rc=0
+[N6] 注入 backend/tests/test_ci_gate_contract.py a0b9f37f32bb -> eb4a49aa6d75（锚点唯一 [1, 1]）
+[N6] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 2 failed, 14 passed in 20.13s
+[N6]   RED test_index_has_no_crlf_entries
+[N6]   RED test_non_text_index_entries_are_exactly_the_enumerated_set
+[N6]   计划钉住 ['test_index_has_no_crlf_entries', 'test_non_text_index_entries_are_exactly_the_enumerated_set']
+[N6]   实测红面 ['test_index_has_no_crlf_entries', 'test_non_text_index_entries_are_exactly_the_enumerated_set']
+[N6]   判决 KILLED-ASSIGNED
+[N6] 还原：sha1 与注入前相同、cmp rc=0
+[N7] 注入 backend/tests/test_ci_gate_contract.py a0b9f37f32bb -> 0ca2edd50e16（锚点唯一 [1]）
+[N7] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 2 failed, 13 passed in 22.44s
+[N7]   RED test_collected_count_matches_the_pinned_number
+[N7]   RED test_the_gate_module_itself_is_collected
+[N7]   计划钉住 ['test_collected_count_matches_the_pinned_number', 'test_the_gate_module_itself_is_collected']
+[N7]   实测红面 ['test_collected_count_matches_the_pinned_number', 'test_the_gate_module_itself_is_collected']
+[N7]   判决 KILLED-ASSIGNED
+[N7] 还原：sha1 与注入前相同、cmp rc=0
+[N8] 注入 backend/tests/test_ci_gate_contract.py a0b9f37f32bb -> 582bca1b201e（锚点唯一 [1]）
+[N8] pytest（tests/test_ci_gate_contract.py 全 16 枚）: 1 failed, 15 passed in 21.23s
+[N8]   RED test_every_exemption_row_states_why
+[N8]   计划钉住 ['test_every_exemption_row_states_why']
+[N8]   实测红面 ['test_every_exemption_row_states_why']
+[N8]   判决 KILLED-ASSIGNED
+[N8] 还原：sha1 与注入前相同、cmp rc=0
+
+| 变异 | 规格判据 | 目标文件 | 锚点命中 | 计划钉住的门 | 实测红面 | 判决（归因） | 备注 | 还原 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N1 | §6.1 收集数钉 | backend/tests/conftest.py | 1 次/编辑 | test_collected_count_matches_the_pinned_number | test_collected_count_matches_the_pinned_number | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+| N2 | §6.2 单 runner 钉 | .github/workflows/ci.yml | 1 次/编辑 | test_backend_contracts_has_no_unittest_discover_step | test_backend_contracts_has_no_unittest_discover_step | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+| N3 | §6.3 依赖同源钉 | .github/workflows/ci.yml | 1 次/编辑 | test_install_face_uses_requirements_txt_as_the_source | test_install_face_uses_requirements_txt_as_the_source,test_extra_pip_arguments_are_exactly_the_exemption_table | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+| N4 | §6.3 豁免表形状钉 | .github/workflows/ci.yml | 1 次/编辑 | test_extra_pip_arguments_are_exactly_the_exemption_table | test_extra_pip_arguments_are_exactly_the_exemption_table | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+| N5 | §6.4 行尾规则钉 | .gitattributes | 1 次/编辑 | test_gitattributes_carries_the_required_rules | test_gitattributes_carries_the_required_rules | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+| N6 | §6.4 覆盖度钉的空判地板 | backend/tests/test_ci_gate_contract.py | 1 次/编辑 | test_index_has_no_crlf_entries,test_non_text_index_entries_are_exactly_the_enumerated_set | test_index_has_no_crlf_entries,test_non_text_index_entries_are_exactly_the_enumerated_set | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+| N7 | §6.1 总数钉 + 卡 H 自我存续钉（改名门自己） | backend/tests/test_ci_gate_contract.py | 1 次/编辑 | test_collected_count_matches_the_pinned_number,test_the_gate_module_itself_is_collected | test_collected_count_matches_the_pinned_number,test_the_gate_module_itself_is_collected | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+| N8 | §6.3 豁免行的『为什么』地板 | backend/tests/test_ci_gate_contract.py | 1 次/编辑 | test_every_exemption_row_states_why | test_every_exemption_row_states_why | **KILLED-ASSIGNED** | - | OK（sha1 同 + cmp rc=0） |
+
+8/8 KILLED-ASSIGNED
+
+== 门 × 本轮实测红面（击杀者溯源）==
+RED  	test_collected_count_matches_the_pinned_number	N1,N7
+RED  	test_the_gate_module_itself_is_collected	N7
+NEVER	test_the_gate_module_itself_carries_no_skip_or_xfail_decorator	（本轮未观测到红）
+NEVER	test_collection_measurement_counts_node_ids_not_the_summary_line	（本轮未观测到红）
+RED  	test_backend_contracts_has_no_unittest_discover_step	N2
+NEVER	test_backend_contracts_runs_the_pytest_suite	（本轮未观测到红）
+NEVER	test_step_ordering_still_explains_itself	（本轮未观测到红）
+RED  	test_install_face_uses_requirements_txt_as_the_source	N3
+RED  	test_extra_pip_arguments_are_exactly_the_exemption_table	N3,N4
+NEVER	test_install_face_pip_source_values_are_pinned	（本轮未观测到红）
+RED  	test_every_exemption_row_states_why	N8
+NEVER	test_workflow_plain_scalars_bearing_a_colon_space_are_quoted	（本轮未观测到红）
+RED  	test_gitattributes_carries_the_required_rules	N5
+RED  	test_index_has_no_crlf_entries	N6
+RED  	test_non_text_index_entries_are_exactly_the_enumerated_set	N6
+NEVER	test_eol_rules_are_a_no_op_for_the_current_tree	（本轮未观测到红）
+
+16 枚门里本轮观测到红 9 枚；8 发全跑，NEVER 是真读数

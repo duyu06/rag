@@ -1,0 +1,8 @@
+ M .github/workflows/ci.yml
+ M backend/app/identity/README.md
+ M backend/app/identity/__init__.py
+?? .gitattributes
+?? backend/tests/test_ci_gate_contract.py
+?? docs/ENTERPRISE_B0_PLAN.md
+?? docs/ENTERPRISE_B0_SPECIFICATION.md
+?? scripts/b0_collection_probe.py

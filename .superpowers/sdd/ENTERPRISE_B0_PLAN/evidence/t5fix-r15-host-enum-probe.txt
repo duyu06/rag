@@ -1,0 +1,41 @@
+==========================================================================
+环境事实
+==========================================================================
+python            : 3.13.7
+fastapi           : 0.135.3
+starlette         : 1.0.0
+_IncludedRouter 在 fastapi.routing 里? : False   在 starlette.routing 里? : False
+
+sorted({type(r).__name__ for r in app.routes}) = ['APIRoute', 'Route']
+顶层 app.routes 条目数                      = 52
+顶层里 APIRoute 的条数                      = 48
+递归走到的条目总数（含容器自己）            = 52
+递归展开后的服务面条目数                    = 52
+==========================================================================
+覆盖面集合：旧走法（只走顶层） vs 新走法（递归展开）
+==========================================================================
+旧走法 authenticated 条数 = 42
+新走法 authenticated 条数 = 42
+新 >= 旧（条数不减）      = True
+旧 ⊆ 新（超集关系）       = True
+新 \ 旧（递归多看见的腿）  = []
+旧 \ 新（必须为空=放宽）   = []
+两侧完全相同（宿主形态）  = True
+
+MUST_BE_COVERED 条数      = 8
+旧走法漏掉的点名腿        = []  (n=0)
+新走法漏掉的点名腿（须空）= []
+点名腿全部被门覆盖        = True
+本模块仍定义 test_every_authenticated_route_is_gated_or_whitelisted : True
+本模块仍定义 test_the_enumeration_sees_every_service_surface : True
+
+免门腿 旧 = ['GET /api/auth/me', 'POST /api/auth/password/change']
+免门腿 新 = ['GET /api/auth/me', 'POST /api/auth/password/change']
+免门腿集合相同            = True
+
+OpenAPI operations 条数   = 48
+递归清单全量腿数          = 48
+顶层清单全量腿数          = 48
+OpenAPI \ 递归（盲区）     = []
+OpenAPI \ 顶层（旧盲区）   = []
+==========================================================================

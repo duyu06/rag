@@ -1,0 +1,25 @@
+# Step 3.5 容器格的**环境事实**复档（镜像级，可重跑；b0-t5-cell 那枚容器已按清理要求 docker rm -f，其内的 wrapper 行在报告正文引用）
+## python -V（镜像内）
+Python 3.12.14
+## 15 条 requirements 的包在场性（镜像内 importlib.metadata 点验）
+OK   PyJWT 2.15.0
+OK   PyMuPDF 1.28.2
+OK   argon2-cffi 25.1.0
+OK   ddgs 9.16.0
+OK   fastapi 0.141.1
+OK   httpx 0.28.1
+OK   numpy 2.5.3
+OK   pydantic 2.13.5
+OK   pydantic-settings 2.15.0
+OK   python-docx 1.2.0
+OK   qdrant-client 1.19.1
+OK   rank-bm25 0.2.2
+OK   sentence-transformers 5.7.0
+OK   torch 2.14.0+cpu
+OK   transformers 5.17.0
+OK   typesafe-sdk 0.7.1
+OK   uvicorn 0.54.0
+## pip install pytest 后的版本（与宿主 pytest 9.1.1 对齐）
+pytest 9.1.1
+## 宿主对照
+pytest 9.1.1

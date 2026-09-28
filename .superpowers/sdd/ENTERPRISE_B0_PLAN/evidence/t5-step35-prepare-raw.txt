@@ -1,0 +1,12 @@
+repo root : E:/xiangmu/rag
+stage dir : /tmp/tmp.cp3NeAjhEg
+surface files packed: 318
+total 13676
+drwxr-xr-x 1 zhang 197121       0 Sep 28 07:24 .
+drwxr-xr-x 1 zhang 197121       0 Sep 28 07:24 ..
+-rw-r--r-- 1 zhang 197121 3768320 Sep 28 07:24 gitdir.tar
+-rw-r--r-- 1 zhang 197121   12683 Sep 28 07:24 surface.list
+-rw-r--r-- 1 zhang 197121 6287360 Sep 28 07:24 surface.tar
+container started: b0-t5-cell
+--- /w top-level in container ---
+OCI runtime exec failed: exec failed: Cwd must be an absolute path

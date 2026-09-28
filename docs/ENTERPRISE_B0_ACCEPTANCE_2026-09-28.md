@@ -1,0 +1,170 @@
+# ENTERPRISE-B0 验收记录 · 门禁地基（2026-09-28）
+
+| 项 | 值 |
+| --- | --- |
+| 文档 | `docs/ENTERPRISE_B0_ACCEPTANCE_2026-09-28.md` |
+| 规格 | `docs/ENTERPRISE_B0_SPECIFICATION.md`（2026-09-28 冻结，含 §16 修订卡 A–E 与本轮新增 F–K） |
+| 计划 | `docs/ENTERPRISE_B0_PLAN.md`（7 枚任务） |
+| 执行方式 | SDD 逐任务：实现 → 独立评审 → 修复轮 → 定向复评。台账 `.superpowers/sdd/ENTERPRISE_B0_PLAN/progress.md` |
+| 起始状态 | HEAD = `7cc5efc` = tag `security-a-rc1`；工作树带两枚**不属于 B0** 的未提交改动（`backend/app/identity/README.md`、`__init__.py`） |
+| 状态 | **本地判据全部闭合；远端四条待回填**（B0-02 / B0-03 / B0-10 / B0-13 只能由 GitHub run 的 step 级读数结） |
+| tag | **暂缓**（用户 2026-09-28 裁定：按清单提交并推送，tag 不在本轮） |
+
+---
+
+## 1. 一句话
+
+B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反驳：收集数被钉住、runner 只剩一个、
+依赖只有一份真源、行尾归一化变成仓库属性，而这四条各自都有一枚**被观测到红过**的门守着。
+
+## 2. 判据矩阵
+
+状态词只用 `GREEN / PENDING_EXTERNAL / BLOCKED`。本地读数为控制器本人复跑，非转抄子代理。
+
+| ID | 判据 | 读数 | 状态 |
+| --- | --- | --- | --- |
+| B0-01 | pytest 收集数 == 钉住常数 | `EXPECTED_COLLECTED = 1332`；本地两 cwd 与发布容器三处同数；门 `test_collected_count_matches_the_pinned_number` 绿 | **GREEN**（远端比对归 B0-03） |
+| B0-02 | 远端 `backend-contracts` **整 job** success | 尚无本轮 run | **PENDING_EXTERNAL** |
+| B0-03 | 同 commit 本地与远端收集数逐位相同 | 本地侧已备（1332） | **PENDING_EXTERNAL** |
+| B0-04 | §8.1 四格全绿且 `.env` 还原逐字节一致 | 四格 `1332 passed / 36 warnings / 1133 subtests`、rc=0、0 failed/0 errors/0 skipped；`.env` sha `4d7f974107dd` 前后相同 | **GREEN** |
+| B0-05 | 单 runner 钉绿 | 门绿；`ci.yml` 内无 `unittest discover` 步 | **GREEN** |
+| B0-06 | 依赖同源钉绿（含豁免表形状） | 门绿；豁免表恰 `pytest` + `torch`（CPU 发行源），多一处少一处皆红 | **GREEN** |
+| B0-07 | `.gitattributes` 的 no-op 性 | 静态 `checked=2 / offenders=0`；动态工作树聚合 sha 四时点恒等，`git status` 仅多出 `?? .gitattributes` 一行 | **GREEN** |
+| B0-08 | 行尾钉：无 `i/crlf`；`i/-text` == 枚举 3 枚；解析覆盖 313/313 | 门绿（含修复轮补的非空地板） | **GREEN** |
+| B0-09 | SECA-20 扫描门零漂移 | 面 316→318（逐枚归因），**命中 16 文件 / 31 处与 SEC-A 封版一字未动**，`EXEMPTIONS` 与 HEAD 逐字节相同 ⇒ 零新增豁免是被证明的 | **GREEN** |
+| B0-10 | compose 与 pwsh 两道首次真起跑各有结论 | 本地预检 `docker compose config --quiet` rc=0、pwsh 7.6.6 可用；**远端 step 结论未取** | **PENDING_EXTERNAL** |
+| B0-11 | §9 变异逐发红 + 还原一致 | **8/8 `KILLED-ASSIGNED`**，0 `KILLED-INCIDENTAL`、0 `COLLECTION-BROKEN`；`--check` 12/12 rc=0；聚合面三时点回台账 | **GREEN** |
+| B0-12 | `backend/app/**` 未被 B0 改动 | 卡 J 三子句：`git diff --name-only HEAD -- backend/app` 减去两枚 identity 后为空；`--cached` 侧空；两枚 identity sha `3bc681bbc52c` / `2cfab9f18182` == 基线 | **GREEN** |
+| B0-13 | 全量 pytest 的 CI 耗时读数与 cache 取舍 | 本地四格 129.53–211.46s（控制器本人 178.43s）；容器 3.12/Linux 全量 107.52s、collect 11.44s；门内子进程收集占模块 96%、约全量 10–16% | **PENDING_EXTERNAL**（远端安装步耗时与命中率未取） |
+| B0-14 | `G20` 新开 + `G0` 勘误落档 | 卡 D；`docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md` 的 `G20` 行与 `G0` 措辞在 Task 7 远端闭合后落笔 | **PENDING_EXTERNAL** |
+| B0-15 | 容器内 3.12 那一格有读数 | `rag-backend:security-a-rc1` / Python 3.12.14 / 无 `.env`：`1332 collected`，格内 `3 failed, 1329 passed`（三枚归因见 §4） | **GREEN** |
+
+## 3. 本轮交付面
+
+**新增**：`.gitattributes`、`backend/tests/test_ci_gate_contract.py`（16 枚门）、
+`scripts/b0_collection_probe.py`、`docs/ENTERPRISE_B0_SPECIFICATION.md`、`docs/ENTERPRISE_B0_PLAN.md`、
+本文件、`.superpowers/sdd/ENTERPRISE_B0_PLAN/**`（台账 / briefs / 报告 / 评审件 / 变异台 / evidence / baseline）。
+
+**修改**：`.github/workflows/ci.yml`（仅 `backend-contracts`；其余三个 job 与上一 commit **逐字节相同**，
+评审以 job 块切片独立核过；文件保持 CRLF，bare LF 恒 0）。
+
+**动到的 SEC-A 已封版测试**（用户 R15 显式批准的越界，两处都是"只改测试、判据不降"）：
+`backend/tests/test_password_lifecycle_contract.py`（路由枚举改为递归展开）、
+`backend/tests/test_real_llm_failover_gate.py`（**只改失败信息**，判据一分未松）。
+
+**精选单文件入库**：`.superpowers/sdd/MODEL_ROUTER_V23_PLAN/task10/real-llm-failover-001.json`
+（P0 真 failover 证据件，`git add -f`）。**不在此列**：两枚 identity 未提交改动、
+`snap-task*/`（13 枚快照目录）、`tmp/`（745K 过程件，内含证伪用的一次性假凭据样本，故意不入库）。
+
+### 3.1 提交时抓到的两件事（都不是理论问题）
+
+1. **`git add -f` 会越过 `.gitignore`**，因此 `git add -f <目录>` 会把该目录下被忽略的东西一并拖进 index。
+   本轮实发一次：`-f` 扩 `mutations/` 时带进了 `__pycache__/ent_b0_mutations.cpython-313.pyc`，
+   而这枚编译产物在 `git ls-files --eol` 里被判定为 **`i/-text`** —— 正好撞在
+   `test_non_text_index_entries_are_exactly_the_enumerated_set` 钉死的"必须恰等于那三枚"上。
+   已 `git rm --cached` 摘出，摘出后 index 的 `i/-text` 回到三枚、四枚行尾门 3 passed、
+   门模块 16 passed、SEC-A 46 passed。**教训落在手法上**：`-f` 只准对**逐个点名的文件**使用，
+   不准对目录使用；要扩目录就普通 `git add`，让 `.gitignore` 继续生效。
+2. **过程件入库后自动扫描门并不覆盖它们**。把 81 枚 `.superpowers/**` 纳入跟踪后，扫描的**名字表**从
+   318 涨到 400，而 `_in_scan_scope()` 按前缀 `.superpowers/` 排除 ⇒ 这些文件的内容**一枚都不被扫描**。
+   命中数因此纹丝不动（仍 16 文件 / 31 处，与 SEC-A 封版一致），但"没红"不等于"干净"。
+   本轮的补偿取证：把同一组 face（`sk-…`/`gh[pousr]_…`/`AKIA…`/`eyJ…`/`BEGIN … PRIVATE KEY`）
+   手工施于全部 81 枚已暂存的 `.superpowers/` 文件，**结果 NONE**。
+   于是本文件的措辞纪律是：**"过程件已手工量过，自动扫描门按前缀不覆盖它们"**，
+   而不是"过程件已通过扫描门"。若要自动覆盖，得改 `_UNSCANNED_PREFIXES` —— 那是安全面决策，归 B1 / §18。
+
+## 3.2 交接口（对 B1 的两条硬要求）
+
+- `git add -f` 的目录级用法在 CI 侧无门可挡（门只看 index 形状，不看你是谁）。B1 若要继续入库过程件，
+  应把"非文本 index 集合"从**枚举三枚**升级为**枚举 + 显式禁止 `__pycache__`/`.pyc` 进面**。
+- 扫描面的**名字表**与**实际内容覆盖面**已经分叉（400 vs 319）。B1 若要用面数做判据，必须说明用的是哪一个。
+
+## 4. B0 照出来的既有缺陷（这才是它的收益证明）
+
+这四条都不是 B0 引入的，全部**早就存在**，是"CI 第一次真跑全部测试"这个动作把它们冲出来的：
+
+1. **测量流程自己污染交付面**（卡 F）。规格里"把 `backend/.env` 就地改名 `.env.bak`"这句话，
+   因 `.gitignore:6` 是精确路径而让改名产物落进 SECA-20 扫描面，当场把两枚门拖红。
+   归因闭环靠一次对照：把 `.env` 挪出仓库后两格同回全绿 ⇒ 红纯由残留。
+2. **B0 自己的交付物把门看瞎**（卡 K）。`.gitattributes` 一生效，属性列里就多了空格，
+   `_EOL_LINE` 的 `attr/\S*` 抽不动 ⇒ 解析行数 313→311，丢掉的正好是 `deploy.ps1` 与那枚 `.sh`，
+   两枚行尾门**静默空判绿**。修法不是补那条正则，是加"解析覆盖度"判据：不依赖属性列形状假设。
+3. **一枚 SEC-A 覆盖门在新版 FastAPI 下漏掉 27/48 条服务腿**。顶层 `app.routes` 多出 `_IncludedRouter`
+   之后，只走顶层的枚举看不见一半服务面；`MUST_BE_COVERED` 点名的 5 条只是它恰好还能抓到的子集。
+   修法是递归展开，**不是**把新类型加白名单——后者等于继续假装"顶层枚举 = 全部服务面"。
+   覆盖面只增不减已核（48 腿 / 42 已认证腿两侧一致，白名单未新增任何一枚）。
+4. **一枚判据只在"本机有过程件"时才绿**（卡 J 连带）。`test_p0_row_status_matches_the_evidence` 读的
+   JSON 被 `.gitignore` 整目录挡掉 ⇒ 干净 checkout 里门要求 `BLOCKED`、矩阵写着 `GREEN`。
+   两边都不许动：**改矩阵=篡改 V2.3 已发生的验收事实，放宽门=降反造假强度**。正解是让证据真随仓库交付。
+
+## 5. 变异台
+
+`.superpowers/sdd/ENTERPRISE_B0_PLAN/mutations/ent_b0_mutations.py`，八发：
+N1 藏模块 / N2 塞回 unittest 步 / N3 换回手写清单 / N4 多装一枚未豁免包 /
+N5 删行尾规则 / N6 把行尾面掏空 / N7 改名一枚门 / N8 把豁免行的"为什么"缩短。
+
+判决口径在修复轮 2 被收紧过：原先 `rc != 0` 就叫 `KILLED`，计划点名的节点**既不打印也不比对**，
+所以"另一枚偶然红了"和"该红的红了"在仪表上长得一样。现在强制
+`assigned node ∈ observed red set`，并分出 `KILLED-INCIDENTAL` / `COLLECTION-BROKEN` 两个非绿判决。
+字节纪律沿用 SEC-A：anchor 必须恰好命中一次、`finally` 用**读到的原字节**还原（不从 git 取，
+四个目标里两个是未跟踪文件，`git diff --exit-code` 对它们恒返回 0，那是假绿）、sha + 外部 `cmp` 双核。
+
+16 门"至少被观测到红过一次"的溯源表 = **14/16**；另两枚
+（`test_collection_measurement_counts_node_ids_not_the_summary_line`、
+`test_eol_rules_are_a_no_op_for_the_current_tree`）是 helper 自测 / 回归守卫，
+其非空性由 `assert checked` 与 `assert named` 一类地板保证 —— 这一点如实登记，不写成"全数验证"。
+
+## 6. 规格修订卡索引（§16，判据一律未降）
+
+A "CI 缺依赖"→ 准确表述；B 持久化文件 5→6；C conftest 危害点在 autouse 夹具而非模块级 import；
+D 新开 `G20` 并勘误 `G0`；E payload 8→10 字段；F `.env` 挪出仓库（判据未变，取证手法更正）；
+G B0-007 与 B0-12 两节自相矛盾的对齐（收紧）；H 自我存续钉"抓得到哑化的门"是越界（收紧）；
+I 依赖同源钉被实现缩窄成"包名"（收紧）；J 卡 G 第一子句落地被证伪后的再修正（等价但可满足）；
+K `.gitattributes` 令行尾门静默失明（收紧，新增覆盖度判据）。
+
+## 7. 已知限制（B0 不消解）
+
+L1 宿主 3.13.7 与 CI 3.12 之差只由容器格部分覆盖；L2 两枚含游离 CR 的 markdown 仍在 `i/-text`；
+L3 `uvicorn` 仍无 job 安装；L4 lint / typecheck / pip-audit / gitleaks / OpenAPI 契约仍未做；
+L5 切换前后 `Ran N` 类历史读数不可混读；**L6 自指盲区不可消除**——一枚门无法证明"自己没被摘掉"，
+现有缓解只有常数双写与评审看收集数；L7 B0 全绿只能由远端结；
+**L8 开区间依赖的解析不可复现是真债**（本轮只修症状），归 B1；
+**L9 warning 总数不是跨环境绝对量**（`JWT_SECRET` 31B vs 45B ⇒ 36 vs 2），不得建跨环境绝对值门。
+
+## 8. 开放边界（不假装已解决）
+
+- 行尾覆盖度地板仍可被"自洽的极小假面"绕过（1 条记录 + 1 个同名 tracked 路径可同时满足
+  非空 / 等量 / 集合相等），当前兜底是 `i/-text` 的硬编码枚举。彻底闭需把 tracked 侧绑到
+  独立计数源（如 `git ls-tree -r HEAD`），那会改动门判据 ⇒ 未做，登记。
+- `"Run: a #1"  # 注释`（引号内含 `#` 且另带行尾注释）仍假红；引号感知剥注释可解，完整正确性
+  （`\"` / `''` 转义族）才需要 YAML 解析器，而 B0 明令禁止再造第二份真相。树内零此形状。
+- P0 evidence 入库后**不经过自动扫描门**（`.superpowers/` 按前缀排除，与 tracked 状态无关）。
+  本轮以同一组 face 手工量得 0 命中 —— 验收措辞只能到这个程度，不得写"已过扫描门"。
+
+## 9. 交接口
+
+B0 交给 B1 的是"任何新进 `backend/tests/` 的门都会被 CI 收集"这一事实，以及三条债：
+落盘键名黑名单（8 枚调用点 / 6 份文件，等式钉 4→6）、文档元数据与摄取侧止血、
+以及 §8 的依赖解析可复现性。B2 拿到的是单一指标实现的前提。
+
+## 10. 远端往返（待回填）
+
+| 项 | 读数 | 状态 |
+| --- | --- | --- |
+| run id / URL | — | 待取 |
+| `backend-contracts` 整 job | — | **PENDING_EXTERNAL** |
+| step 级：Install / SECA-20 / contract suite / compose / pwsh | — | **PENDING_EXTERNAL** |
+| 远端收集数 vs 本地 1332 | — | **PENDING_EXTERNAL** |
+| 安装步耗时与 cache 命中 | — | **PENDING_EXTERNAL** |
+
+## 11. 冻结基线读数
+
+控制器本人复跑（提交前）：`python -m pytest backend/tests -q` ⇒
+**1332 passed, 36 warnings, 1133 subtests passed in 178.43s**，rc=0。
+
+字节锚点：`ci.yml` `1c706e165b73`（147 CRLF / 0 bare LF）、
+门文件 `a0b9f37f32bb`（832 LF / 0 CRLF / 50994 B）、`.gitattributes` `c5d07b5dc438`（18 LF / 0 CR）、
+SEC-A 扫描模块 `fd39d7d374f9`（与上一 commit 逐字节相同 ⇒ 零豁免漂移可证）、
+identity 两枚 `3bc681bbc52c` / `2cfab9f18182`（未触碰）、
+`.env` `4d7f974107dd`、跟踪面聚合 `d30366c6a440`@313 / `2685edde76fe`@311、
+扫描面 318 文件 / 16 命中 / 31 处。

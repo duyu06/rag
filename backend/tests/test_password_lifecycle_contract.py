@@ -53,7 +53,7 @@ import jwt as pyjwt
 from fastapi import HTTPException
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
-from starlette.routing import Match, Mount
+from starlette.routing import Host, Match, Mount
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TESTS_DIR = BACKEND_DIR / "tests"
@@ -138,7 +138,7 @@ def _decode(token: str) -> dict:
 # --------------------------------------------------------------------------
 # 依赖树枚举（SECA-10 的清单生成器）
 # --------------------------------------------------------------------------
-def _route_keys(route: APIRoute) -> tuple[str, ...]:
+def _route_keys(route: object) -> tuple[str, ...]:
     """一条路由拆成若干 `"METHOD path"`；挂了多个方法就逐个算，绝不折成一项。
 
     只取第一个方法那条写法会把 `GET+POST` 同路径的第二个方法静默丢出覆盖面。今天的表里
@@ -156,20 +156,123 @@ def _uses_dependency(dependant, predicate: Callable[[object], bool]) -> bool:
     return False
 
 
+# --- 路由树展开（B0-T5 修复轮，规格 §10.3 第 2 类）-------------------------
+# 为什么这里是**递归展开**而不是"把看不懂的顶层条目过滤掉"（§10.3 第 2 类：断言写死了
+# 本机形态）：新版 FastAPI（`fastapi/routing.py` 的 `_IncludedRouter`，**不是** Starlette）
+# 让 `include_router()` 在顶层只挂一枚指回子路由表的条目、不再把子表复制上来，于是
+# "顶层 `app.routes` 就是全部服务面"这个前提已经假了；把它过滤掉等于继续假装前提为真，
+# 覆盖面塌一块而门照样绿。递归只可能让清单变宽（宿主的旧形状下逐位等，见 B0 修复报告）。
+def _child_nodes(node: object) -> list[object] | None:
+    """这枚条目内部挂着的子路由表；不是容器就返回 `None`。
+
+    认三种形状，全部只读属性：① `effective_candidates()`——新版 include 条目给出的**生效**
+    子条目，路径已含 include 前缀、dependant 是 include 时重建的那一枚（处理器桩必须打在
+    它身上才拦得到真调用）；② `original_router.routes`——同一批子路由的原始形状（宿主
+    fastapi 0.135.3 没有 ①，且 `include_router(prefix="")` 时两者等价）；③ 任何自带
+    `.routes` 的 router 形状。`Mount` / `Host` **不**在这里展开：它们的子路径是相对挂载点的，
+    直接拼出来的 `"METHOD path"` 是一条盘上不存在的假腿——那种形状继续由
+    `test_the_enumeration_sees_every_service_surface` 判红，而不是被递归"支持"掉。
+    """
+    if isinstance(node, (Mount, Host)):
+        return None
+    candidates = getattr(node, "effective_candidates", None)
+    if callable(candidates):
+        children = list(candidates())
+        if children:
+            return children
+    router = getattr(node, "original_router", None)
+    if router is not None and getattr(router, "routes", None):
+        return list(router.routes)
+    children = getattr(node, "routes", None)
+    if isinstance(children, (list, tuple)) and children:
+        return list(children)
+    return None
+
+
+def _node_prefix(node: object) -> str:
+    """include 时带的前缀；只在 ②/③ 那种"原始子条目"形状下才需要手工拼进路径。"""
+    context = getattr(node, "include_context", None)
+    return str(getattr(context, "prefix", "") or "")
+
+
+def _walk_surfaces(nodes: list[object], prefix: str = "") -> list[dict]:
+    """深度优先把整棵路由树摊平成"服务面条目"清单（递归，绝不跳过容器）。
+
+    每条 `{route, path, methods, dependants, node}`：`route` 是可上桩的 `APIRoute`
+    （非 `APIRoute` 的条目为 `None`），`path` 是**生效**路径，`dependants` 是派发时真会被读
+    到的 dependant 集合（include 重建的那一枚若与 `route.dependant` 不同，两枚都在里面）。
+    """
+    surfaces: list[dict] = []
+    for node in nodes:
+        children = _child_nodes(node)
+        if children is not None:
+            surfaces.extend(
+                _walk_surfaces(children, prefix + _node_prefix(node))
+            )
+            continue
+        route = node if isinstance(node, APIRoute) else None
+        if route is None:
+            original = getattr(node, "original_route", None)
+            route = original if isinstance(original, APIRoute) else None
+        if route is not None and node is not route:
+            # 生效条目（形状 ①）：路径已经带前缀，别再拼一次。
+            path, own_prefix = str(getattr(node, "path", "") or ""), ""
+        else:
+            path, own_prefix = str(getattr(route, "path", "") or ""), prefix
+        dependants: list[object] = []
+        for holder in (route, node if node is not route else None):
+            dependant = getattr(holder, "dependant", None) if holder is not None else None
+            if dependant is not None and all(dependant is not seen for seen in dependants):
+                dependants.append(dependant)
+        surfaces.append({
+            "route": route,
+            "path": own_prefix + path,
+            "methods": getattr(node, "methods", None),
+            "dependants": dependants,
+            "node": node,
+        })
+    return surfaces
+
+
+def _service_surfaces() -> list[dict]:
+    return _walk_surfaces(list(app.routes))
+
+
+def _walk_nodes(nodes: list[object]) -> list[object]:
+    """递归访问到的**每一枚**条目（容器自己也算在内）。
+
+    给"挂载点一条都不许有"那枚判据用：它要问的是"树里有没有走不进去的形状"，
+    而不是"叶子长什么样"。
+    """
+    seen: list[object] = []
+    for node in nodes:
+        seen.append(node)
+        children = _child_nodes(node)
+        if children:
+            seen.extend(_walk_nodes(children))
+    return seen
+
+
+def _surface_keys(surface: dict) -> tuple[str, ...]:
+    methods = sorted(set(surface["methods"] or set()) & set(_HTTP_METHODS))
+    return tuple(f"{method} {surface['path']}" for method in methods)
+
+
 def _route_index(predicate: Callable[[object], bool]) -> dict[str, APIRoute]:
     """`"METHOD path" -> 路由对象`：覆盖面清单与处理器桩必须指向**同一个对象**。
 
-    只走顶层 `APIRoute`。这条边界不是谦逊、也不是假设：挂载点、非 `APIRoute` 的服务面、
-    表上出现未知 HTTP 动词都会先红在前提用例上，所以"清单只看得见这些"是一句可核对的话，
+    清单来自 `_service_surfaces()` 的**递归**展开（为什么必须递归见 `_child_nodes` 上方那段）。
+    这条边界不是谦逊、也不是假设：挂载点、非 `APIRoute` 但带着服务面的条目、表上出现未知
+    HTTP 动词都会先红在前提用例上，所以"清单只看得见这些"是一句可核对的话，
     而不是等某次重构把覆盖面静默削窄。
     """
     index: dict[str, APIRoute] = {}
-    for route in app.routes:
-        dependant = getattr(route, "dependant", None)
-        if not isinstance(route, APIRoute) or dependant is None:
+    for surface in _service_surfaces():
+        route, dependants = surface["route"], surface["dependants"]
+        if route is None or not dependants:
             continue
-        if _uses_dependency(dependant, predicate):
-            for key in _route_keys(route):
+        if any(_uses_dependency(dependant, predicate) for dependant in dependants):
+            for key in _surface_keys(surface):
                 index[key] = route
     return index
 
@@ -200,39 +303,83 @@ def _routes_using(target: Callable[..., object]) -> set[str]:
     return _routes_where(_predicate_using(target))
 
 
+def _resolve_dispatch(nodes: list[object], scope: dict) -> object | None:
+    """照 Starlette/FastAPI 的派发循环取**第一个 FULL match**，命中容器就走进它再继续匹配。
+
+    为什么这里也要递归（§10.3 第 2 类，与 `_child_nodes` 同一枚理由）：include 条目自己会
+    FULL 命中，而真跑业务的是它里面那枚 `APIRoute`；派发侧不展开的话，"我遍历的树 == 执行器
+    跑的树"这句核对会拿容器去比清单里的端点，两边根本不是同一层东西。
+    """
+    for node in nodes:
+        match, child_scope = node.matches(scope)  # type: ignore[arg-type]
+        if match is not Match.FULL:
+            continue
+        children = _child_nodes(node)
+        if children is None:
+            original = getattr(node, "original_route", None)
+            return original if isinstance(original, APIRoute) else node
+        inner = _resolve_dispatch(children, {**scope, **child_scope})
+        return inner if inner is not None else node
+    return None
+
+
 def _dispatched_route(method: str, path: str) -> object | None:
-    """路由器真正会交给哪一枚路由对象：照 Starlette 的派发循环取**第一个 FULL match**。
+    """路由器真正会交给哪一枚路由对象。
 
     "我遍历了 `app.routes`"并不自动等于"请求落在我遍历的那枚路由上"：清单是遍历出来的，
     派发是按顺序匹配出来的，两者会在挂载点、路由遮蔽或注册顺序变化时劈叉，而劈叉的症状恰好
-    是"桩打在 A 上、请求进了 B 的真处理器"。这里用路由器自己那枚 `matches()` 把两端对齐。
+    是"桩打在 A 上、请求进了 B 的真处理器"。这里用路由器自己那枚 `matches()` 把两端对齐，
+    并且**跟着 include 条目走进子表**（实现见 `_resolve_dispatch`）。
     """
     scope: dict[str, object] = {
         "type": "http", "path": path, "method": method, "headers": [], "root_path": "",
     }
-    for route in app.router.routes:
-        match, _child_scope = route.matches(scope)  # type: ignore[arg-type]
-        if match is Match.FULL:
-            return route
-    return None
+    return _resolve_dispatch(list(app.router.routes), scope)
 
 
-def _restore_call(route: APIRoute, original: object) -> None:
-    """把处理器换回去。
+def _restore_call(holder: object, original: object) -> None:
+    """把 `holder`（一枚 dependant）的处理器换回去。
 
     单独一个函数是为了能直接挂进 `addCleanup`：用 lambda 的话，清理阶段真抛错时栈上看不出
-    是哪一条路由没还原。
+    是哪一条路由没还原。参数是 dependant 而不是路由对象，因为 include 生效形状下一条端点有
+    两枚 dependant，逐枚还原才谈得上"没留桩"。
     """
-    route.dependant.call = original
+    holder.call = original
 
 
 def _route_for(route_key: str) -> APIRoute | None:
     """按 `"METHOD path"` 找那枚路由对象——清单与处理器桩共用的入口。"""
     _method, path = route_key.split(" ", 1)
-    for route in app.routes:
-        if isinstance(route, APIRoute) and route.path == path and route_key in _route_keys(route):
-            return route
+    for surface in _service_surfaces():
+        route = surface["route"]
+        if route is not None and surface["path"] == path:
+            if route_key in _surface_keys(surface):
+                return route
     return None
+
+
+def _surfaces_of(route: APIRoute) -> list[dict]:
+    """这枚路由在**递归展开后**的清单里的全部条目（同一枚路由可能因 include 出现多枚形状）。"""
+    return [surface for surface in _service_surfaces() if surface["route"] is route]
+
+
+def _route_dependants(route: APIRoute) -> list[object]:
+    """派发时真会被读到的 dependant 集合：`route.dependant` 加上 include 重建的那一枚。
+
+    为什么两枚都要（§10.3 第 2 类）：新版 include 会给同一枚端点**另建**生效 dependant，
+    只把 `route.dependant.call` 换成桩拦不住真调用 —— 那正是本文件最不肯要的失败形状
+    （"覆盖面是假的而破坏是真的"）。宿主旧形状下这里只有一枚，逐位等于改前的行为。
+    """
+    dependants: list[object] = []
+    for surface in _surfaces_of(route):
+        for dependant in surface["dependants"]:
+            if all(dependant is not seen for seen in dependants):
+                dependants.append(dependant)
+    if not dependants:
+        dependant = getattr(route, "dependant", None)
+        if dependant is not None:
+            dependants.append(dependant)
+    return dependants
 
 
 def _arm_tripwire(test: unittest.TestCase, route: APIRoute, route_key: str,
@@ -244,15 +391,20 @@ def _arm_tripwire(test: unittest.TestCase, route: APIRoute, route_key: str,
     仍然是"这条端点过没过门"。桩是**同步**函数并当场抛 `HTTPException`：协程端点的
     `is_coroutine_callable` 在建路由时就定死了，而抛异常发生在调用点上，同步/异步/生成器三条
     分支都在序列化之前出局。还原挂在 `addCleanup` 上，红也没处躲。
+    打上的是 `_route_dependants()` 给出的**每一枚** dependant（include 生效形状下有两枚，
+    只打一枚等于桩打空；为什么见 `_route_dependants`）。
     """
-    original = route.dependant.call
+    tripwires: list[tuple[object, object]] = []
 
     def tripwire(**_values: object) -> None:
         tripped.append(route_key)
         raise HTTPException(status_code=TRIPEWIRE_STATUS, detail=TRIPEWIRE_COPY)
 
-    route.dependant.call = tripwire
-    test.addCleanup(_restore_call, route, original)
+    for dependant in _route_dependants(route):
+        tripwires.append((dependant, dependant.call))
+        dependant.call = tripwire
+    for dependant, original in tripwires:
+        test.addCleanup(_restore_call, dependant, original)
     return tripwire
 
 
@@ -890,11 +1042,11 @@ class MustChangeGateCoverageTests(_LongJwtSecret, _AuditToTempFile, unittest.Tes
 
     def _assert_no_stub_left(self) -> None:
         stubs = set(self.stub_of.values())
-        stuck = [
-            route.path for route in app.routes
-            if isinstance(route, APIRoute)
-            and getattr(route.dependant, "call", None) in stubs
-        ]
+        stuck = sorted({
+            surface["path"] for surface in _service_surfaces()
+            for dependant in surface["dependants"]
+            if getattr(dependant, "call", None) in stubs
+        })
         self.assertEqual([], stuck, f"这些路由的处理器还挂在绊线上：{stuck}")
 
     # --- 覆盖面判定 -------------------------------------------------------
@@ -980,12 +1132,16 @@ class MustChangeGateCoverageTests(_LongJwtSecret, _AuditToTempFile, unittest.Tes
         self.assertEqual(len(swept), len(denials), "门挡下的请求与审计笔数不等")
 
     def test_no_route_is_registered_with_several_http_methods(self):
-        """拆行枚举的前提：今天没有一条路由同时挂多个方法。长出那一天本枚红，提醒改判据。"""
-        multi = [
-            (route.path, sorted(set(route.methods or ())))
-            for route in app.routes
-            if isinstance(route, APIRoute) and len(set(route.methods or ())) > 1
-        ]
+        """拆行枚举的前提：今天没有一条路由同时挂多个方法。长出那一天本枚红，提醒改判据。
+
+        取的是递归展开后的清单（为什么见 `_child_nodes`）——include 子表里的多方法路由同样是
+        真路由，只看顶层会把这条前提悄悄放宽成"只有顶层那几条不许多方法"。
+        """
+        multi = sorted(
+            (surface["path"], sorted(set(surface["methods"] or ())))
+            for surface in _service_surfaces()
+            if surface["route"] is not None and len(set(surface["methods"] or ())) > 1
+        )
         self.assertEqual([], multi)
 
     def test_the_method_alphabet_sees_every_registered_verb(self):
@@ -994,44 +1150,82 @@ class MustChangeGateCoverageTests(_LongJwtSecret, _AuditToTempFile, unittest.Tes
         两种形状都在这里红：表上出现本文件不认识的动词（`OPTIONS` / `TRACE` / 自定义），以及
         一条路由的方法集只剩 `HEAD` 以致一行都拆不出来。门的覆盖面要跟着路由表长，而不是跟着
         本文件的常量长——否则新增一条 `TRACE` 端点会既不过门也不被任何人发现。
+        清单同样取递归展开后的（为什么见 `_child_nodes`）。
         """
         blind: list[tuple[str, list[str]]] = []
-        for route in app.routes:
-            if not isinstance(route, APIRoute):
+        for surface in _service_surfaces():
+            if surface["route"] is None:
                 continue
-            methods = set(route.methods or ())
+            methods = set(surface["methods"] or ())
             unknown = sorted(methods - _KNOWN_METHODS)
             if unknown:
-                blind.append((route.path, unknown))
-            elif methods and not _route_keys(route):
-                blind.append((route.path, sorted(methods)))
+                blind.append((surface["path"], unknown))
+            elif methods and not _surface_keys(surface):
+                blind.append((surface["path"], sorted(methods)))
         self.assertEqual([], blind, "枚举看不见这些方法：把字母表补全，别把端点丢掉")
 
     def test_the_enumeration_sees_every_service_surface(self):
-        """`_route_index` 只走顶层 `APIRoute`——这条边界今天成立，所以它得**看得见**。
+        """`_route_index` 走的是**递归展开**后的整棵树——这条边界得**看得见**、也得走得动。
 
         挂载点（`app.mount()`）、子路由、带依赖的非 `APIRoute` 条目都会让一棵子树**静默**退出
         覆盖面：清单少了条目，剩下的每条照样各得 403，门是绿的而覆盖面已经塌了一块。这里把
-        "没有枚举看不见的服务面"钉成断言。非 `APIRoute` 的条目只允许是文档面那类——不挂依赖、
-        不在 `/api/` 之下。哪天要挂静态资源或子应用，先在这里改判据，再谈覆盖面。
+        "没有枚举看不见的服务面"钉成断言。
+
+        B0 Task 5 容器格的实测形状（fastapi 0.141.1）改了这条的写法但**没有放宽它**：
+        `include_router()` 现在在顶层挂一枚 `_IncludedRouter` 条目而不再把子表复制上来，
+        所以"带子表 = 枚举看不见"这句已经不成立——递归恰恰是走进它。于是本枚改成两条都判：
+        ① 递归**走不进**的容器（挂载点族）一条都不许有；
+        ② 递归展开后的叶子里，非 `APIRoute` 的只允许是文档面那类——不挂依赖、不在 `/api/` 之下。
+        外加一条把"只增不减"钉死的探针：递归清单必须**包含**只看顶层时能看见的每一条腿。
+        哪天要挂静态资源或子应用，先在这里改判据，再谈覆盖面。
         """
-        containers = [
-            getattr(route, "path", type(route).__name__)
-            for route in app.routes
-            if isinstance(route, Mount) or hasattr(route, "routes")
-        ]
-        self.assertEqual([], containers, "出现挂载点：顶层枚举会漏掉整棵子树")
-        off_enumeration = [
-            getattr(route, "path", type(route).__name__)
-            for route in app.routes
-            if not isinstance(route, APIRoute)
+        unwalkable = sorted({
+            getattr(node, "path", type(node).__name__)
+            for node in _walk_nodes(list(app.routes))
+            if isinstance(node, (Mount, Host))
+        })
+        self.assertEqual([], unwalkable, "出现挂载点：递归也不展开它，覆盖面会漏掉整棵子树")
+        off_enumeration = sorted({
+            getattr(surface["node"], "path", type(surface["node"]).__name__)
+            for surface in _service_surfaces()
+            if surface["route"] is None
             and (
-                str(getattr(route, "path", "")).startswith("/api")
-                or getattr(route, "dependant", None) is not None
-                or getattr(route, "methods", None) is None
+                str(getattr(surface["node"], "path", "")).startswith("/api")
+                or getattr(surface["node"], "dependant", None) is not None
+                or bool(surface["dependants"])
+                or surface["methods"] is None
             )
-        ]
-        self.assertEqual([], off_enumeration, "非 APIRoute 的条目带着服务面：枚举不覆盖它")
+        })
+        self.assertEqual([], off_enumeration, "非 APIRoute 的叶子带着服务面：枚举不覆盖它")
+        # "只增不减"钉：顶层那一条腿都不许因为这次改递归而消失（放宽覆盖面就红在这里）。
+        top_level = {
+            key for route in app.routes
+            if isinstance(route, APIRoute) and getattr(route, "dependant", None) is not None
+            for key in _route_keys(route)
+        }
+        recursive = {
+            key for surface in _service_surfaces()
+            if surface["route"] is not None
+            for key in _surface_keys(surface)
+        }
+        self.assertEqual(
+            [], sorted(top_level - recursive),
+            "递归展开反而比顶层枚举少看见了这些腿：那是放宽，不是修复",
+        )
+        # 独立 oracle：OpenAPI 是库**自己**遍历生效路由表生成的，它列出的每一条 operation 都
+        # 必须出现在递归清单里。顶层枚举 vs 递归枚举谁赢是本枚自己算的，容易被"两边都漏了
+        # 同一处"糊过去；库自己那张表漏不了——递归走不进某一棵子树时，这里立刻点名。
+        openapi_blind: list[str] = []
+        for path, item in app.openapi().get("paths", {}).items():
+            for verb in item:
+                if verb.upper() in _HTTP_METHODS:
+                    key = f"{verb.upper()} {path}"
+                    if key not in recursive:
+                        openapi_blind.append(key)
+        self.assertEqual(
+            [], sorted(openapi_blind),
+            "OpenAPI 有这些 operation 而递归清单看不见：覆盖面已经塌了一块",
+        )
 
     def test_the_pending_dependency_is_used_by_the_whitelist_only(self):
         """白名单那两条得**真的**在免门腿上：只比集合相等会被"整表为空"骗过去。

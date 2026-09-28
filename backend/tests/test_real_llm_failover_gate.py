@@ -31,6 +31,7 @@
 from __future__ import annotations
 
 import ast
+import fnmatch
 import inspect
 import json
 import os
@@ -390,6 +391,76 @@ class P0CollectionGateTests(unittest.TestCase):
 # ==========================================================================
 # ③ 文档面：矩阵 P0 行状态与执行证据互锁
 # ==========================================================================
+REPO_ROOT = BACKEND_DIR.parent
+
+#: 仓库的忽略规则——**只服务于失败文案**（R15 裁定：判据不读它，判的仍是 `kit.read_evidence()`
+#: + `kit.validate_evidence()` 那一条，一个字没动）。
+GITIGNORE_FILE = REPO_ROOT / ".gitignore"
+
+
+def _ignored_face_hint(path: Path) -> str:
+    """这枚文件被 `.gitignore` 的**哪一条**挡在交付面外（红的时候才现算）。
+
+    为什么现算而不写死一句"它被 .gitignore 挡着"：这段话唯一的用途是让第一现场读得懂，
+    规则哪天改了，写死的那句就变成第二条误导。为什么在这里不派 `git check-ignore` 子进程：
+    断言的 msg 是**先算好再交给 assertEqual** 的，这里冒出一个异常会把「红」变成「error」，
+    现场比现在更难读。匹配只按 `.gitignore` 的字面形状做两件事：目录规则看路径分量、
+    文件规则看整体与文件名——命中不了就如实说"未被命中"。
+    """
+    try:
+        rel = path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        return f"（{path} 不在仓库内 ⇒ 谈不上被仓库的忽略规则挡住）"
+    try:
+        lines = GITIGNORE_FILE.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        return f"（读不到 {GITIGNORE_FILE.name}：{exc}）"
+    for number, pattern in enumerate(lines, start=1):
+        rule = pattern.strip()
+        if not rule or rule.startswith("#"):
+            continue
+        bare = rule.rstrip("/").lstrip("/")
+        if rule.endswith("/") and bare and bare in rel.split("/")[:-1]:
+            return f"命中 `{GITIGNORE_FILE.name}:{number}` 的 `{rule}`——整目录不进交付面"
+        if not rule.endswith("/") and (
+                fnmatch.fnmatch(rel, bare) or fnmatch.fnmatch(Path(rel).name, bare)):
+            return f"命中 `{GITIGNORE_FILE.name}:{number}` 的 `{rule}`"
+    return f"未被 `{GITIGNORE_FILE.name}` 命中（那它本就该随仓库一起交付）"
+
+
+def _evidence_absence_note(read_error: str | None) -> str:
+    """证据件**不在场**时，把「缺的是哪一枚、为什么不在、该动哪一面」说全。
+
+    这一段的动机是 B0 Task 5 容器格的第一现场：那三枚红里这一枚最误导人——判据给出的是
+    `'BLOCKED' != 'GREEN'`，等号左边是闸要求的值、右边是矩阵写的值，读者的第一反应是"去把矩阵
+    改回 BLOCKED"。而那恰好是本文件最不肯看到的动作：矩阵写着 GREEN 是 V2.3 那次真机跑的**真实
+    结论**（`kit.validate_evidence` 的十枚判据 + 逐枚重算 sha1 就是为它作的保），把它改成
+    BLOCKED 等于伪造一次结论。真正不在场的东西是**证据件本身**——它落在 `.superpowers/` 下、
+    被仓库的忽略规则整目录挡在交付面外，于是任何干净 checkout（CI runner / 发布容器）里这一枚
+    都**不可判**。不可判 ≠ 已通过，所以本枚照旧红（R15：判据一分不松），只是要说清红在哪。
+    """
+    if read_error != "missing":
+        return ""
+    rel = kit.EVIDENCE_FILE
+    try:
+        rel = kit.EVIDENCE_FILE.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        pass
+    return (
+        "\n\n—— 这一格缺的不是矩阵那一行，是那枚没进交付面的过程件 ——"
+        f"\n- 证据件路径：{kit.EVIDENCE_FILE}（仓库相对 `{rel}`）"
+        f"\n- 本轮读取结果：{read_error!r} —— 文件根本不在场（不是内容不合格）。"
+        f"\n- 它{_ignored_face_hint(kit.EVIDENCE_FILE)}；"
+        "⇒ 干净 checkout（CI / 发布容器）里它**必然**不在场，本机才在场。"
+        "\n- 所以本行在干净 checkout 里是**不可判**，而不可判 ≠ 已通过：判据照旧要求 "
+        f"{P0_STATUS_WITHOUT_EVIDENCE!r}，本枚照旧红。"
+        "\n- 出路不是改矩阵（把 GREEN 写成 BLOCKED 等于伪造 V2.3 的真实结论），"
+        "而是让证据上交付面：把上面那枚 JSON 以 `git add -f` 精选入库"
+        "（B0 计划 Task 7 的 staging 段已登记，需用户明确授权后才能提交）。"
+        "\n- 想要本机复算这份证据：跑 .superpowers/scripts/run_p0_failover_acceptance.sh。"
+    )
+
+
 class P0MatrixStatusLockedToEvidenceTests(unittest.TestCase):
     """闸③：没跑过真机 ⇒ 矩阵 P0 行只许 `BLOCKED`；跑过 ⇒ 只许 `GREEN` 且证据成立。"""
 
@@ -412,7 +483,8 @@ class P0MatrixStatusLockedToEvidenceTests(unittest.TestCase):
                 P0_STATUS_WITHOUT_EVIDENCE, status,
                 f"P0 还没跑过真机（证据：{read_error or problems}），矩阵那一行却写着 "
                 f"{status!r}。唯一合法取值是 {P0_STATUS_WITHOUT_EVIDENCE!r}——"
-                "改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh")
+                "改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh"
+                + _evidence_absence_note(read_error))
             return
         self.assertEqual(
             P0_STATUS_WITH_EVIDENCE, status,

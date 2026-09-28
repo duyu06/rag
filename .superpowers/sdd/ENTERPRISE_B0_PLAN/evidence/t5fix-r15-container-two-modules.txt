@@ -1,0 +1,17 @@
+=== B0-T5-R15 容器格复跑（两枚受影响模块 + 收集钉 + PyJWT 警告探针）===
+date(UTC): 2026-09-28T11:29:50Z
+Python 3.12.14
+fastapi 0.141.1 starlette 1.7.0 pyjwt 2.15.0 pytest 9.1.1
+--- 两枚受影响模块 ---
+E           - 想要本机复算这份证据：跑 .superpowers/scripts/run_p0_failover_acceptance.sh。
+
+backend/tests/test_real_llm_failover_gate.py:482: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+1 failed, 91 passed, 23 subtests passed in 56.64s
+rc=1
+--- 收集钉（全量 --collect-only）---
+
+1332 tests collected in 27.65s
+--- PyJWT 短密钥警告探针 ---
+pyjwt 2.15.0 -> warnings: [('InsecureKeyLengthWarning', 'The HMAC key is 16 bytes long, which is below the minimum re'), ('InsecureKeyLengthWarning', 'The HMAC key is 16 bytes long, which is below the minimum re')]

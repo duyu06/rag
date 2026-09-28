@@ -1,0 +1,32 @@
+surface files BEFORE plant : 318
+planted: /e/xiangmu/rag/b0_t5_drift_probe.py
+probe ignore check: NOT ignored (rc=1) => on the delivery surface
+surface files AFTER  plant : 319  (expected BEFORE+1)
+--- gate run with probe on the surface (expected RED) ---
+>       assert {relative: row[0] for relative, row in EXEMPTIONS.items()} == _hit_counts(
+            _delivery_surface_names())
+E       AssertionError: assert {'backend/.en...g.py': 1, ...} == {'b0_t5_drift...i.py': 1, ...}
+E         
+E         Omitting 16 identical items, use -vv to show
+E         Right contains 1 more item:
+E         {'b0_t5_drift_probe.py': 1}
+E         Use -v to get more diff
+
+backend\tests\test_secret_hygiene_contract.py:637: AssertionError
+=========================== short test summary info ===========================
+FAILED backend/tests/test_secret_hygiene_contract.py::test_repository_tracked_files_hold_no_credential_material
+FAILED backend/tests/test_secret_hygiene_contract.py::test_the_exemption_table_matches_the_hit_set
+2 failed, 3 passed, 41 deselected in 2.37s
+gate rc(PIPESTATUS)=1
+--- full-module hit/occurrence reading with probe on the surface ---
+surface files 319 hit files 17 occurrences 32
+probe hits 1
+surface files AFTER  remove: 318
+ASSERTION OK: surface files returned to 318
+--- gate run after removal (expected GREEN again) ---
+.....                                                                    [100%]
+5 passed, 41 deselected in 1.35s
+--- probe residue check ---
+ls: cannot access '/e/xiangmu/rag/b0_t5_drift_probe.py': No such file or directory
+STATUS IDENTICAL to pre-experiment
+[trap] probe removed

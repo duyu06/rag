@@ -1,0 +1,39 @@
+# Task 4 review package (working tree; zero commits)
+
+## .gitattributes (18 lines, CRLF 0 bareLF 18)
+# 归一化由仓库决定，不由每台机器的 core.autocrlf 决定。
+* text=auto
+
+# 进镜像/进 Linux 执行的文件必须是 LF：CRLF 的 .sh 在容器里直接跑不起来。
+*.sh text eol=lf
+
+# Windows 部署脚本按 Windows 形态签出。
+*.ps1 text eol=crlf
+
+# 真二进制。显式声明，不靠 git 猜。
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.gif binary
+*.woff binary
+*.woff2 binary
+
+## git status --porcelain
+ M .github/workflows/ci.yml
+ M backend/app/identity/README.md
+ M backend/app/identity/__init__.py
+?? .gitattributes
+?? backend/tests/test_ci_gate_contract.py
+?? docs/ENTERPRISE_B0_PLAN.md
+?? docs/ENTERPRISE_B0_SPECIFICATION.md
+?? scripts/b0_collection_probe.py
+
+## git diff --stat
+ backend/app/identity/README.md   | 13 ++++++----
+ backend/app/identity/__init__.py | 13 +++++++---
+ 3 files changed, 52 insertions(+), 29 deletions(-)
+
+## git check-ignore probes (must be NOT ignored)
+rc=1

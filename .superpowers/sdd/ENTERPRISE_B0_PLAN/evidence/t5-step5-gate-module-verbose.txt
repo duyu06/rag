@@ -1,0 +1,38 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\zhang\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: E:\xiangmu\rag
+plugins: anyio-4.13.0, langsmith-0.7.30
+collecting ... collected 16 items
+
+backend/tests/test_ci_gate_contract.py::test_collected_count_matches_the_pinned_number PASSED [  6%]
+backend/tests/test_ci_gate_contract.py::test_the_gate_module_itself_is_collected PASSED [ 12%]
+backend/tests/test_ci_gate_contract.py::test_the_gate_module_itself_carries_no_skip_or_xfail_decorator PASSED [ 18%]
+backend/tests/test_ci_gate_contract.py::test_collection_measurement_counts_node_ids_not_the_summary_line PASSED [ 25%]
+backend/tests/test_ci_gate_contract.py::test_backend_contracts_has_no_unittest_discover_step PASSED [ 31%]
+backend/tests/test_ci_gate_contract.py::test_backend_contracts_runs_the_pytest_suite PASSED [ 37%]
+backend/tests/test_ci_gate_contract.py::test_step_ordering_still_explains_itself PASSED [ 43%]
+backend/tests/test_ci_gate_contract.py::test_install_face_uses_requirements_txt_as_the_source PASSED [ 50%]
+backend/tests/test_ci_gate_contract.py::test_extra_pip_arguments_are_exactly_the_exemption_table PASSED [ 56%]
+backend/tests/test_ci_gate_contract.py::test_install_face_pip_source_values_are_pinned PASSED [ 62%]
+backend/tests/test_ci_gate_contract.py::test_every_exemption_row_states_why PASSED [ 68%]
+backend/tests/test_ci_gate_contract.py::test_workflow_plain_scalars_bearing_a_colon_space_are_quoted PASSED [ 75%]
+backend/tests/test_ci_gate_contract.py::test_gitattributes_carries_the_required_rules PASSED [ 81%]
+backend/tests/test_ci_gate_contract.py::test_index_has_no_crlf_entries PASSED [ 87%]
+backend/tests/test_ci_gate_contract.py::test_non_text_index_entries_are_exactly_the_enumerated_set PASSED [ 93%]
+backend/tests/test_ci_gate_contract.py::test_eol_rules_are_a_no_op_for_the_current_tree PASSED [100%]
+
+============================ slowest 12 durations =============================
+33.43s call     backend/tests/test_ci_gate_contract.py::test_collected_count_matches_the_pinned_number
+0.52s setup    backend/tests/test_ci_gate_contract.py::test_collected_count_matches_the_pinned_number
+0.47s call     backend/tests/test_ci_gate_contract.py::test_index_has_no_crlf_entries
+0.29s call     backend/tests/test_ci_gate_contract.py::test_non_text_index_entries_are_exactly_the_enumerated_set
+0.06s call     backend/tests/test_ci_gate_contract.py::test_eol_rules_are_a_no_op_for_the_current_tree
+0.01s teardown backend/tests/test_ci_gate_contract.py::test_eol_rules_are_a_no_op_for_the_current_tree
+
+(6 durations < 0.005s hidden.  Use -vv to show these durations.)
+============================= 16 passed in 34.88s =============================
+
+real	0m37.418s
+user	0m0.000s
+sys	0m0.063s

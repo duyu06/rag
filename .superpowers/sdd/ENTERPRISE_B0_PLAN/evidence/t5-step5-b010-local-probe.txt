@@ -1,0 +1,12 @@
+=== docker compose config (本地强化读数，非远端判据) ===
+compose config rc=0
+=== pwsh presence ===
+/c/Program Files/PowerShell/7/pwsh
+/c/WINDOWS/System32/WindowsPowerShell/v1.0/powershell
+=== pwsh 语法校验（CI 步的本地同形代理读数）===
+command: pwsh -NoProfile -c '[scriptblock]::Create((Get-Content -Raw scripts/deploy.ps1)) | Out-Null'
+pwsh rc=0
+=== pwsh version ===
+7.6.6
+=== compose config 再取一次带 --no-media-less 的确定性读数 ===
+compose --quiet rc=0

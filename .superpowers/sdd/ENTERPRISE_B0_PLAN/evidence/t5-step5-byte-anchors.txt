@@ -1,0 +1,24 @@
+=== git diff body (with .gitattributes live) — Task 4 pinned 10107 bytes / dfa0fbde86b5 ===
+warning: in the working copy of 'backend/app/identity/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/identity/__init__.py', LF will be replaced by CRLF the next time Git touches it
+10107
+warning: in the working copy of 'backend/app/identity/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/identity/__init__.py', LF will be replaced by CRLF the next time Git touches it
+sha256[:12] dfa0fbde86b5 bytes 10107
+=== status aggregate (Task 4 pinned 53bb297dbc72) ===
+sha256[:12] d550e9739816
+=== .gitattributes bytes / sha (Task 4 pinned c5d07b5dc438 / 435 bytes) ===
+435 .gitattributes
+c5d07b5dc438
+=== ci.yml sha (Task 4 fix1 pinned 1c706e165b73) ===
+1c706e165b73
+=== gate module file sha (Task 4 fix1 pinned 73bede2def2e) ===
+73bede2def2e
+
+# 取证口径注（本任务收工前追加，避免被误读成同一公式的比对）：
+#  - 上面 "status aggregate (Task 4 pinned 53bb297dbc72)" 那行的 d550e9739816 是 **`git status --porcelain`
+#    文本的 sha256 前 12 位**；Task 4 R12 的 53bb297dbc72 是 **逐文件 sha 清单的 WORKTREE-AGGREGATE**，
+#    两枚是**不同公式**，不可直接判等。本任务的 status 锚是 t5-status-pre.txt（开工 8 行）与后续每一次
+#    逐行 diff（t5-step3-status-after.txt / t5-step3-mechanics-status.txt / t5-final-integrity.txt 全 rc=0）。
+#  - 可与 Task 4 直接判等的是：`git diff` 正文 10107 / dfa0fbde86b5、.gitattributes c5d07b5dc438、
+#    ci.yml 1c706e165b73、门模块 73bede2def2e、两枚 identity 3bc681bbc52c / 2cfab9f18182 —— 本文件内全 MATCH。

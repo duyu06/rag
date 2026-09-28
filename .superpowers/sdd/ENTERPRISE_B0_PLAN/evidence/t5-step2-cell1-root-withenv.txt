@@ -1,0 +1,59 @@
+.................................................................................................................................. [  9%]
+.................................................. [ 13%]
+.................................................. [ 17%]
+................................................................................................................................................................................................... [ 31%]
+....................................................................................................................................................................................... [ 45%]
+........................................ [ 48%]
+......................................................... [ 52%]
+...................................................................... [ 58%]
+................................................................. [ 63%]
+.............................................................. [ 67%]
+................................................................. [ 72%]
+............................................................. [ 77%]
+........................................................................ [ 82%]
+......................................................................... [ 88%]
+....................................................................................................................................................... [ 99%]
+........                                                        [100%]
+============================== warnings summary ===============================
+backend/tests/test_feishu_identity_contract.py: 3 warnings
+backend/tests/test_llm_usage_contract.py: 1 warning
+backend/tests/test_model_router_v23_contract.py: 8 warnings
+backend/tests/test_typesafe_api_runtime.py: 1 warning
+backend/tests/test_typesafe_security_contract.py: 1 warning
+  C:\Users\zhang\AppData\Local\Programs\Python\Python313\Lib\site-packages\jwt\api_jwt.py:147: InsecureKeyLengthWarning: The HMAC key is 31 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
+backend/tests/test_feishu_identity_contract.py: 3 warnings
+backend/tests/test_llm_usage_contract.py: 4 warnings
+backend/tests/test_model_router_v23_contract.py: 8 warnings
+backend/tests/test_typesafe_api_runtime.py: 3 warnings
+backend/tests/test_typesafe_security_contract.py: 2 warnings
+  C:\Users\zhang\AppData\Local\Programs\Python\Python313\Lib\site-packages\jwt\api_jwt.py:365: InsecureKeyLengthWarning: The HMAC key is 31 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    decoded = self.decode_complete(
+
+backend/tests/test_model_router_v23_contract.py::LedgerGuardClassificationTests::test_a_direct_schema_connect_is_classified_write_too
+  E:\\xiangmu\\rag\\backend\\tests\\conftest.py:404: RuntimeWarning: [ledger-guard] \u6d4b\u8bd5**\u53ea\u8bfb**\u4e86\u4ed3\u5e93\u771f\u5b9e\u8d26\u672c C:\\Users\\zhang\\AppData\\Local\\Temp\\tmpgqiljwem\\data\\conversations.db \u21d2 \u5df2\u6539\u9053\u5230 C:\\Users\\zhang\\AppData\\Local\\Temp\\tmpgqiljwem\\isolated\\conversations.db\uff08\u8bfb\u4e0d\u5224\u7ea2\uff1b\u5199\u624d\u5224\u7ea2\uff0c\u89c1 tests/conftest.py N1\uff09\n    return self._real_connect(*args, **kwargs)
+
+backend/tests/test_model_router_v23_contract.py::LedgerGuardClassificationTests::test_a_pure_read_is_classified_read_and_never_pins_red
+  E:\\xiangmu\\rag\\backend\\tests\\conftest.py:404: RuntimeWarning: [ledger-guard] \u6d4b\u8bd5**\u53ea\u8bfb**\u4e86\u4ed3\u5e93\u771f\u5b9e\u8d26\u672c C:\\Users\\zhang\\AppData\\Local\\Temp\\tmpro977xq9\\data\\conversations.db \u21d2 \u5df2\u6539\u9053\u5230 C:\\Users\\zhang\\AppData\\Local\\Temp\\tmpro977xq9\\isolated\\conversations.db\uff08\u8bfb\u4e0d\u5224\u7ea2\uff1b\u5199\u624d\u5224\u7ea2\uff0c\u89c1 tests/conftest.py N1\uff09\n    return self._real_connect(*args, **kwargs)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+[ledger-guard] 1 次「读保护集下的真实账本」被改道（N1：读不判红）：
+[ledger-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard] 13 次「读保护集下的真实凭据表」被改道（N1：读不判红）：
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1339\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   ……另有 3 次同类读改道
+1332 passed, 36 warnings, 1133 subtests passed in 211.46s (0:03:31)
+
+real	3m38.890s
+user	0m0.000s
+sys	0m0.062s

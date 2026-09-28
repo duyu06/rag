@@ -1,0 +1,27 @@
+=== FINAL integrity check (Task 5 close) ===
+HEAD: 7cc5efc0460abb01171c20cee61ef01bf5282a3d
+--- git status --porcelain ---
+ M .github/workflows/ci.yml
+ M backend/app/identity/README.md
+ M backend/app/identity/__init__.py
+?? .gitattributes
+?? backend/tests/test_ci_gate_contract.py
+?? docs/ENTERPRISE_B0_PLAN.md
+?? docs/ENTERPRISE_B0_SPECIFICATION.md
+?? scripts/b0_collection_probe.py
+--- vs pre-experiment ---
+STATUS IDENTICAL (8 lines)
+--- byte anchors now ---
+backend/.env                                     4d7f974107dd  expected 4d7f974107dd  MATCH
+backend/app/identity/README.md                   3bc681bbc52c  expected 3bc681bbc52c  MATCH
+backend/app/identity/__init__.py                 2cfab9f18182  expected 2cfab9f18182  MATCH
+.gitattributes                                   c5d07b5dc438  expected c5d07b5dc438  MATCH
+.github/workflows/ci.yml                         1c706e165b73  expected 1c706e165b73  MATCH
+backend/tests/test_ci_gate_contract.py           73bede2def2e  expected 73bede2def2e  MATCH
+--- residue checks ---
+ls: cannot access 'b0_t5_drift_probe.py': No such file or directory
+ls: cannot access '.superpowers/sdd/ENTERPRISE_B0_PLAN/evidence/t5-hold-dir.txt': No such file or directory
+b0-t5 containers: 0
+--- SEC-A gates one last time ---
+.....                                                                    [100%]
+5 passed, 41 deselected in 1.85s

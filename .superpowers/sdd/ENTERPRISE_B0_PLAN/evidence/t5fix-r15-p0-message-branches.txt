@@ -1,0 +1,7 @@
+=== B0-T5 修复轮：修 2 文案分支的反证（只读，不改任何文件）===
+未被忽略的面 : 未被 `.gitignore` 命中（那它本就该随仓库一起交付）
+被整目录忽略 : 命中 `.gitignore:25` 的 `.superpowers/`——整目录不进交付面
+仓外路径     : （C:\Windows\win.ini 不在仓库内 ⇒ 谈不上被仓库的忽略规则挡住）
+note(None，即在场但不合格) 返回 : '' ⇒ 空串 = 文案与 HEAD 一字不差
+note(unparsable) 返回 : ''
+note(missing) 前 60 字 : "\n\n—— 这一格缺的不是矩阵那一行，是那枚没进交付面的过程件 ——\n- 证据件路径：E:\\xiangmu\\rag\\.superpowers\\sd

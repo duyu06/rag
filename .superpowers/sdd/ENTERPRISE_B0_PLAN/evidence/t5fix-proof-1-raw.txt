@@ -1,0 +1,26 @@
+========================================================================
+形状 ②（原始子表 original_router.routes，无 include 前缀）
+  顶层条目数                     = 2
+  旧走法枚举到的腿              = 0  []
+  新走法枚举到的腿              = 3  ['GET /api/nested/one', 'PATCH /api/nested/three', 'POST /api/nested/two']
+  (a) 旧走法漏掉的腿            = ['GET /api/nested/one', 'PATCH /api/nested/three', 'POST /api/nested/two']
+  (b) 递归多看见的腿数          = 3
+  超集（旧 ⊆ 新）               = True
+  顶层那枚容器被展开了          = True
+========================================================================
+形状 ①（effective_candidates 给出生效子表 + include 前缀 /api/v2）
+  旧走法枚举到的腿              = 0  []
+  新走法枚举到的腿              = 3  ['GET /api/v2/api/nested/one', 'PATCH /api/v2/api/nested/three', 'POST /api/v2/api/nested/two']
+  带前缀的腿被拼对了            = True
+  每条嵌套腿带几枚 dependant    = [2]  （路由自己那枚 + include 生效那枚 ⇒ 桩打得到真调用）
+  超集（旧 ⊆ 新）               = True
+========================================================================
+(c) 宿主真 app（fastapi 0.135.3，顶层无 _IncludedRouter 形状）
+  顶层条目数                    = 52
+  递归访问到的条目数            = 52
+  旧走法腿数                    = 42
+  新走法腿数                    = 42
+  旧 \ 新（必须为空）           = []
+  新 \ 旧（只增不减的那部分）   = []
+  SUPERSET(old ⊆ new)           = True
+  IDENTICAL(旧==新，宿主形态)   = True

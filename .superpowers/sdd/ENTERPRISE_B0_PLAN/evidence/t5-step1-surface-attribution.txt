@@ -1,0 +1,27 @@
+# surface composition at Task 5 (raw git listings)
+cached(tracked): 313
+others(untracked,not ignored): 5
+--- the untracked-not-ignored files (the only B0-addable increment) ---
+.gitattributes
+backend/tests/test_ci_gate_contract.py
+docs/ENTERPRISE_B0_PLAN.md
+docs/ENTERPRISE_B0_SPECIFICATION.md
+scripts/b0_collection_probe.py
+--- hit set (16 files / 31 occurrences) ---
+surface files 318 hit files 16 occurrences 31
+  1  backend/.env.example
+  2  backend/app/auth.py
+  1  backend/app/cli.py
+  1  backend/app/config.py
+  1  backend/app/security_startup.py
+  1  backend/tests/test_authentication_leg_contract.py
+  1  backend/tests/test_feishu_identity_contract.py
+ 10  backend/tests/test_model_router_v23_contract.py
+  2  backend/tests/test_password_lifecycle_contract.py
+  4  backend/tests/test_secret_hygiene_contract.py
+  1  backend/tests/test_typesafe_api_runtime.py
+  1  backend/tests/test_typesafe_judgments.py
+  1  frontend/src/lib/api.ts
+  1  frontend/src/lib/conversations.ts
+  1  scripts/conversation_p1_integration.py
+  2  scripts/deploy.ps1

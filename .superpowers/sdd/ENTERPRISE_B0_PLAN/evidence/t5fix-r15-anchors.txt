@@ -1,0 +1,45 @@
+=== 字节锚（sha256 前 12 位 / 字节数）===
+  c5d07b5dc438       435  .gitattributes
+  1c706e165b73      7106  .github/workflows/ci.yml
+  beea80c42159       322  backend/requirements.txt
+  73bede2def2e     48603  backend/tests/test_ci_gate_contract.py
+  fd39d7d374f9     61324  backend/tests/test_secret_hygiene_contract.py
+  dd8a61adac67    115009  backend/tests/test_password_lifecycle_contract.py
+  bf1a6a85cba3     33563  backend/tests/test_real_llm_failover_gate.py
+  c83936cf78aa     41685  backend/tests/real_llm_failover_kit.py
+
+=== Task 4/5 钉住的锚是否仍在位（这些文件本批不许动）===
+  MATCH  .gitattributes  pinned=c5d07b5dc438 now=c5d07b5dc438
+  MATCH  .github/workflows/ci.yml  pinned=1c706e165b73 now=1c706e165b73
+  MATCH  backend/tests/test_ci_gate_contract.py  pinned=73bede2def2e now=73bede2def2e
+
+=== 门模块的两枚常数 ===
+  EXPECTED_COLLECTED = 1332
+  if len(ids) == EXPECTED_COLLECTED:
+  _OWN_TEST_NAMES 枚数出现次数 = 3
+
+=== SEC-A 豁免表行数（本批不许新增）===
+  含 EXEMPTIONS 段：True
+  EXEMPTIONS 表体行数（前 80 行内）= 19
+
+=== app 面三子句（B0-12 口径，只读）===
+  git diff HEAD -- backend/app = ['backend/app/identity/README.md', 'backend/app/identity/__init__.py']
+  减去两枚 identity 后 = []   为空? True
+  git diff --cached --name-only = []   为空? True
+
+=== 工作树 status（本批开工 8 行）===
+   M .github/workflows/ci.yml
+   M backend/app/identity/README.md
+   M backend/app/identity/__init__.py
+   M backend/tests/test_password_lifecycle_contract.py
+   M backend/tests/test_real_llm_failover_gate.py
+  ?? .gitattributes
+  ?? backend/tests/test_ci_gate_contract.py
+  ?? docs/ENTERPRISE_B0_PLAN.md
+  ?? docs/ENTERPRISE_B0_SPECIFICATION.md
+  ?? scripts/b0_collection_probe.py
+  行数 = 10
+
+=== 树内不许有挪窝残留 ===
+  仓内 parked/absent 残留 = []
+  证据件在场? True  sha=2ec6460041da

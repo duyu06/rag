@@ -1,0 +1,35 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+_ P0MatrixStatusLockedToEvidenceTests.test_p0_row_status_matches_the_evidence _
+
+self = <test_real_llm_failover_gate.P0MatrixStatusLockedToEvidenceTests testMethod=test_p0_row_status_matches_the_evidence>
+
+    def test_p0_row_status_matches_the_evidence(self):
+        status = kit.matrix_p0_status()
+        self.assertIsNotNone(status, "矩阵里没有 P0 行了（§10 的『+1』被删）")
+        evidence, read_error = kit.read_evidence()
+        problems = kit.validate_evidence(evidence)
+        if evidence is None or problems:
+>           self.assertEqual(
+                P0_STATUS_WITHOUT_EVIDENCE, status,
+                f"P0 还没跑过真机（证据：{read_error or problems}），矩阵那一行却写着 "
+                f"{status!r}。唯一合法取值是 {P0_STATUS_WITHOUT_EVIDENCE!r}——"
+                "改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh"
+                + _evidence_absence_note(read_error))
+E           AssertionError: 'BLOCKED' != 'GREEN'
+E           - BLOCKED
+E           + GREEN
+E            : P0 还没跑过真机（证据：missing），矩阵那一行却写着 'GREEN'。唯一合法取值是 'BLOCKED'——改状态之前请先跑 .superpowers/scripts/run_p0_failover_acceptance.sh
+E           
+E           —— 这一格缺的不是矩阵那一行，是那枚没进交付面的过程件 ——
+E           - 证据件路径：E:\xiangmu\rag\.superpowers\sdd\MODEL_ROUTER_V23_PLAN\task10\real-llm-failover-001.json（仓库相对 `.superpowers/sdd/MODEL_ROUTER_V23_PLAN/task10/real-llm-failover-001.json`）
+E           - 本轮读取结果：'missing' —— 文件根本不在场（不是内容不合格）。
+E           - 它命中 `.gitignore:25` 的 `.superpowers/`——整目录不进交付面；⇒ 干净 checkout（CI / 发布容器）里它**必然**不在场，本机才在场。
+E           - 所以本行在干净 checkout 里是**不可判**，而不可判 ≠ 已通过：判据照旧要求 'BLOCKED'，本枚照旧红。
+E           - 出路不是改矩阵（把 GREEN 写成 BLOCKED 等于伪造 V2.3 的真实结论），而是让证据上交付面：把上面那枚 JSON 以 `git add -f` 精选入库（B0 计划 Task 7 的 staging 段已登记，需用户明确授权后才能提交）。
+E           - 想要本机复算这份证据：跑 .superpowers/scripts/run_p0_failover_acceptance.sh。
+
+backend\tests\test_real_llm_failover_gate.py:482: AssertionError
+=========================== short test summary info ===========================
+FAILED backend/tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+1 failed in 1.24s

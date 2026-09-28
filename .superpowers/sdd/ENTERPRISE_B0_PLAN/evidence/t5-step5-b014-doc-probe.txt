@@ -1,0 +1,6 @@
+=== B0-14 现状读数（docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md）===
+grep -c 'G20'  => 0  (exit rc=1)
+G0 行现文本     => 7:| G0 工程 | 部分 | `.github/workflows/ci.yml` 已有 build/测试/真BGE门禁/前端构建；缺 lint、typecheck、依赖扫描(pip-audit)、工具化 secret 扫描(gitleaks)、OpenAPI 契约测试 |
+文件是否被 B0 改过 => （空 = 未改）
+文件行数 => 47
+框架标题行 => # 企业级验收框架 G0–G19 差距盘点（2026-09-23）

@@ -1,0 +1,27 @@
+=== clause 1: git diff --name-only HEAD -- backend/app (raw) ===
+warning: in the working copy of 'backend/app/identity/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/identity/__init__.py', LF will be replaced by CRLF the next time Git touches it
+backend/app/identity/README.md
+backend/app/identity/__init__.py
+=== clause 1: same, minus the two identity files (must be EMPTY) ===
+warning: in the working copy of 'backend/app/identity/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/identity/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/identity/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/identity/__init__.py', LF will be replaced by CRLF the next time Git touches it
+clause1-residue-count=0
+=== clause 2: git diff --cached --name-only -- backend/app (must be EMPTY) ===
+clause2-count=0
+=== aux: any untracked file under backend/app (whitelist guarantee) ===
+aux-untracked-count=0
+=== clause 3: identity sha256 first 12 (baseline 3bc681bbc52c / 2cfab9f18182) ===
+backend/app/identity/README.md 3bc681bbc52c
+backend/app/identity/__init__.py 2cfab9f18182
+=== aux: identity mtimes (untouched since 2026-09-? evidence) ===
+-rw-r--r-- 1 zhang 197121 16587 Sep 26 00:23 backend/app/identity/README.md
+-rw-r--r-- 1 zhang 197121  3344 Sep 26 00:15 backend/app/identity/__init__.py
+=== aux: full app-face diff stat (only the two identity files may appear) ===
+warning: in the working copy of 'backend/app/identity/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/identity/__init__.py', LF will be replaced by CRLF the next time Git touches it
+ backend/app/identity/README.md   | 13 ++++++++-----
+ backend/app/identity/__init__.py | 13 ++++++++++---
+ 2 files changed, 18 insertions(+), 8 deletions(-)

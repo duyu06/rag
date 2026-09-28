@@ -1,0 +1,569 @@
+{
+  "case_id": "REAL-LLM-FAILOVER-001",
+  "schema_version": 1,
+  "completed": true,
+  "provider_transport": null,
+  "generated_at": "2026-09-24T13:52:06+00:00",
+  "design_source": "docs/MODEL_ROUTER_V23_DESIGN.md §10 P0 行（十字逐字）",
+  "registry_file": "E:\\xiangmu\\rag\\backend\\config\\llm_registry.json",
+  "registry_mutated": "未改（本用例只读注册表；config/llm_registry.json 一字未动）",
+  "config_overrides": {
+    "llm_total_budget_ms": 900000,
+    "llm_model_timeout_seconds": 300,
+    "llm_router_enabled": true,
+    "llm_registry_file": "E:\\xiangmu\\rag\\backend\\config\\llm_registry.json",
+    "why": "§12 出厂预算（30 s / 20 s）装不下 2 GiB 冷加载；只改测试进程内的 Settings 实例，产品默认值与 .env 不动。需要主 agent 裁决是否给真机 验收另立一档配置键。",
+    "frozen_range_note": "llm_total_budget_ms 出厂约束是 5000..120000，900000 越界（测试侧 patch 绕过 Field 校验）"
+  },
+  "request": {
+    "mode": "rag",
+    "trace_id": "p0-failover-6146ff1417d7",
+    "request_id": "p0-req-89b55677",
+    "keep_alive": "0",
+    "num_predict": 256,
+    "temperature": 0.2,
+    "user_prompt_chars": 157,
+    "user_prompt_sha1": "1fb30b7904f3d81af462f85a9d94c3c2813b456b",
+    "canaries": [
+      "CANARY-9c1f4e7a-6b0d-4e2f-8a13-zhengju",
+      "请用中文分点回答：员工出差住宿需要注意哪三件事？每条一句话，依据上面给出的资料。",
+      "CANARY-9c1f4e7a-6b0d-4e2"
+    ]
+  },
+  "timings_ms": {
+    "per_step": [
+      {
+        "step": "00_precheck_plan",
+        "ms": 2.6
+      },
+      {
+        "step": "00_precheck_ollama",
+        "ms": 211.9
+      },
+      {
+        "step": "01_real_llm_complete",
+        "ms": 70828.2
+      },
+      {
+        "step": "02_attach_and_save_trace",
+        "ms": 7.5
+      },
+      {
+        "step": "08_assemble_evidence",
+        "ms": 22.4
+      },
+      {
+        "step": "09_postcheck",
+        "ms": 30.6
+      }
+    ],
+    "total": 111838.3
+  },
+  "plan": {
+    "primary_entry": "ollama-ornith",
+    "primary_model": "ornith-1.5:9b-text",
+    "fallback_entries": [
+      "ollama-phi3"
+    ],
+    "fallback_models": [
+      "phi3:mini"
+    ],
+    "reason_codes": [
+      "CAPABILITY_MATCH",
+      "LOCAL_PREFERRED",
+      "HIGHER_PRIORITY"
+    ]
+  },
+  "environment": {
+    "before": {
+      "base_url": "http://localhost:11434",
+      "reachable": true,
+      "tags": [
+        {
+          "name": "ornith-1.5:9b-text",
+          "size_gib": 5.24
+        },
+        {
+          "name": "ornith-1.5:9b",
+          "size_gib": 6.1
+        },
+        {
+          "name": "phi3:mini",
+          "size_gib": 2.03
+        }
+      ],
+      "loaded": [],
+      "error": null,
+      "has_primary": true,
+      "has_fallback": true
+    },
+    "memory_before": {
+      "platform": "Windows",
+      "total_gib": 15.22,
+      "available_gib": 0.44,
+      "memory_load_percent": 97,
+      "phi3_load_floor_gib": 3.2,
+      "enough_for_phi3": false,
+      "verdict": "不够：可用 0.44 GiB < 3.2 GiB ⇒ 加载 phi3:mini 有把机器打进 paging 的风险"
+    },
+    "probe_reference": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\ornith-primary-load-probe.json",
+    "after": {
+      "base_url": "http://localhost:11434",
+      "reachable": true,
+      "tags": [
+        {
+          "name": "ornith-1.5:9b-text",
+          "size_gib": 5.24
+        },
+        {
+          "name": "ornith-1.5:9b",
+          "size_gib": 6.1
+        },
+        {
+          "name": "phi3:mini",
+          "size_gib": 2.03
+        }
+      ],
+      "loaded": [],
+      "error": null,
+      "has_primary": true,
+      "has_fallback": true
+    },
+    "memory_after": {
+      "platform": "Windows",
+      "total_gib": 15.22,
+      "available_gib": 4.4,
+      "memory_load_percent": 71,
+      "phi3_load_floor_gib": 3.2,
+      "enough_for_phi3": true,
+      "verdict": "够：可用 4.40 GiB ≥ 3.2 GiB"
+    }
+  },
+  "answer": {
+    "text": "1. 员工出差住宿的金额上限为每晚600元。\n\n2. 出差住宿需经经部门经理的审批。\n\n3. 出差住宿发票需在30天内提交给财务。",
+    "chars": 65,
+    "cjk_chars": 44,
+    "model": "phi3:mini",
+    "finish_reason": "stop",
+    "input_tokens": 713,
+    "output_tokens": 90,
+    "usage_estimated": false
+  },
+  "assertions": [
+    {
+      "id": 1,
+      "name": "primary_really_called",
+      "observed": {
+        "attempts": [
+          {
+            "model_id": "ollama-ornith",
+            "provider": "ollama",
+            "result": "failed",
+            "error_type": "model_unavailable",
+            "latency_ms": 41597.5
+          },
+          {
+            "model_id": "ollama-phi3",
+            "provider": "ollama",
+            "result": "success",
+            "error_type": null,
+            "latency_ms": 20036.3
+          }
+        ],
+        "egress_entry_id": "ollama-ornith",
+        "egress_model": "ornith-1.5:9b-text",
+        "egress_request_bytes": 1619,
+        "egress_ok": false
+      },
+      "pass": true,
+      "elapsed_ms": 2.1
+    },
+    {
+      "id": 2,
+      "name": "failure_classified_model_unavailable",
+      "observed": {
+        "attempt_error_type": "model_unavailable",
+        "llm_error_message_verbatim": "模型不可用（alloc）：{\"error\":\"llama-server reported out-of-memory during startup: ggml_vulkan: Failed to allocate pinned memory (vk::Device::allocateMemory: ErrorOutOfDeviceMemory)\\nggml_gallocr_reserve_n_impl: failed to",
+        "http_status": 500,
+        "markers_hit": [
+          "alloc"
+        ],
+        "probe_classification": {
+          "kind": "model_unavailable",
+          "status_code": 500,
+          "no_fallback": false,
+          "message": "模型不可用（alloc）：{\"error\":\"llama-server reported out-of-memory during startup: alloc_tensor_range: failed to allocate Vulkan0 buffer of size 820943872\\nerror loading model: unable to allocate Vulkan0 buffer\"}"
+        }
+      },
+      "pass": true,
+      "elapsed_ms": 0.1
+    },
+    {
+      "id": 3,
+      "name": "fallback_called",
+      "observed": {
+        "attempts_count": 2,
+        "second_attempt": {
+          "model_id": "ollama-phi3",
+          "result": "success",
+          "error_type": null,
+          "latency_ms": 20036.3
+        },
+        "egress_model": "phi3:mini",
+        "egress_request_bytes": 1610,
+        "egress_ok": true
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 4,
+      "name": "phi3_valid_chinese_answer",
+      "observed": {
+        "chars": 65,
+        "cjk_chars": 44,
+        "model_field": "phi3:mini",
+        "answer_head": "1. 员工出差住宿的金额上限为每晚600元。\n\n2. 出差住宿需经经部门经理的审批。\n\n3. 出差住宿发票需在30天内提交给财务。",
+        "min_chars": 8,
+        "min_cjk_chars": 4
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 5,
+      "name": "fallback_index_is_one",
+      "observed": {
+        "selected_index": 1,
+        "reason_codes": [
+          "CAPABILITY_MATCH",
+          "LOCAL_PREFERRED",
+          "HIGHER_PRIORITY"
+        ],
+        "context_dropped": 0
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 6,
+      "name": "trace_id_consistent",
+      "observed": {
+        "entry_trace_id": "p0-failover-6146ff1417d7",
+        "ledger_trace_id": "p0-failover-6146ff1417d7",
+        "trace_file_trace_id": "p0-failover-6146ff1417d7",
+        "request_id": "p0-req-89b55677",
+        "ledger_request_id": "p0-req-89b55677",
+        "trace_file_count": 1
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 7,
+      "name": "model_route_two_attempts",
+      "observed": {
+        "keys": [
+          "attempts",
+          "context_dropped",
+          "fallbacks",
+          "mode",
+          "primary",
+          "requirements",
+          "selected_index",
+          "selected_reason_codes",
+          "stage"
+        ],
+        "attempts": [
+          {
+            "model": "ornith-1.5:9b-text",
+            "result": "failed",
+            "error_type": "model_unavailable"
+          },
+          {
+            "model": "phi3:mini",
+            "result": "success",
+            "error_type": null
+          }
+        ],
+        "stage": "fallback",
+        "selected_index": 1,
+        "primary": {
+          "id": "ollama-ornith",
+          "provider": "ollama",
+          "model": "ornith-1.5:9b-text",
+          "score": 100,
+          "reason_codes": [
+            "CAPABILITY_MATCH",
+            "LOCAL_PREFERRED",
+            "HIGHER_PRIORITY"
+          ]
+        }
+      },
+      "pass": true,
+      "elapsed_ms": 1.1
+    },
+    {
+      "id": 8,
+      "name": "usage_row_landed",
+      "observed": {
+        "rows": 1,
+        "row": {
+          "id": 1,
+          "trace_id": "p0-failover-6146ff1417d7",
+          "request_id": "p0-req-89b55677",
+          "route_mode": "rag",
+          "route_reason": "[\"CAPABILITY_MATCH\", \"LOCAL_PREFERRED\", \"HIGHER_PRIORITY\"]",
+          "provider": "ollama",
+          "model": "phi3:mini",
+          "fallback_index": 1,
+          "input_tokens": 713,
+          "output_tokens": 90,
+          "total_tokens": 803,
+          "ttft_ms": null,
+          "latency_ms": 61633.808,
+          "estimated_cost": 0.0,
+          "currency": "USD",
+          "success": 1,
+          "error_type": null,
+          "status_code": null,
+          "created_at": "2026-09-24T13:53:17Z"
+        },
+        "ledger_path": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206\\conversations.db",
+        "tables_in_temp_db": [
+          "llm_request_logs",
+          "sqlite_sequence"
+        ]
+      },
+      "pass": true,
+      "elapsed_ms": 0.0
+    },
+    {
+      "id": 9,
+      "name": "zero_prompt_stored",
+      "observed": {
+        "needles": [
+          "CANARY-9c1f4e7a-6b0d-4e2f-8a13-zhengju",
+          "请用中文分点回答：员工出差住宿需要注意哪三件事？每条一句话，依据上面给出的资料。",
+          "CANARY-9c1f4e7a-6b0d-4e2",
+          "你是 yaoke 企业知识助手。\n你可以使用两类",
+          "请依据以下证据回答问题"
+        ],
+        "hits": [],
+        "columns_scanned": [
+          "created_at",
+          "currency",
+          "error_type",
+          "estimated_cost",
+          "fallback_index",
+          "id",
+          "input_tokens",
+          "latency_ms",
+          "model",
+          "output_tokens",
+          "provider",
+          "request_id",
+          "route_mode",
+          "route_reason",
+          "status_code",
+          "success",
+          "total_tokens",
+          "trace_id",
+          "ttft_ms"
+        ],
+        "cells_scanned": 19
+      },
+      "pass": true,
+      "elapsed_ms": 0.1
+    },
+    {
+      "id": 10,
+      "name": "api_face_is_200",
+      "observed": {
+        "caliber": "状态码口径：生成腿回放本次真答案（零第二次外呼），检索腿替身；测的是「fallback 成功不塌成 5xx」",
+        "status_code": 200,
+        "answer_equals_real": true,
+        "model_used_field": "ornith-1.5:9b-text",
+        "response_body_chars": 196
+      },
+      "pass": true,
+      "elapsed_ms": 40642.2
+    }
+  ],
+  "provider_calls": [
+    {
+      "entry_id": "ollama-ornith",
+      "provider": "ollama",
+      "model": "ornith-1.5:9b-text",
+      "request_bytes": 1619,
+      "request_bytes_method": "adapter.payload 序列化重建（非 wire 抓包）",
+      "timeout_s": 300.0,
+      "message_roles": [
+        "system",
+        "user"
+      ],
+      "elapsed_ms": 41596.4,
+      "ok": false,
+      "error_kind": "model_unavailable",
+      "http_status": 500,
+      "no_fallback": false,
+      "error_body_excerpt": "模型不可用（alloc）：{\"error\":\"llama-server reported out-of-memory during startup: ggml_vulkan: Failed to allocate pinned memory (vk::Device::allocateMemory: ErrorOutOfDeviceMemory)\\nggml_gallocr_reserve_n_impl: failed to"
+    },
+    {
+      "entry_id": "ollama-phi3",
+      "provider": "ollama",
+      "model": "phi3:mini",
+      "request_bytes": 1610,
+      "request_bytes_method": "adapter.payload 序列化重建（非 wire 抓包）",
+      "timeout_s": 300.0,
+      "message_roles": [
+        "system",
+        "user"
+      ],
+      "elapsed_ms": 20032.8,
+      "ok": true,
+      "answer_chars": 65,
+      "finish_reason": "stop",
+      "input_tokens": 713,
+      "output_tokens": 90,
+      "usage_estimated": false,
+      "error_body_excerpt": null,
+      "error_kind": null,
+      "http_status": 200
+    }
+  ],
+  "ledger": {
+    "path": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206\\conversations.db",
+    "rows": 1,
+    "row": {
+      "id": 1,
+      "trace_id": "p0-failover-6146ff1417d7",
+      "request_id": "p0-req-89b55677",
+      "route_mode": "rag",
+      "route_reason": "[\"CAPABILITY_MATCH\", \"LOCAL_PREFERRED\", \"HIGHER_PRIORITY\"]",
+      "provider": "ollama",
+      "model": "phi3:mini",
+      "fallback_index": 1,
+      "input_tokens": 713,
+      "output_tokens": 90,
+      "total_tokens": 803,
+      "ttft_ms": null,
+      "latency_ms": 61633.808,
+      "estimated_cost": 0.0,
+      "currency": "USD",
+      "success": 1,
+      "error_type": null,
+      "status_code": null,
+      "created_at": "2026-09-24T13:53:17Z"
+    },
+    "canary_needles": [
+      "CANARY-9c1f4e7a-6b0d-4e2f-8a13-zhengju",
+      "请用中文分点回答：员工出差住宿需要注意哪三件事？每条一句话，依据上面给出的资料。",
+      "CANARY-9c1f4e7a-6b0d-4e2",
+      "你是 yaoke 企业知识助手。\n你可以使用两类",
+      "请依据以下证据回答问题"
+    ],
+    "canary_hits": [],
+    "tables": [
+      "llm_request_logs",
+      "sqlite_sequence"
+    ],
+    "protected_repo_ledgers": {
+      "E:\\xiangmu\\rag\\backend\\data\\conversations.db": 0,
+      "E:\\xiangmu\\rag\\data\\conversations.db": null
+    }
+  },
+  "trace": {
+    "path": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206\\agent_traces.jsonl",
+    "lines": 1,
+    "trace_id": "p0-failover-6146ff1417d7",
+    "model_route_keys": [
+      "attempts",
+      "context_dropped",
+      "fallbacks",
+      "mode",
+      "primary",
+      "requirements",
+      "selected_index",
+      "selected_reason_codes",
+      "stage"
+    ],
+    "model_route_attempts": [
+      {
+        "model": "ornith-1.5:9b-text",
+        "result": "failed",
+        "error_type": "model_unavailable"
+      },
+      {
+        "model": "phi3:mini",
+        "result": "success",
+        "error_type": null
+      }
+    ],
+    "model_route_stage": "fallback",
+    "model_route_selected_index": 1
+  },
+  "chain": {
+    "selected_index": 1,
+    "reason_codes": [
+      "CAPABILITY_MATCH",
+      "LOCAL_PREFERRED",
+      "HIGHER_PRIORITY"
+    ],
+    "attempts": [
+      {
+        "model_id": "ollama-ornith",
+        "result": "failed",
+        "error_type": "model_unavailable"
+      },
+      {
+        "model_id": "ollama-phi3",
+        "result": "success",
+        "error_type": null
+      }
+    ],
+    "response_model": "phi3:mini"
+  },
+  "sha1_scope_note": "files_sha1 覆盖：临时库、临时 trace、A-2 探针件、本用例源码（stale 检测）。不含证据文件自身与矩阵/闸文件（见上）。",
+  "files_sha1": {
+    "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206\\conversations.db": "b93ce392a1d7c4c1c9aa89ff81e852f4643ef0b1",
+    "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206\\agent_traces.jsonl": "356826f73d7c9f8a839a7089f77d023f7feef21f",
+    "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\ornith-primary-load-probe.json": "961985e87a275677bfa23fa02f3eef6f7cd51380",
+    "E:\\xiangmu\\rag\\backend\\tests\\test_real_llm_failover_acceptance.py": "da92cdf51de5dbfad3107f1dc744d18e4173e07c"
+  },
+  "self_validation_problems": [],
+  "green_permission": {
+    "case_id": "REAL-LLM-FAILOVER-001",
+    "checked_at": "2026-09-24T13:53:58+00:00",
+    "matrix_status_now": "BLOCKED",
+    "evidence_path": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\real-llm-failover-001.json",
+    "evidence_present": false,
+    "evidence_problems": [
+      "证据不是 JSON 对象（缺文件 / 解析失败 / 有人手写了个字符串）"
+    ],
+    "conditions": [
+      {
+        "name": "证据 JSON 存在于约定路径",
+        "ok": false,
+        "detail": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\real-llm-failover-001.json（missing）"
+      },
+      {
+        "name": "证据内部自洽（10 枚断言各自带实测值）",
+        "ok": false,
+        "detail": "证据不是 JSON 对象（缺文件 / 解析失败 / 有人手写了个字符串）"
+      },
+      {
+        "name": "矩阵 P0 行当前状态 ∈ {BLOCKED, GREEN}",
+        "ok": true,
+        "detail": "现读状态 = BLOCKED"
+      }
+    ],
+    "green_permitted_by_evidence": false,
+    "note": "即便 green_permitted_by_evidence=true，改矩阵的动作仍归主 agent；本函数只给判据，不碰 docs/MODEL_ROUTER_V23_MATRIX.md。"
+  },
+  "run_artifacts": {
+    "run_dir": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206",
+    "ledger": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206\\conversations.db",
+    "trace": "E:\\xiangmu\\rag\\.superpowers\\sdd\\MODEL_ROUTER_V23_PLAN\\task10\\run\\20260924-215206\\agent_traces.jsonl"
+  }
+}

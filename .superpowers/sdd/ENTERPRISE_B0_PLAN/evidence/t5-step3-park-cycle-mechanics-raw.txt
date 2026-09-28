@@ -1,0 +1,11 @@
+sha BEFORE      : 4d7f974107dd9db2becbea672af5d92d916579c15f27d366c492ba78682dba8e
+parked to       : /tmp/tmp.cvKz0meNF8 (mktemp -d, outside the repo)
+.env in tree?   : no
+surface now     : 318  (must stay 318: no in-tree copy leaked onto the face)
+[restore] moved back
+sha AFTER       : 4d7f974107dd9db2becbea672af5d92d916579c15f27d366c492ba78682dba8e
+ASSERTION OK: byte-for-byte identical
+surface restored: 318
+STATUS IDENTICAL to the 8 pre-experiment lines
+ls backend/.env : -rw-r--r-- 1 zhang 197121 1561 Sep 23 15:06 E:/xiangmu/rag/backend/.env
+[trap] env-guard ran

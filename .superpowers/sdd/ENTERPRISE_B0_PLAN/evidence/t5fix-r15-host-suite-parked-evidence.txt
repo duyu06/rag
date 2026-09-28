@@ -1,0 +1,11 @@
+### 干净 checkout 模拟（证据件已移到仓外）cwd=repo root ###
+[credential-guard]   �������� 3 ��ͬ����ĵ�
+=========================== short test summary info ===========================
+FAILED backend/tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+1 failed, 1331 passed, 36 warnings, 1133 subtests passed in 329.51s (0:05:29)
+### 同一形态下 P0 那枚从 backend/ cwd 的读数（判据与 cwd 无关）###
+=========================== short test summary info ===========================
+FAILED tests/test_real_llm_failover_gate.py::P0MatrixStatusLockedToEvidenceTests::test_p0_row_status_matches_the_evidence
+1 failed in 2.16s
+sha256sum: .superpowers/sdd/MODEL_ROUTER_V23_PLAN/task10/real-llm-failover-001.json: No such file or directory
+restored: 

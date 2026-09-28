@@ -1,0 +1,8 @@
+### CELL B cwd=E:\xiangmu\rag\backend ###
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1370\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1370\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1370\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   data\\conversations.db \u21d2 C:\\Users\\zhang\\AppData\\Local\\Temp\\pytest-of-zhang\\pytest-1370\\llm-ledger-isolation0\\conversations.db
+[credential-guard]   ……另有 3 次同类读改道
+1332 passed, 36 warnings, 1133 subtests passed in 440.76s (0:07:20)
+rc=0
