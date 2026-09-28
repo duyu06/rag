@@ -4,7 +4,7 @@
 
 | Gate | 现状 | 关键证据 / 缺口一句话 |
 | --- | --- | --- |
-| G0 工程 | 部分 | `.github/workflows/ci.yml` 已有 build/测试/真BGE门禁/前端构建；缺 lint、typecheck、依赖扫描(pip-audit)、工具化 secret 扫描(gitleaks)、OpenAPI 契约测试 |
+| G0 工程 | 部分 | CI 有 build/**contract 套件**/真BGE门禁/前端构建；缺 lint、typecheck、依赖扫描(pip-audit)、工具化 secret 扫描(gitleaks)、OpenAPI 契约测试。**2026-09-29 勘误（B0 卡 D）**：原文把`python -m unittest discover` 计入"已有测试"，是低估——该步从原理上收不到模块级裸 pytest 函数，且在 main 上恒红、红到吞掉同 job 后续步骤。"有测试步"≠"测试被收集"，判据见新开的 `G20` |
 | G1 知识治理 | 大部分缺失 | payload 仅 8 字段（`ingestion.py:162`）；无 owner/version/checksum/密级/生效期；同名重传=覆盖重索引，无 superseded/active |
 | G2 检索质量 | 接近良好 | Hit@1/Hit@3/MRR 双实现有实测；缺 Recall@5、nDCG@10、graded relevance |
 | G3 生成质量 | 缺失 | `complex_accuracy.py` 只查拒答标记词与回合存在性；Groundedness/Correctness/Completeness 零自动度量 |
@@ -24,6 +24,7 @@
 | G17 版本治理 | 部分 | `retrieval_schema_version` 有且 demo 自动重建；用户文档不触发、无双索引灰度回滚 |
 | G18 Prompt 版本 | 缺失 | RAG/Agent prompt 为源码常量无版本号（仅 TypeSafe 有 PROMPT_VERSION） |
 | G19 Golden Dataset | 部分 | case schema 有雏形；缺 tenant/role/expected_sections/expected_answer_contains/answerable/forbidden_document 字段 |
+| G20 门禁收集面与行尾 | **已由 B0 闭合（2026-09-29）** | 新开：收集面完整性（裸函数被 runner 看不见）、单一 runner、依赖与 `requirements.txt` 同源、收集数钉、`.gitattributes` 行尾确定性。B0 交付：`backend/tests/test_ci_gate_contract.py` 16 枚门 + 八发变异台；远端 `backend-contracts` 首绿（1335 passed / 0 failed，compose 与 pwsh 两道首次真跑即绿）。**不含** lint/typecheck/pip-audit/gitleaks/OpenAPI（仍是 G0 的缺项） |
 
 ## 缺失能力 Top 排序（重要性 × 成本，靠前先做）
 

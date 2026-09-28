@@ -7,7 +7,7 @@
 | 计划 | `docs/ENTERPRISE_B0_PLAN.md`（7 枚任务） |
 | 执行方式 | SDD 逐任务：实现 → 独立评审 → 修复轮 → 定向复评。台账 `.superpowers/sdd/ENTERPRISE_B0_PLAN/progress.md` |
 | 起始状态 | HEAD = `7cc5efc` = tag `security-a-rc1`；工作树带两枚**不属于 B0** 的未提交改动（`backend/app/identity/README.md`、`__init__.py`） |
-| 状态 | **本地判据全部闭合；远端四条待回填**（B0-02 / B0-03 / B0-10 / B0-13 只能由 GitHub run 的 step 级读数结） |
+| 状态 | **`backend-contracts` 远端已 GREEN**（run `36472389872`：1335 passed / 0 failed；compose 与 pwsh 首次真跑即绿）。**但整个 run 仍 red**：`backend-integration` 缺 `argon2`、`backend-quality` 缺 `typesafe_sdk` —— 规格 §1 明令 B0 不得触碰这两枚 job，故属未做的既有缺口，不是本轮引入的回归 |
 | tag | **暂缓**（用户 2026-09-28 裁定：按清单提交并推送，tag 不在本轮） |
 
 ---
@@ -24,19 +24,19 @@ B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反
 | ID | 判据 | 读数 | 状态 |
 | --- | --- | --- | --- |
 | B0-01 | pytest 收集数 == 钉住常数 | `EXPECTED_COLLECTED = 1332`；本地两 cwd 与发布容器三处同数；门 `test_collected_count_matches_the_pinned_number` 绿 | **GREEN**（远端比对归 B0-03） |
-| B0-02 | 远端 `backend-contracts` **整 job** success | 尚无本轮 run | **PENDING_EXTERNAL** |
-| B0-03 | 同 commit 本地与远端收集数逐位相同 | 本地侧已备（1332） | **PENDING_EXTERNAL** |
+| B0-02 | 远端 `backend-contracts` **整 job** success | run `36472389872` ⇒ job **success**，非成功步骤数 = 0 | **GREEN** |
+| B0-03 | 同 commit 本地与远端收集数逐位相同 | 本地两 cwd `1335 passed / 0 failed / 1159 subtests`；远端同 commit `1335 passed / 2 warnings / 1159 subtests in 54.59s` ⇒ 枚数与子测数逐位相同（warnings 36↔2 属 §14 L9 的 env 耦合，不作跨环境判据） | **GREEN** |
 | B0-04 | §8.1 四格全绿且 `.env` 还原逐字节一致 | 四格 `1332 passed / 36 warnings / 1133 subtests`、rc=0、0 failed/0 errors/0 skipped；`.env` sha `4d7f974107dd` 前后相同 | **GREEN** |
 | B0-05 | 单 runner 钉绿 | 门绿；`ci.yml` 内无 `unittest discover` 步 | **GREEN** |
 | B0-06 | 依赖同源钉绿（含豁免表形状） | 门绿；豁免表恰 `pytest` + `torch`（CPU 发行源），多一处少一处皆红 | **GREEN** |
 | B0-07 | `.gitattributes` 的 no-op 性 | 静态 `checked=2 / offenders=0`；动态工作树聚合 sha 四时点恒等，`git status` 仅多出 `?? .gitattributes` 一行 | **GREEN** |
 | B0-08 | 行尾钉：无 `i/crlf`；`i/-text` == 枚举 3 枚；解析覆盖 313/313 | 门绿（含修复轮补的非空地板） | **GREEN** |
 | B0-09 | SECA-20 扫描门零漂移 | 面 316→318（逐枚归因），**命中 16 文件 / 31 处与 SEC-A 封版一字未动**，`EXEMPTIONS` 与 HEAD 逐字节相同 ⇒ 零新增豁免是被证明的 | **GREEN** |
-| B0-10 | compose 与 pwsh 两道首次真起跑各有结论 | 本地预检 `docker compose config --quiet` rc=0、pwsh 7.6.6 可用；**远端 step 结论未取** | **PENDING_EXTERNAL** |
+| B0-10 | compose 与 pwsh 两道首次真起跑各有结论 | run `36472389872`：两步均 **success** —— 它们**有史以来第一次被执行**（此前恒被上游红步吞掉，正是 §5.2 描述的机制在运行） | **GREEN** |
 | B0-11 | §9 变异逐发红 + 还原一致 | **8/8 `KILLED-ASSIGNED`**，0 `KILLED-INCIDENTAL`、0 `COLLECTION-BROKEN`；`--check` 12/12 rc=0；聚合面三时点回台账 | **GREEN** |
 | B0-12 | `backend/app/**` 未被 B0 改动 | 卡 J 三子句：`git diff --name-only HEAD -- backend/app` 减去两枚 identity 后为空；`--cached` 侧空；两枚 identity sha `3bc681bbc52c` / `2cfab9f18182` == 基线 | **GREEN** |
-| B0-13 | 全量 pytest 的 CI 耗时读数与 cache 取舍 | 本地四格 129.53–211.46s（控制器本人 178.43s）；容器 3.12/Linux 全量 107.52s、collect 11.44s；门内子进程收集占模块 96%、约全量 10–16% | **PENDING_EXTERNAL**（远端安装步耗时与命中率未取） |
-| B0-14 | `G20` 新开 + `G0` 勘误落档 | 卡 D；`docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md` 的 `G20` 行与 `G0` 措辞在 Task 7 远端闭合后落笔 | **PENDING_EXTERNAL** |
+| B0-13 | 全量 pytest 的 CI 耗时读数与 cache 取舍 | 远端套件 **54.59s**、SECA-20 子集 1.19s；本地 Windows 两格 182.78s / 183.95s；容器 3.12/Linux 107.52s。门内子进程收集占模块 96%、约全量 10–16%。**cache 命中率无分步读数** ⇒ 取舍半边仍开 | **GREEN**（耗时）／**PENDING_EXTERNAL**（cache 取舍） |
+| B0-14 | `G20` 新开 + `G0` 勘误落档 | 已落：`docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md` 新增 `G20 门禁收集面与行尾` 行；`G0` 行加"有测试步 ≠ 测试被收集"勘误并指向 G20 | **GREEN** |
 | B0-15 | 容器内 3.12 那一格有读数 | `rag-backend:security-a-rc1` / Python 3.12.14 / 无 `.env`：`1332 collected`，格内 `3 failed, 1329 passed`（三枚归因见 §4） | **GREEN** |
 
 ## 3. 本轮交付面
@@ -187,18 +187,76 @@ B0 交给 B1 的是"任何新进 `backend/tests/` 的门都会被 CI 收集"这�
 
 ### 10.2 本轮结论
 
-**B0-02 / B0-10 / B0-13 不闭合**，且不可闭合的原因不是 B0 的改造有缺陷，而是 B0 让 CI 第一次真正跑到了
+**（2026-09-29 更新）这三条已闭合**：`fix(sec-a-corr-01)` 把 `record.get()` 换成属性接口并加三枚 AST 级结构钉；`test(v2.3-p0)` 把 P0 证据改成可移植载体。远端从 99 红降到 0 红，`backend-contracts` 整 job success。让主门第一次跑到 1335 枚的是 B0，把两条早已躺在已提交代码里的缺陷翻出来的也是 B0。剩余 run 级 red 属另两枚 job 的依赖清单漂移（B0 按规格不得触碰）。tag 仍按用户裁定暂缓。
+
+**（原文照录，不删）** B0-02 / B0-10 / B0-13 不闭合，且不可闭合的原因不是 B0 的改造有缺陷，而是 B0 让 CI 第一次真正跑到了
 那 1332 枚，从而把两条**早已存在于已提交代码里**的缺陷暴露在门禁上：一条是 SEC-A 自己留下的未提交依赖，
 一条是 V2.3 那枚闸的单机耦合。tag 已由用户裁定暂缓，本轮不打。
 
+### 10.3 闭合往返（run `36472389872` @ commit `b825112`，即当前 HEAD）
+
+`gh run view --json jobs / --log / --log-failed` 实测，读数以逐步骤、逐行为单位落档：
+
+| 项 | 读数 | 状态 |
+| --- | --- | --- |
+| 整 run | `failure`（4 job：`backend-contracts` **success**、`frontend-build` **success**、`backend-integration` failure、`backend-quality` failure） | — |
+| `backend-contracts` 步骤级 | 11 步（含 Post 段共 15 步）**全部 success**，非成功步骤数 = **0** | **GREEN** |
+| 主门 `Run backend contract suite (single runner: pytest)` | `1335 passed, 2 warnings, 1159 subtests passed in 54.59s` ⇒ 0 failed / 0 errors / 0 skipped | **GREEN** |
+| `Validate Docker Compose configuration` | **success**（该步历史上从未被执行过） | **GREEN** |
+| `Validate Windows deployment script syntax` | **success**（同上） | **GREEN** |
+| `Cache pip wheels` / `Post Cache pip wheels` | success / success，但 workflow 未导出分步命中读数 ⇒ **无法据此判定命中与否** | cache 取舍仍 **PENDING_EXTERNAL** |
+| 本地 ↔ 远端逐位 | 本地两 cwd `1335 passed / 0 failed / 1159 subtests`；远端同 commit 同数 ⇒ B0-03 的"逐位相同"成立（warnings 36 ↔ 2 属 §14 L9，不作跨环境判据） | **GREEN** |
+
+**上一节两条根因各自的闭合证据**：
+根因 A ⇒ `9bed85a` 把 `record.get("feishu_open_id")` 换成 `getattr` 属性接口，并由
+`RecordInterfaceShapeTests` 三枚 AST/语义钉钉住"不得再出现 `Mapping.get` 调用点"（这一枚单独开作
+SEC-A-CORR-01，不归 B0）；根因 B ⇒ `64ec762` + `71cc5e1` 把 P0 证据改成**可移植载体**（portable bundle +
+manifest 的 sha256 外锚 + raw 层条件判据），干净签出下 `source_run_dir` 缺席只把 raw 层判为不可用，
+不再把整枚闸彩排成 `BLOCKED`。
+
+**剩余 run 级 red 的逐条归因**（两者 B0 按规格 §1 均**不得触碰**，属既有缺口而非本轮回归）：
+`backend-integration` ⇒ `ModuleNotFoundError: No module named 'argon2'`；
+`backend-quality` ⇒ `ModuleNotFoundError: No module named 'typesafe_sdk'`。
+⇒ 与 §15 交给 B1 的"依赖清单同源化"是同一条债，只是那两枚 job 的清单不在 B0 的白名单里。
+
 ## 11. 冻结基线读数
+
+**方法先说清**：下面所有 12 位锚点一律是**对文件原始字节取 sha256、截前 12 位**（不是 git blob sha1；
+本节早先的读数没有标算法，这本身就是一枚可复现性缺陷，在此补上）。测量式：
+`hashlib.sha256(Path(f).read_bytes()).hexdigest()[:12]`。
 
 控制器本人复跑（提交前）：`python -m pytest backend/tests -q` ⇒
 **1332 passed, 36 warnings, 1133 subtests passed in 178.43s**，rc=0。
 
-字节锚点：`ci.yml` `1c706e165b73`（147 CRLF / 0 bare LF）、
+字节锚点（B0 自身收口时点）：`ci.yml` `1c706e165b73`（147 CRLF / 0 bare LF）、
 门文件 `a0b9f37f32bb`（832 LF / 0 CRLF / 50994 B）、`.gitattributes` `c5d07b5dc438`（18 LF / 0 CR）、
 SEC-A 扫描模块 `fd39d7d374f9`（与上一 commit 逐字节相同 ⇒ 零豁免漂移可证）、
 identity 两枚 `3bc681bbc52c` / `2cfab9f18182`（未触碰）、
 `.env` `4d7f974107dd`、跟踪面聚合 `d30366c6a440`@313 / `2685edde76fe`@311、
 扫描面 318 文件 / 16 命中 / 31 处。
+
+### 11.1 闭合时点（HEAD `b825112`）的复量与逐枚归因
+
+远端与本地同 commit 的读数见 §10.3。锚点在两枚文件上**合法漂动**，其余逐字符回台账：
+
+| 件 | 收口时点 | 闭合时点 | 漂动原因 |
+| --- | --- | --- | --- |
+| `backend/tests/test_ci_gate_contract.py` | `a0b9f37f32bb` | `893d59b4d74b` | `05334eb` 把 `EXPECTED_COLLECTED` 从 1332 重锚到 1335；字节数（50994 B / 832 LF）与行数一字未动 ⇒ 只有那三位数字变了 |
+| `backend/app/identity/__init__.py` | `2cfab9f18182`（工作树态、未提交） | `2cfab9f18182`（已提交） | 同一份字节：B0-12 量的是"工作树 == 基线工作树"，CORR-01 只是把它入库 ⇒ B0 未触碰 `backend/app/**` 这条判据不变 |
+| `ci.yml` / `.gitattributes` / SEC-A 扫描模块 | `1c706e165b73` / `c5d07b5dc438` / `fd39d7d374f9` | 三枚**逐字符相同** | 闭合往返没有动这三枚；`fd39d7d374f9` 相同 ⇒ `EXEMPTIONS` 表零漂移仍然成立 |
+
+新落档（闭合时点首次有锚）：`backend/tests/real_llm_failover_kit.py` `bc5c90c7616c`（136036 B / LF-only）、
+`backend/tests/test_real_llm_failover_gate.py` `1ecc82b411e1`（55602 B / LF-only）、
+`backend/tests/test_feishu_identity_contract.py` `19394dbd78c6`（110364 B / LF-only）。
+
+**交付面 313 → 447 的逐枚归因**（`git ls-tree -r 7cc5efc` vs `git ls-files -c -o --exclude-standard` 实测差集 134 枚）：
+`.superpowers/**` +121（SDD 过程件与 evidence 目录）、`docs/` +10（含 6 枚 P0 portable evidence JSON 与三份额外文档）、
+`.gitattributes` +1、`backend/tests/test_ci_gate_contract.py` +1、`scripts/b0_collection_probe.py` +1。
+⇒ 面涨了 134 枚而**命中仍是 16 文件 / 31 处、`EXEMPTIONS` 一字未动**，且这是在远端那台机器上被证明的
+（§10.3 的 `Run SECA-20 delivery-surface secret scan` = success）。这条比 B0-09 的原读数强：
+新增的 217 枚 `.superpowers` 过程件里零命中，是被门禁跑出来的，不是我扫出来再抄进来的。
+
+**`.env` 一维**：`backend/.env` 此刻**仍在原位**（1561 B、0 CRLF / LF 行、sha256 前 12 位 `4d7f974107dd`
+与收口时点逐字符相同 ⇒ §8.1 的"移出再逐字节还原"确实还原了）。它被 `.gitignore:6` 的精确路径挡在
+跟踪面与扫描面之外（`git ls-files` 无此项），所以 447 枚里没有它 —— 与 §8.1 的结论一致：该维度中性。
+
