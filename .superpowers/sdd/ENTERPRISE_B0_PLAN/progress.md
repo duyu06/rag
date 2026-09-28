@@ -471,3 +471,22 @@
   ⇒ 结论与措辞纪律：Task 7 可以安全入库、且入库后面数仍 318（今天它被 `--exclude-standard` 挡在 untracked 外），
   但验收文档**不得**写"该证据件已通过密钥扫描门"；只能写"门按前缀不覆盖此路径，本会话以同一组 face
   手工量得 0 命中"。若将来要真覆盖它，那是改 `_UNSCANNED_PREFIXES` 的安全面决策，归 B1 / §18，不属 B0。
+
+- **R23（远端往返 run 36436145777 @ `9482f44`）**：`backend-contracts` 步骤级 =
+  Cache / 同源 Install / SECA-20 扫描 / compileall / demo-assets **全 success**，
+  主门 **failure**（`99 failed, 1219 passed, 20 errors / 84.23s`），compose 与 pwsh 两步 **skipped**
+  （主门一红即中止 —— §5.2 那条机制当场自证）。
+  逐条归因：113 条红/错里 **111 条**同一句 `AttributeError: 'UserIdentity' object has no attribute 'get'`、
+  **1 条** P0 证据闸、**1 条** 冷启动登录 500（前者的下游）。
+  ⇒ **B0 的改造本身在远端是成立的**（收集、依赖、扫描、顺序全部按规格跑通）；
+  红来自两条**早已在已提交代码里**的缺陷，B0 只是第一次把它们跑到门禁上。
+- **R24（否证上一封版结论，控制器独立复现）**：在 `%TEMP%` 干净克隆到 `7cc5efc`（= `security-a-rc1`）
+  复跑 `test_rbac_contract` 的 login-payload 一枚 ⇒ **同一句失败**；该树 `identity/__init__.py:63`
+  即 `record.get(...)`。⇒ **SEC-A 报告的"两 cwd 各 1316 passed"是带着未提交的 identity 修复量出来的**，
+  `security-a-rc1` 的树本身不绿。这不是本轮引入的，但它使上一张验收文档的该结论作废，需用户裁如何更正。
+- **R25（P0 闸的单机耦合，入库 evidence 不足以解）**：`kit.validate_evidence()` 无条件重算
+  `files_sha1` 的**绝对路径**四枚，其中三枚（`run/<ts>/conversations.db`、`agent_traces.jsonl`、
+  `ornith-primary-load-probe.json`）落在 gitignored 的 `.superpowers/` 下且未被跟踪 ⇒
+  干净 checkout 必然 missing ⇒ 闸要求 `BLOCKED` 而矩阵写 `GREEN` ⇒ 恒红。
+  彻底解需入库一次真机运行的 sqlite + trace 原文（`.db` 还会新增一枚 `i/-text`，撞 §6.4 枚举钉），
+  或改该闸语义 ⇒ **两条都在 B0 白名单之外**，已停手交用户裁。

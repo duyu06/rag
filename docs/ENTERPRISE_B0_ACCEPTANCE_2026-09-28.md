@@ -147,15 +147,49 @@ B0 交给 B1 的是"任何新进 `backend/tests/` 的门都会被 CI 收集"这�
 落盘键名黑名单（8 枚调用点 / 6 份文件，等式钉 4→6）、文档元数据与摄取侧止血、
 以及 §8 的依赖解析可复现性。B2 拿到的是单一指标实现的前提。
 
-## 10. 远端往返（待回填）
+## 10. 远端往返（run `36436145777` @ commit `9482f44`）
+
+`gh run view --json jobs / --log-failed` 实测：
 
 | 项 | 读数 | 状态 |
 | --- | --- | --- |
-| run id / URL | — | 待取 |
-| `backend-contracts` 整 job | — | **PENDING_EXTERNAL** |
-| step 级：Install / SECA-20 / contract suite / compose / pwsh | — | **PENDING_EXTERNAL** |
-| 远端收集数 vs 本地 1332 | — | **PENDING_EXTERNAL** |
-| 安装步耗时与 cache 命中 | — | **PENDING_EXTERNAL** |
+| 整 run | `failure`（4 job：frontend-build **success**、backend-contracts failure、backend-integration failure、backend-quality failure） | — |
+| `backend-contracts` 步骤级 | Set up / checkout / setup-python / **Cache pip wheels** / **Install（同源 requirements.txt）** / **SECA-20 扫描** / compileall / validate_demo_assets ⇒ **全 success** | **GREEN** |
+| 主门 `Run backend contract suite` | **failure**：`99 failed, 1219 passed, 20 errors, 1127 subtests in 84.23s` | **BLOCKED**（归因见下） |
+| compose 配置校验 / pwsh 语法校验 | **skipped**（主门红 ⇒ 同步中止，正是 §5.2 描述的那条机制仍在生效） | **PENDING_EXTERNAL** |
+| 远端收集数 | 与本地同为 1332 面（99+1219+20 计入方式见日志） | 待正式核对 |
+
+### 10.1 主门红的两条根因，都不属于 B0 的改造
+
+远端逐条统计（`--log-failed` 里 `FAILED|ERROR backend/tests/` 共 **113 条**）：
+**111 条**同一句 `AttributeError: 'UserIdentity' object has no attribute 'get'`，
+**1 条** P0 证据闸，**1 条** `test_booting_twice_on_a_file_that_already_has_rows_changes_nothing`
+（"第 1 遍冷启动后登录不上：Internal Server Error"，是前一条的下游——登录腿炸在同一个 `.get()` 上）。
+
+**根因 A（112/113）**：已提交的 `backend/app/identity/__init__.py` 里 `resolve_for_user()` 仍是
+`record.get("feishu_open_id")`，而 SEC-A 已把 `record` 换成 `directory.UserIdentity`（pydantic 模型，
+没有 `.get()`）；宿主那份**未提交**的工作树改动把它改成了 `getattr(record, "feishu_open_id", "")`。
+⇒ CI 跑提交版、宿主跑修好的版本，两边不是同一份代码。
+**这条同时否证了上一封版结论**：控制器在 `%TEMP%` 干净克隆到 `7cc5efc`（= `security-a-rc1`）复跑
+`test_rbac_contract.py::…test_login_payload_exposes_canonical_role_and_permissions`，**当场同一句失败**，
+且该树里 `identity/__init__.py:63` 就是 `record.get(...)`。
+⇒ **"SEC-A 两 cwd 各 1316 passed" 是带着未提交修复量出来的**；`security-a-rc1` 的树本身不绿。
+
+**根因 B（1 枚，`test_p0_row_status_matches_the_evidence`）**：仅入库 evidence JSON **不够**。
+`kit.validate_evidence()` 无条件重算 `files_sha1` 里的**绝对路径**，四枚分别是
+`…\task10\run\20260924-215206\conversations.db`、`…\agent_traces.jsonl`、
+`…\task10\ornith-primary-load-probe.json`、`backend\tests\test_real_llm_failover_gate.py`——
+前三枚都落在 `.superpowers/` 下且**未被跟踪**。干净 checkout 里它们必然 missing ⇒ `problems` 非空 ⇒
+闸要求矩阵写 `BLOCKED`，而矩阵写 `GREEN` ⇒ 红。
+⇒ 这枚闸**在设计上就是绑定单机的**：只有跑过那一次真 failover 的这台机器、这个绝对路径下才可能满足。
+要让它跨机成立，只能把一次真机运行的 **sqlite 库 + trace 原文**一并入库（其中前三枚是运行数据，
+`.db` 还会新增一枚 `i/-text`、撞上 §6.4 的枚举钉），或改变该闸的语义。**两条都在 B0 白名单之外，交用户裁**。
+
+### 10.2 本轮结论
+
+**B0-02 / B0-10 / B0-13 不闭合**，且不可闭合的原因不是 B0 的改造有缺陷，而是 B0 让 CI 第一次真正跑到了
+那 1332 枚，从而把两条**早已存在于已提交代码里**的缺陷暴露在门禁上：一条是 SEC-A 自己留下的未提交依赖，
+一条是 V2.3 那枚闸的单机耦合。tag 已由用户裁定暂缓，本轮不打。
 
 ## 11. 冻结基线读数
 
