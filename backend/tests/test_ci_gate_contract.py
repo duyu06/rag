@@ -641,6 +641,13 @@ REQUIRED_GITATTRIBUTES_RULES = (
     "* text=auto",
     "*.sh text eol=lf",
     "*.ps1 text eol=crlf",
+    # 2026-09-29 加的第四枚：P0 闸的外部锚 `[I2]` 量的是**检出后**的字节，而 `* text=auto` +
+    # `eol: unspecified` 把检出形态交给每台机器的 core.autocrlf —— Windows 干净 clone 会把
+    # `docs/evidence/**` 六枚 bundle JSON 拉成 CRLF，于是同一枚 commit 在 Linux 绿、在 Windows 红
+    # （台账 R32 / 3B 报告 F9 的隔离实验：同一 clone 只改行尾 ⇒ `3 failed` ↔ `15 passed`）。
+    # 规则只写在 `.gitattributes` 里不够：没有这一枚钉，任何人删掉它就静默退回那台单机耦合的闸。
+    # 所以并进这枚**已存在**的门——加一条必需规则，不新增测试、不动收集数钉。
+    "docs/evidence/** text eol=lf",
 )
 REQUIRED_BINARY_RULES = ("*.png", "*.jpg", "*.jpeg", "*.webp", "*.ico",
                          "*.gif", "*.woff", "*.woff2")

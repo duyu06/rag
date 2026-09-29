@@ -790,3 +790,76 @@ manifest 里 raw_provenance.acceptance_module 的新字段实测：
 **为什么这枚重钉是「可见的代码改动」而不是「洗平判据」**：改的是 `git rev-parse` 拿得到的
 载体字段与一份机械投影，`test_real_llm_failover_gate.py` 里那枚常数的 diff 与 bundle 的 diff
 在同一批里，评审一眼看得见；台账 §F7 说的残余信任根不因为本轮而消失，也不因为本轮而加重。
+
+---
+
+### F9. 控制器本人复现（2026-09-29）+ 一枚**新发现的真源缺陷**
+
+F5 那十四发的读数是 implementer 写的，我在压缩前的台账里把它标成「未由我复现、不得当作已验」。
+本节是**我自己重跑**的结果，跑法与 F5 同一枚台子、同一份 HEAD（`b825112` 的代码面，工作树经逐字节
+核对 == blob）：
+
+```
+--check            基线六枚 RESTORED-OK ×6 + 闸文件外部锚在场且唯一=True + 序列化口径可逆=True
+                   锚点 M1..M9 / N1..N5 逐发 ANCHOR-OK，needle 计数 3/3、2/2、1/1 全带锚
+--anchor-selftest  两枚故意错的 needle 都响：TARGET-NOT-FOUND ×1、ANCHOR-NOT-UNIQUE ×3（不落盘）
+整轮十四发          M1..M9 + N1..N5 = KILLED-ASSIGNED-RESTORED-OK ×14，rc=0
+                   计划外附带红 = [] ×14；还原核对该行出现 ×14（sha256 同 + 外部 cmp rc=0 + 基线核对）
+                   计数: {'KILLED': 14}，park 目录已删 = True
+```
+
+原始输出落盘：`evidence/p0-3b-bench-controller-repro-2026-09-29.txt`（7809 B，未入库）。
+干净态定向复跑（同一次运行后）：四枚被触碰模块 `183 passed / 0 failed / 243 subtests in 125.10s`，
+收集探针 `TOTAL 1335`。⇒ F5 的结论**成立**，从"implementer 声称"升格为"控制器复现"。
+
+**简报那六条读数逐条对上（我这轮的层级都标出来）**：
+
+| 读数 | 我的复现 | 层级 / 状态 |
+| --- | --- | --- |
+| 1 干净签出闸绿 | Windows clone **红**（3 failed，`[I2]`），同 clone 改回 LF **绿**（15 passed）；Linux/CI 形态由远端 run `36472389872` 的 1335 里这枚闸通过 | **条件成立**——"可移植"目前只在 LF 检出形态上成立，见下方新缺陷 |
+| 2 本机 raw 在场且执行 | `kit.p0_evidence_verdict()` 直读：`raw_state='full'`、portable / truth / raw 三组 problems 全 `[]`、两枚运行件 `sha1 == declared == recorded` | **复现** |
+| 3 十四发逐发杀 | 见上，`KILLED-ASSIGNED-RESTORED-OK` ×14、`[]` 附带红 ×14、rc=0 | **复现** |
+| 4 闸模块整模块绿 + SEC-A 46 passed + 零新增豁免 | 闸模块在 clone/本机两侧皆 15 passed；SEC-A 单跑 **46 passed**，`git diff --stat` 对该文件**为空** | **复现** |
+| 5 收集数 1335 + B0 十六枚门 | `TOTAL 1335`；`test_ci_gate_contract.py` 单跑 **16 passed** | **复现** |
+| 6 全量两 cwd | 我没有重跑（本轮自 `b825112` 起**没有改动任何代码面**，工作树逐字节 == blob，而远端在同一 commit 上量过 `1335 passed / 0 failed`）；这条沿用 R30 的读数与 §10.3 的远端读数，**不冒称本轮新量** | 沿用（层级已注明） |
+
+
+**残留核对做到三层，不是因为台子可信**：`git cat-file blob HEAD:<path>` 与工作树逐字节 `==`
+（三枚：manifest / 闸文件 / primary-probe）；`PORTABLE_MANIFEST_SHA256` == manifest 工作树 sha256
+（`c39a09f8…`）；raw 层两枚运行件 sha1 == manifest `raw_provenance` 声明值
+（`conversations.db b93ce392a1d7…`、`agent_traces.jsonl 356826f73d7c…`）。
+
+**我自己的一次破坏，如实记在这里**：第一轮整轮我放后台跑，看到 `PORTABLE_MANIFEST_SHA256` 在变
+就误判成异常，**中途 kill** ⇒ M5 的注入字节留在三枚已跟踪文件里。事实上台子**必须**同时按 pin
+（台头 ③：改 manifest 不改锚，`[I2]` 会先响，后面 `[I3]`–`[I7]` 到底有没有牙就永远读不出来），
+所以那三处漂移是正常注入，不正常的是我打断它。
+⇒ 教训：**这枚台子在跑的时候工作树必然是脏的，且 kill 一次就留下真脏树**；处置只能按 `--check`
+的基线值逐枚回到 blob，`git restore` 单独用不够（见下一条）。已登记为台账 R31。
+
+**新发现（真源缺陷，不是仪表病）：`[I2]` 外部锚依赖 checkout 的行尾形态。**
+Windows 上干净 clone 实测：`docs/evidence/**` 六枚 JSON 全被 smudge 成 **CRLF**，
+manifest 工作树 sha256 变成 `91b0dff6…` ≠ 钉住的 `c39a09f8…`（后者是 blob / Linux CI 形态）。
+`git check-attr` 给的机制是它自己说的：`text: auto` + `eol: unspecified` ⇒ 检出形态由
+`core.autocrlf=true` 决定。⇒ **同一枚 commit 在远端 Linux 绿、在 Windows 签出必红**；
+R26-③ 想要的"可移植载体"在行尾这一维上还没成立。
+
+**这一条是隔离出来的，不是推出来的**（同一枚 clone、同一份 HEAD，只把行尾当唯一变量）：
+
+| 同一 clone 的两态 | 命令 | 读数 |
+| --- | --- | --- |
+| 检出原样（六枚 CRLF） | `pytest tests/test_real_llm_failover_gate.py` | **3 failed / 14 passed / 32 subtests**：`test_p0_row_status_matches_the_evidence` 红（`'BLOCKED' != 'GREEN'`，portable 层 **17 条问题**），两枚 `SUBFAILED` 是退化探针自己拒绝——它明说「baseline 已经带着 `[I2]` sha256 不配：bundle 本身就不成立，这发探针证明不了任何事」 |
+| 六枚就地改回 LF（工作树 == blob） | 同上 | **15 passed / 0 failed / 34 subtests in 9.29s** |
+
+⇒ 根因**只有行尾**，而且闸的拒绝式文案在这里干了对的事：它没有让那两发探针在坏基线上假绿。
+B0 的行尾门抓不到它，因为那些钉量的是 index 侧（index 里一直是 LF，无违规），不是检出侧。
+两条候选，**都还没动**，待用户 / 独立评审裁：
+
+- **A（我倾向）**：`.gitattributes` 加 `docs/evidence/** text eol=lf`。结构性确定、判据一字不动，
+  代价是改一枚**有锚的交付面文件**（`c5d07b5dc438`）并同步 B0 验收 §11，且门 13 的必需规则集
+  要确认加一条不会红（它钉的是"三枚必须在"，不是"只许三枚"，但这条得实测而不是推断）。
+- **B**：kit 哈希前先做 CRLF→LF 规范化。只动载体，但把"逐字节"这句话改弱了，
+  而且是**判据代码**在替 git 做决定。
+
+顺手一条同族事实：`git restore` 之后 `git status` 仍会把这三枚显示成 ` M`（工作树是 LF、
+autocrlf 期望 CRLF），而 `git diff` 为空 ⇒ 这是 stat-dirty 不是内容差。**别把它读成残留**，
+但也别用它当"干净"的证据——判据是逐字节 `==` blob。

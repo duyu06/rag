@@ -16,3 +16,8 @@
 *.gif binary
 *.woff binary
 *.woff2 binary
+
+# P0 portable bundle 的外部锚量的是**检出后**的字节（`[I2]`），而 `* text=auto` + `eol: unspecified`
+# 会把检出形态交给每台机器的 core.autocrlf：Windows 干净 clone 因此把六枚 JSON 拉成 CRLF，同一枚
+# commit 在 Linux 绿、在 Windows 红。这里显式钉成 LF —— 入库形态本来就一直是 LF，本规则只统一检出侧。
+docs/evidence/** text eol=lf

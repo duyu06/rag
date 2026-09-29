@@ -130,6 +130,18 @@ L5 切换前后 `Ran N` 类历史读数不可混读；**L6 自指盲区不可消
 现有缓解只有常数双写与评审看收集数；L7 B0 全绿只能由远端结；
 **L8 开区间依赖的解析不可复现是真债**（本轮只修症状），归 B1；
 **L9 warning 总数不是跨环境绝对量**（`JWT_SECRET` 31B vs 45B ⇒ 36 vs 2），不得建跨环境绝对值门。
+**L10 B0 的行尾四枚钉全部量 index 侧（`i/…`），管不到"检出侧"**：`* text=auto` + `eol: unspecified`
+的文本在 Windows 上跟 `core.autocrlf` 走，于是**同一枚 commit 的检出字节在两台上不同**。
+这不是 B0 引入的（B0 之前根本没有 `.gitattributes`），但 B0 之后它有了可被证伪的后果——
+V2.3 P0 闸的外部锚取的是**工作树** sha256，Windows 干净 clone 因此红在 `[I2]`
+（隔离实验：同一 clone 只改行尾 ⇒ `3 failed` ↔ `15 passed`；台账 R32 / 3B 报告 F9）。
+**修法 A 已由用户 2026-09-29 裁定并实施**：`.gitattributes` 增加 `docs/evidence/** text eol=lf`
+（入库形态本来就一直是 LF，这条只统一**检出**侧），并把这枚规则**并进门 15 的必需规则集**
+（`REQUIRED_GITATTRIBUTES_RULES` 三枚 → 四枚）——不新增测试、不动收集数钉；
+摘掉那一行当场 `1 failed`、点名 `['docs/evidence/** text eol=lf']`，`finally` 按原字节写回。
+⇒ L10 现在说的是"已知且已钉"，而不是"已知且已解决"：**远端那一格还没读**（本轮 push 后的 run），
+而 `.gitattributes` 自己没有 `eol=` 规则（`git add` 时会提示"LF will be replaced by CRLF"），
+它管住了别人没管住自己——功能上无害（属性表按空白分隔，与行尾无关），登记在此不做第二轮扩张。
 
 ## 8. 开放边界（不假装已解决）
 
@@ -243,7 +255,9 @@ identity 两枚 `3bc681bbc52c` / `2cfab9f18182`（未触碰）、
 | --- | --- | --- | --- |
 | `backend/tests/test_ci_gate_contract.py` | `a0b9f37f32bb` | `893d59b4d74b` | `05334eb` 把 `EXPECTED_COLLECTED` 从 1332 重锚到 1335；字节数（50994 B / 832 LF）与行数一字未动 ⇒ 只有那三位数字变了 |
 | `backend/app/identity/__init__.py` | `2cfab9f18182`（工作树态、未提交） | `2cfab9f18182`（已提交） | 同一份字节：B0-12 量的是"工作树 == 基线工作树"，CORR-01 只是把它入库 ⇒ B0 未触碰 `backend/app/**` 这条判据不变 |
-| `ci.yml` / `.gitattributes` / SEC-A 扫描模块 | `1c706e165b73` / `c5d07b5dc438` / `fd39d7d374f9` | 三枚**逐字符相同** | 闭合往返没有动这三枚；`fd39d7d374f9` 相同 ⇒ `EXEMPTIONS` 表零漂移仍然成立 |
+| `ci.yml` / SEC-A 扫描模块 | `1c706e165b73` / `fd39d7d374f9` | 两枚**逐字符相同** | 闭合往返没动这两枚；`fd39d7d374f9` 相同 ⇒ `EXEMPTIONS` 表零漂移仍然成立 |
+| `.gitattributes` | `c5d07b5dc438`（18 LF / 0 CR / 435 B） | **`b85430dbe6d1`**（23 LF / 0 CR / 846 B） | L10 的修法 A：新增 `docs/evidence/** text eol=lf` + 四行说明。这是**检出侧**规则，blob 侧一直是 LF ⇒ 不触发任何 renormalisation，`i/crlf` 仍 0、`i/-text` 仍恰三枚 |
+| `backend/tests/test_ci_gate_contract.py`（第二次漂动） | `a0b9f37f32bb` → `893d59b4d74b` | **`5ac7220e6c55`**（839 LF / 51731 B） | 门 15 的必需规则集 3→4（把上面那条并进来钉住）；**没有新增测试** ⇒ `EXPECTED_COLLECTED` 仍是 1335，实测 `TOTAL 1335` |
 
 新落档（闭合时点首次有锚）：`backend/tests/real_llm_failover_kit.py` `bc5c90c7616c`（136036 B / LF-only）、
 `backend/tests/test_real_llm_failover_gate.py` `1ecc82b411e1`（55602 B / LF-only）、

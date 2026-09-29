@@ -585,3 +585,52 @@
 - **B0 侧收口**：`EXPECTED_COLLECTED` 已按实测 1332→**1335** 重锚（CORR-01 新增 3 枚结构钉所致，
   属"加测试"的合法变化），基线明细同步 1335 行；两枚变异台的字节锚各自重钉（B0 台 `4bba148e804d`）。
   全量两 cwd 各 **1335 passed / 0 failed**（182.78s / 183.95s，1159 subtests）。
+- **R31（B0 侧文档闭合 + 我自己撞出来的两枚真源问题，2026-09-29）**：
+  - **落档**：`83edc17 docs(b0)` 提交并推送 —— `G20` 新开 + `G0` 勘误（B0-14）、B0-02/03/10/13 用
+    run `36472389872` @ `b825112` 的 step 级读数闭合，新增 §10.3（11 步全 success、
+    `1335 passed / 2 warnings / 1159 subtests in 54.59s`、compose 与 pwsh 首次真跑即绿、
+    剩余 run 级 red 逐条归因为 `argon2` / `typesafe_sdk` 两枚 job 的依赖漂移——规格 §1 明令 B0 不得触碰）。
+    §11 补 §11.1：**锚点算法此前没标**（同一串 12 位在台账里既有 sha256[:12] 又有 git blob sha1，
+    `c5d07b5dc438` vs `1b64d6e47305` 就是这么错开的），现明确为「对原始字节取 sha256 前 12 位」；
+    交付面 313→447 的 134 枚逐枚归因（+121 `.superpowers/**` / +10 `docs/` / `.gitattributes` /
+    新门文件 / probe 脚本），而命中仍 16 文件 31 处、`EXEMPTIONS` 字节相同 ⇒ 这条比 B0-09 原读数强。
+    提交 message 里我把 `a0b9f37f32bb` 误打成 `a0b937f32bb`——文档表格是对的，不改历史，错在这儿记一笔。
+  - **我做的坏事（如实）**：把十四发台放后台跑，看到"闸文件常数在变"就误判为异常，**中途 kill** ⇒
+    M5 的注入字节残留在三枚已跟踪文件里（`manifest.json` / `primary-probe.json` / 闸文件的 pin）。
+    台子本来就设计成"改 manifest 必须同时按 pin"（台头 ③），所以那三处漂移是**正常注入**，
+    不正常的是我打断它。处置：`git cat-file blob HEAD:<path>` 逐枚写回原始字节 +
+    与 blob 逐字节 `==` 校验 + sha256 复量回 `c39a09f8…`；`git restore` 那一步**不能单独用**
+    （见下一条），最后 `git status` 只剩用户自己的 `identity/README.md`。
+  - **新发现（真源缺陷，非仪器病）：P0 闸的 `[I2]` 外部锚依赖 checkout 的行尾形态。**
+    Windows 干净 clone 实测：六枚 bundle JSON 全部被 smudge 成 **CRLF**，manifest 工作树 sha256
+    = `91b0dff6…` ≠ 钉住的 `c39a09f8…`（后者是 **blob/CI** 形态）。⇒ 同一枚 commit
+    在 Linux CI 绿、在 Windows 签出必红。`core.autocrlf=true` + `.gitattributes` 的 `* text=auto`
+    对没有显式 `eol=` 规则的 `.json` 生效，`docs/evidence/**` 是 B0 §7 四条"不做"里没覆盖的新区块。
+    这**不是** B0 的行尾门能抓的（那些钉量的是 index 侧 `i/…`，index 里一直是 LF，无违规可言），
+    也不影响远端主门（Linux），但它让"可移植载体"这句话在 Windows 上不打折地成立不起来。
+    两条候选，都还没做，**待用户/独立评审裁**：A `.gitattributes` 加 `docs/evidence/** text eol=lf`
+    （结构性确定，判据一字不动，代价是改一枚有锚的交付面文件并同步 §11）；
+    B kit 哈希前先做 CRLF→LF 规范化（只动载体，但把"逐字节"这句话改弱了）。
+    我倾向 A，因为它把决定权放在 git 而不是放在判据代码里。
+- **R32（3B 读数由我复现 + 一枚隔离出来的真源缺陷，2026-09-29）**：
+  - **复现**（台子与 HEAD 未动，工作树逐字节 == blob 先验过）：`--check` 基线六枚 RESTORED-OK ×6 +
+    外部锚在场且唯一 + 序列化可逆；`--anchor-selftest` 两枚错 needle 都响；**整轮十四发
+    M1..M9 + N1..N5 = `KILLED-ASSIGNED-RESTORED-OK` ×14，rc=0，计划外附带红 `[]` ×14，
+    park 已删**。原始输出 `evidence/p0-3b-bench-controller-repro-2026-09-29.txt`（未入库）。
+    ⇒ 简报读数 3 与 3B 报告 F5 从"implementer 声称"升格为"控制器复现"；**读数 4/5 同步复现**：
+    SEC-A 扫描门单跑 **46 passed** 且那枚文件 `git diff` 为空（零新增豁免可证）、
+    B0 门 **16 passed**、收集探针 **TOTAL 1335**、四枚被触碰模块合跑 **183 passed / 243 subtests**；
+    **读数 2** 本机 verdict 三层全清（`raw_state='full'`、portable/truth/raw problems 皆 `[]`、
+    两枚运行件 sha1 == manifest 声明）。
+  - **残留核对三层**：三枚被注入件 `git cat-file blob HEAD:<path>` == 工作树逐字节、
+    pin == manifest 工作树 sha256（`c39a09f8…`）、raw 两枚 sha1 == `raw_provenance` 声明值。
+  - **读数 1 的层级必须改写**（不许再说"干净签出绿"就完了）：**Linux/CI 形态**绿（远端 run
+    `36472389872` 里这枚闸在 1335 中通过）；**Windows 干净 clone 红**——同一 clone 只把行尾当
+    唯一变量：六枚 CRLF ⇒ `3 failed / 14 passed`（`[I2] sha256 不配`，portable 层 17 条问题，
+    两枚退化探针**拒绝在坏基线上跑**并明说原因）；改回 LF ⇒ `15 passed / 0 failed / 34 subtests`。
+    机制是 git 自己报的：`text: auto` + `eol: unspecified` ⇒ 检出跟 `core.autocrlf` 走。
+    ⇒ 待裁两条：A `.gitattributes` 加 `docs/evidence/** text eol=lf`（我倾向这条：git 决定、判据不动，
+    但要实测门 13 不会因为多一条规则而红，并同步 `.gitattributes` 的交付面锚）；
+    B kit 哈希前规范化 CRLF（改弱"逐字节"，且让判据代码替 git 做决定）。**本轮一条都没动。**
+  - 文档落档：`83edc17` 已推送（G20/G0 + B0 §10.3/§11.1）；SEC-A 项目记忆与索引已改写为
+    rc1 = ERRATA ISSUED / SUPERSEDED / NOT SHIPPABLE。剩余按用户裁定：独立终审 → rc2（两枚 tag 不碰）。
