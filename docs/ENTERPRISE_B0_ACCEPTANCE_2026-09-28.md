@@ -139,8 +139,13 @@ V2.3 P0 闸的外部锚取的是**工作树** sha256，Windows 干净 clone 因�
 （入库形态本来就一直是 LF，这条只统一**检出**侧），并把这枚规则**并进门 15 的必需规则集**
 （`REQUIRED_GITATTRIBUTES_RULES` 三枚 → 四枚）——不新增测试、不动收集数钉；
 摘掉那一行当场 `1 failed`、点名 `['docs/evidence/** text eol=lf']`，`finally` 按原字节写回。
-⇒ L10 现在说的是"已知且已钉"，而不是"已知且已解决"：**远端那一格还没读**（本轮 push 后的 run），
-而 `.gitattributes` 自己没有 `eol=` 规则（`git add` 时会提示"LF will be replaced by CRLF"），
+⇒ L10 现在是"已知且已钉、两侧都验"：**Windows 干净 clone 复核**（同一枚 clone 只改行尾那一格的对偶）——
+六枚 bundle JSON 检出为 **LF**、manifest 工作树 sha256 回到钉住的 `c39a09f8…`、
+该 clone 内 `test_real_llm_failover_gate.py` **15 passed / 0 failed**、`test_ci_gate_contract.py` **16 passed**；
+**远端也读了**（run `36533335735` @ `c29ce8a`：`backend-contracts` success、0 枚非成功步骤、
+`1335 passed / 2 warnings / 1159 subtests in 53.39s`）。Linux 本来就绿，
+这一格证明的是**修法没有把 CI 改坏**（门 15 多一条必需规则 + `.gitattributes` 多一行）。
+剩下的诚实边界：`.gitattributes` 自己没有 `eol=` 规则（`git add` 时会提示"LF will be replaced by CRLF"），
 它管住了别人没管住自己——功能上无害（属性表按空白分隔，与行尾无关），登记在此不做第二轮扩张。
 
 ## 8. 开放边界（不假装已解决）

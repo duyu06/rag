@@ -634,3 +634,31 @@
     B kit 哈希前规范化 CRLF（改弱"逐字节"，且让判据代码替 git 做决定）。**本轮一条都没动。**
   - 文档落档：`83edc17` 已推送（G20/G0 + B0 §10.3/§11.1）；SEC-A 项目记忆与索引已改写为
     rc1 = ERRATA ISSUED / SUPERSEDED / NOT SHIPPABLE。剩余按用户裁定：独立终审 → rc2（两枚 tag 不碰）。
+- **R33（L10 修法 A 落地 + 一次 push 竞态，2026-09-29）**：
+  - **改动两处、判据零放宽**：`.gitattributes` 加 `docs/evidence/** text eol=lf`（+ 四行说明，
+    435 B/18 LF ⇒ 846 B/23 LF，锚 `c5d07b5dc438` → **`b85430dbe6d1`**）；门 15 的
+    `REQUIRED_GITATTRIBUTES_RULES` 由三枚并成四枚（锚 `893d59b4d74b` → **`5ac7220e6c55`**，839 LF）。
+    **刻意不新增测试**：并入既有门 ⇒ `EXPECTED_COLLECTED` 仍 1335，实测 `TOTAL 1335`。
+    规则只写在 `.gitattributes` 里不够——没钉住的话任何人删掉它就静默退回那台单机耦合的闸。
+  - **证伪（这枚钉有牙）**：摘掉 `docs/evidence/** text eol=lf` 那一行 ⇒
+    `test_gitattributes_carries_the_required_rules` 当场 `1 failed`，文案点名
+    `['docs/evidence/** text eol=lf']`；`finally` 按原字节写回，sha256 复量 + 外部 `cmp` rc=0。
+  - **复跑（本机）**：B0 16 + SEC-A 46 = **62 passed**（新 `-f` 入库的那枚 evidence txt 进了扫描面，
+    仍**零新增豁免**、`i/-text` 仍恰三枚、`i/crlf` 仍 0）、P0 闸 **15 passed / 34 subtests**。
+  - **Windows clone 复核（这是本单的存在理由）**：clone `c29ce8a` 后六枚 bundle JSON 检出为 **LF**，
+    manifest 工作树 sha256 回到钉住的 `c39a09f8…`；同一 clone 内 P0 闸 **15 passed / 0 failed**、
+    B0 门 **16 passed**。对照 R32 那发隔离实验（CRLF ⇒ 3 failed）——两侧都对上了。
+  - **远端**：run **`36533335735`** @ `c29ce8a` ⇒ `backend-contracts` **success、0 枚非成功步骤**，
+    `1335 passed / 2 warnings / 1159 subtests in 53.39s`；SECA-20 子集 `5 passed, 41 deselected`。
+    Linux 本来就绿，这一格证明的是**修法没把 CI 改坏**。整 run 仍 red 于 `argon2` / `typesafe_sdk` 两枚 job。
+  - **push 竞态，如实登记**：`git push` 报 `cannot lock ref 'refs/heads/main': is at c29ce8a but
+    expected 83edc17`。取真值而不是猜：`git ls-remote` + `gh api .../commits/c29ce8a` 证明远端那枚
+    与我本地这枚**同一 sha、同一 message、同六枚文件**，用户自己的 `identity/README.md` 未被推送。
+    最可能原因是压缩前那枚名为 "Commit B0 re-anchor and push all" 的后台任务（因输出超 5GB 被强停）
+    的 push 步在我 commit 之后并发执行。**纪律回写两条**：① 跨回合**不留会写 git 的后台任务**，
+    派单里的 git 写命令必须是我这一轮唯一 writer；② push 报错后先 `ls-remote` 取真值再决定，
+    不盲目重推、更不动 force。
+  - **顺带一枚自指事实（登记，不做第二轮扩张）**：`.gitattributes` 自己没有 `eol=` 规则，
+    所以 `git add` 它时 git 提示"LF will be replaced by CRLF"——**它管住了别人没管住自己**。
+    功能上无害（属性表按空白分隔，与行尾无关），但如果以后要给它自己一条规则，
+    得先想清楚这是不是又一条"必需规则"要钉。
