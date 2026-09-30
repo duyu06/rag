@@ -25,7 +25,7 @@ B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反
 | --- | --- | --- | --- |
 | B0-01 | pytest 收集数 == 钉住常数 | `EXPECTED_COLLECTED = 1332`（**该读数取自重锚前**；现行常数 **1336**，链条 1332→1335→1336 见 §11.1 与 §11.2）；本地两 cwd 与发布容器三处同数；门 `test_collected_count_matches_the_pinned_number` 绿 | **GREEN**（远端比对归 B0-03） |
 | B0-02 | 远端 `backend-contracts` **整 job** success | run `36472389872` ⇒ job **success**，非成功步骤数 = 0 | **GREEN** |
-| B0-03 | 同 commit 本地与远端收集数逐位相同 | 本地两 cwd `1335 passed / 0 failed / 1159 subtests`；远端同 commit `1335 passed / 2 warnings / 1159 subtests in 54.59s` ⇒ 枚数与子测数逐位相同（warnings 36↔2 属 §14 L9 的 env 耦合，不作跨环境判据） | **GREEN** |
+| B0-03 | 同 commit 本地与远端收集数逐位相同 | 本地两 cwd `1335 passed / 0 failed / 1159 subtests`；远端同 commit `1335 passed / 2 warnings / 1159 subtests in 54.59s` ⇒ 枚数与子测数逐位相同（warnings 36↔2 属 §14 L9 的 env 耦合，不作跨环境判据）。**这行取的是 `b825112` 那一格**；重锚到 1336 之后 `fe65f08` / `eb921c6` / `dbd75c3` 三格各自又逐位相同一次（§11.3、§11.4） | **GREEN** |
 | B0-04 | §8.1 四格全绿且 `.env` 还原逐字节一致 | 四格 `1332 passed / 36 warnings / 1133 subtests`（同为重锚前读数，现行 1336）、rc=0、0 failed/0 errors/0 skipped；`.env` sha `4d7f974107dd` 前后相同 | **GREEN** |
 | B0-05 | 单 runner 钉绿 | 门绿；`ci.yml` 内无 `unittest discover` 步 | **GREEN** |
 | B0-06 | 依赖同源钉绿（含豁免表形状） | 门绿；豁免表恰 `pytest` + `torch`（CPU 发行源），多一处少一处皆红 | **GREEN** |
@@ -436,5 +436,19 @@ commit 可解析，没有历史它必然哑红（P1 已实测那个红相）；�
 依赖）。本节所有读数都是**一台 Windows 机器**上的读数；跨机性靠的是"blob 身份与检出行尾无关"这一
 构造，不是第二次实测。
 
-**远端确认（本节这枚 commit 自身的 run）**：待补——按 §11.2/终审裁定，per-run GREEN 不能由前一枚
-commit 代持，所以这一格必须等本轮 push 之后那一趟 CI 回来才写。
+**远端确认（run `36706771490` @ `dbd75c3`，即本节这枚 commit 自身，2026-09-30）**：
+`backend-contracts` **success、非成功步骤数 0**（15 步全 success），主门
+`1336 passed, 2 warnings, 1159 subtests passed in 56.62s`；SECA-20 子集
+`5 passed, 41 deselected in 1.18s` ⇒ B0-03 的"本地与远端逐位相同"在本节这枚 commit 上重新成立一次
+（本地两 cwd `1336 / 1159` ↔ 远端 `1336 / 1159`）。整 run 仍红于 `backend-integration` /
+`backend-quality`（`argon2` / `typesafe_sdk`，规格 §1 划在 B0 权限之外）。
+
+**同族两枚潜在腿的本机读数（重要：机制相同、今天不红）**：修完 `:1306` 后我把剩下的墙钟断言逐条
+分诊了一遍。真同族（对**实测**延迟做 `> 0.0`，且生产侧同样 `round(..., 2)`）是
+`backend/tests/test_typesafe_v2_core.py:1341`（`typesafe_latency_p50_ms`，
+`app/typesafe_judgments.py:869` 那枚 round）与 `:1572`（`latency_p50_ms`，`:517` 那枚 round）——
+**定向 20 连跑：20/20 绿**，所以今天的红不在它们身上；但把断言成立压在"实测值四舍五入后不为 0"
+这一条上，和 `047a0d4` 那次翻车的机制一字不差。归 **B1**，本轮不动（用户裁定：先关 Important 4 再谈 rc2）。
+另有两枚看着像、实际不是同一类：`test_typesafe_v2_pipeline.py:598` 的 `> 12.0` 由一只**刻意每次
+sleep 5ms** 的假 CE 顶出来（地板是构造出来的，不是运气），`test_typesafe_v2_core.py:357`/`:1675`
+和 `pipeline:526` 钉的是 **budget.remaining_ms** 这种逻辑量，不是执行耗时。

@@ -870,3 +870,21 @@
     `backend-integration`/`backend-quality` 的 `argon2`/`typesafe_sdk` 依赖漂移 B0 无权收。
   - 终审 Important 2/3/4 至此全部关闭。rc2 的前置只剩 #131（候选 commit 自身远端 GREEN 的链条）
     与**用户的明确授权**。
+
+- **R42（Important 4 的远端读数 + 同族墙钟腿分诊，2026-09-30）**：
+  - run **`36706771490` @ `dbd75c3`**：`backend-contracts` **success，15 步全 success、非成功步骤 0**；
+    主门 `1336 passed / 2 warnings / 1159 subtests in 56.62s`；SECA-20 `5 passed, 41 deselected in 1.18s`。
+    ⇒ 本地两 cwd `1336/1159` ↔ 远端 `1336/1159` **逐位相同**在 Important 4 这枚 commit 自身上重新成立。
+    整 run 仍红于 `backend-integration` / `backend-quality`（`argon2` / `typesafe_sdk`，B0 无权收）。
+  - 主门确定化后的 job 级连续 success：`2e4fccf → d1bab29 → fe65f08 → a458eb2 → eb921c6 → 0281ab8 →
+    dbd75c3` = **7 枚**，其中带代码差的 4 枚（`fe65f08` 新门 + fetch-depth、`eb921c6` 锚口径、
+    `dbd75c3` 仪表归因；`c29ce8a`/`41e7c5f` 在链条起点之前）。**#131 的"候选 commit 自身 GREEN"
+    到这里有读数为证**；#129 只差用户授权。
+  - **同族腿分诊（把"运气绿"和"构造出来的地板"分开）**：真同族 = 对实测延迟做 `> 0.0` 且生产侧
+    `round(...,2)` —— `test_typesafe_v2_core.py:1341`（`app/typesafe_judgments.py:869`）与 `:1572`
+    （`:517`）。**定向 20 连跑 20/20 绿** ⇒ 今天的红不在它们身上，但机制与 `047a0d4` 那次一字不差，
+    归 **B1**（用户裁定本轮不动）。不是同族的：`test_typesafe_v2_pipeline.py:598`（每次 sleep 5ms 的
+    假 CE 把地板顶出来，是构造不是运气）、`test_typesafe_v2_core.py:357`/`:1675`、`pipeline:526`
+    （钉 `budget.remaining_ms` 逻辑量，不测执行耗时）。
+  - 台账落点：验收新增 **§11.4**（Important 4 全案 + 两台正式轮读数 + 远端确认 + 这次分诊），
+    B0-11 行加"判据已加强"，B0-03 行标明它取的是 `b825112` 那一格、并指向 §11.3/§11.4 的三格重证。
