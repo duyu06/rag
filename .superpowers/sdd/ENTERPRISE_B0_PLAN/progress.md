@@ -814,3 +814,11 @@
     我不擅自装系统依赖或拉新镜像。所以"跨机可复现"目前只有**构造性证据**（双形态锚点 + blob 与
     检出行尾无关 + `--check` 走 clean filter），不是"另一台机器实测过"。
   - 终审 Important 3 到此关闭；剩下 Important 4（仪表三处）与同族两枚潜在腿仍开着，rc2 在后。
+- **R40（Important 3 的远端读数，连续绿第 5 枚，2026-09-30）**：
+  - run **`36696050157` @ `eb921c6`**：`backend-contracts` **success、非成功步骤数 0**，
+    主门 `1336 passed / 2 warnings / 1159 subtests in 55.52s`，SECA-20 子集 `5 passed, 41 deselected in 1.16s`。
+    整 run 仍红于 `backend-integration` / `backend-quality`（`argon2` / `typesafe_sdk`，规格 §1 不许碰）。
+  - 主门确定化后的连续 job 级 success：**`2e4fccf` → `d1bab29` → `fe65f08` → `a458eb2` → `eb921c6`** = 5 枚，
+    其中带代码差的有 `fe65f08`（新门 + `fetch-depth: 0`）与 `eb921c6`（台子与锚换口径）两枚。
+  - 工作树只剩：用户自己的 `identity/README.md`，以及 `test_real_llm_failover_gate.py` 的 stat-dirty
+    （`git diff` 为空、内容 == HEAD blob）。
