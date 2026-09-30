@@ -23,10 +23,10 @@ B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反
 
 | ID | 判据 | 读数 | 状态 |
 | --- | --- | --- | --- |
-| B0-01 | pytest 收集数 == 钉住常数 | `EXPECTED_COLLECTED = 1332`（**该读数取自重锚前**，`05334eb` 起现行常数是 1335，见 §11.1）；本地两 cwd 与发布容器三处同数；门 `test_collected_count_matches_the_pinned_number` 绿 | **GREEN**（远端比对归 B0-03） |
+| B0-01 | pytest 收集数 == 钉住常数 | `EXPECTED_COLLECTED = 1332`（**该读数取自重锚前**；现行常数 **1336**，链条 1332→1335→1336 见 §11.1 与 §11.2）；本地两 cwd 与发布容器三处同数；门 `test_collected_count_matches_the_pinned_number` 绿 | **GREEN**（远端比对归 B0-03） |
 | B0-02 | 远端 `backend-contracts` **整 job** success | run `36472389872` ⇒ job **success**，非成功步骤数 = 0 | **GREEN** |
 | B0-03 | 同 commit 本地与远端收集数逐位相同 | 本地两 cwd `1335 passed / 0 failed / 1159 subtests`；远端同 commit `1335 passed / 2 warnings / 1159 subtests in 54.59s` ⇒ 枚数与子测数逐位相同（warnings 36↔2 属 §14 L9 的 env 耦合，不作跨环境判据） | **GREEN** |
-| B0-04 | §8.1 四格全绿且 `.env` 还原逐字节一致 | 四格 `1332 passed / 36 warnings / 1133 subtests`（同为重锚前读数，现行 1335）、rc=0、0 failed/0 errors/0 skipped；`.env` sha `4d7f974107dd` 前后相同 | **GREEN** |
+| B0-04 | §8.1 四格全绿且 `.env` 还原逐字节一致 | 四格 `1332 passed / 36 warnings / 1133 subtests`（同为重锚前读数，现行 1336）、rc=0、0 failed/0 errors/0 skipped；`.env` sha `4d7f974107dd` 前后相同 | **GREEN** |
 | B0-05 | 单 runner 钉绿 | 门绿；`ci.yml` 内无 `unittest discover` 步 | **GREEN** |
 | B0-06 | 依赖同源钉绿（含豁免表形状） | 门绿；豁免表恰 `pytest` + `torch`（CPU 发行源），多一处少一处皆红 | **GREEN** |
 | B0-07 | `.gitattributes` 的 no-op 性 | 静态 `checked=2 / offenders=0`；动态工作树聚合 sha 四时点恒等，`git status` 仅多出 `?? .gitattributes` 一行 | **GREEN** |
@@ -37,7 +37,7 @@ B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反
 | B0-12 | `backend/app/**` 未被 B0 改动 | 卡 J 三子句：`git diff --name-only HEAD -- backend/app` 减去两枚 identity 后为空；`--cached` 侧空；两枚 identity sha `3bc681bbc52c` / `2cfab9f18182` == 基线。**独立终审点名**：第一子句今天只剩用户自己的 `identity/README.md` ⇒ 这条审计对「这一串 commit 里 app 面只允许 CORR-01 那一处」不设防；已补成区间机器判据（§11.2） | **GREEN**（判据已加强） |
 | B0-13 | 全量 pytest 的 CI 耗时读数与 cache 取舍 | 远端套件 **54.59s**、SECA-20 子集 1.19s；本地 Windows 两格 182.78s / 183.95s；容器 3.12/Linux 107.52s。门内子进程收集占模块 96%、约全量 10–16%。**cache 命中率无分步读数** ⇒ 取舍半边仍开 | **GREEN**（耗时）／**PENDING_EXTERNAL**（cache 取舍） |
 | B0-14 | `G20` 新开 + `G0` 勘误落档 | 已落：`docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md` 新增 `G20 门禁收集面与行尾` 行；`G0` 行加"有测试步 ≠ 测试被收集"勘误并指向 G20 | **GREEN** |
-| B0-15 | 容器内 3.12 那一格有读数 | `rag-backend:security-a-rc1` / Python 3.12.14 / 无 `.env`：`1332 collected`（重锚前读数，现行 1335），格内 `3 failed, 1329 passed`（三枚归因见 §4） | **GREEN** |
+| B0-15 | 容器内 3.12 那一格有读数 | `rag-backend:security-a-rc1` / Python 3.12.14 / 无 `.env`：`1332 collected`（重锚前读数，现行 1336），格内 `3 failed, 1329 passed`（三枚归因见 §4） | **GREEN** |
 
 ## 3. 本轮交付面
 
@@ -324,4 +324,11 @@ README** ⇒ 那条「B0 不动 app 面」的审计在 CORR-01 之后退化成�
   正是终审 Important 3 待裁的那件事）：`ci.yml` `1c706e165b73` → **`b84cb8bcaa10`**
   （152 CRLF / 0 bare LF —— plan §Step 1 那句「CRLF 数随新增行数上升、bareLF 必须仍为 0」在这里成立）；
   门文件 `5ac7220e6c55` → **`5ef3cc91a117`**（879 LF / 0 CR）。
+
+**远端确认（run `36689505511` @ `fe65f08`，2026-09-30）**：`backend-contracts` **success、非成功步骤数 0**，
+`1336 passed, 2 warnings, 1159 subtests passed in 55.02s`；SECA-20 子集 `5 passed, 41 deselected in 1.25s`。
+两件事由这一格同时证成：① **`fetch-depth: 0` 是真的在起作用**——新门在 CI 里通过这件事本身就要求基线
+commit 可解析，没有历史它必然哑红（P1 已实测那个红相）；② 重锚到 1336 之后 **B0-03 的"本地与远端逐位
+相同"仍然成立**（本地两 cwd 与远端同为 `1336 / 1159`）。连续绿计数到这里是 **3/2**
+（`2e4fccf`、`d1bab29`、`fe65f08`），其中只有第三枚带代码差。
 

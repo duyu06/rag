@@ -774,3 +774,19 @@
   - **仍未做（等裁）**：终审 Important 3（锚与 bench 基线改 **git blob** 口径——本轮又出现一次混用：
     `ci.yml` 工作树 `b84cb8bcaa10` vs blob `e0ff7a206cd3`）、Important 4（仪表三处）、
     同族两枚潜在腿 → B1。
+- **R38（第 17 枚门在 CI 落地，连续绿 3 枚，2026-09-30）**：
+  - run **`36689505511` @ `fe65f08`**：`backend-contracts` **success、非成功步骤数 0**，
+    `1336 passed / 2 warnings / 1159 subtests in 55.02s`，SECA-20 子集 `5 passed, 41 deselected in 1.25s`；
+    整 run 仍 failure 于 `backend-integration` / `backend-quality`（`argon2` / `typesafe_sdk`，规格 §1 不许碰）。
+  - **两件事由这一格同时证成**：① `fetch-depth: 0` **确实在起作用**——新门在 CI 通过这件事本身要求基线
+    commit 可解析，没有历史它必然哑红（P1 实测过那个红相）；② 重锚到 1336 后 **B0-03 的逐位相同仍成立**
+    （本地两 cwd 1336/1159 与远端同数）。
+  - 连续绿：**`2e4fccf` → `d1bab29` → `fe65f08`** 三枚 job 级 success，前两枚是零代码差的读数、
+    第三枚带代码差 ⇒ 终审要求的"主门确定化后连续两枚"已满足，且多一枚。
+  - 文档同步：验收 §11.2 补"远端确认"段；三处"现行常数 1335"的限定语改为 **1336**（链条
+    1332→1335→1336 全部指向 §11.1/§11.2），原读数照旧不删。
+  - 仍待用户裁的两件事：终审 Important 3（锚与 bench `BASELINE_SHA1`/needle 统一改 **git blob** 口径——
+    本轮又新增一次混用：`ci.yml` 工作树 `b84cb8bcaa10` vs blob `e0ff7a206cd3`）与
+    Important 4（变异台三处仪表：哨兵绑到 assigned 节点失败块、`:472` 恒真死条件、B0 台缺 reason token）；
+    同族两枚潜在腿 `test_typesafe_v2_core.py:1341`/`:1572` 归 B1。**rc2 的授权仍在这些之后**（终审原话：
+    先修 1306、拿一枚真绿的代码 commit、把 Important 2/3/4/5/7 的文档与判据缺口对齐再签）。
