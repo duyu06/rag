@@ -112,6 +112,23 @@ OOM 的**另一段**文案（`ggml_vulkan: Failed to allocate pinned memory …`
 9. **P0 证据的"事后修饰"面还剩 4 处**（终审 I-11-1）：`files_sha1` 键集不钉、账本数值不重读临时库文件、
    trace 不重读、⑩ 的 `status_code` 不在判据内（实测一发绕通）。因 P0 已跑完且证据已归档，本版不追改
    判据（改了会让已交卷的证据与判据脱钩）；V2.4 收口件时一并加固。
+10. **本版自带一枚会翻色的门禁腿（2026-09-29 追加，随版交付）**：
+    `backend/tests/test_typesafe_v2_pipeline.py:1306` 曾写 `assertGreater(timings["rerank_ms"], 0.0)`，
+    而产出端 `retrieval.py:671` 发布的是 `round(rerank_ms, 2)` ⇒ 一段**真实执行**的亚毫秒耗时合法取整成
+    `0.0`，于是同一份代码在不同 runner 上可红可绿。首次观测到的红在 main 的 `047a0d4`
+    （run `36533959770`：`1 failed, 1334 passed`），而前一枚**零代码差**的 `c29ce8a` 是 `1335 passed`
+    （run `36533335735`）。断言出自 `5ba5f20` = 本版的封版 commit，**tag 未动、不 amend**；修复落在 main
+    的窄单（改成调用面效果钉 + `>= 0`），依据是本仓**既有**的冻结裁定「latency 分布只作为证据采集，
+    不作为 GREEN/BLOCKED 的输入」（`docs/SECURITY_A_SPECIFICATION.md:245` + SECA-13 用调用面 spy 替代阈值）。
+    同族另两枚潜在腿（`test_typesafe_v2_core.py:1341` / `:1572`，产出端 `main.py:971` /
+    `typesafe_judgments.py:517` 同样 `round(..., 2)`）登记给 B1 一并处置。
+    ⇒ **读本版任何"套件全绿"的结论时请带上这条**：单轮 run 的绿不是逐 commit 性质。
+11. **P0 行的 GREEN 在 CI 形态与原机形态证明的不是同一件事（2026-09-29 追加，限定语）**：
+    CI（干净签出）走 `json-only`，证明的是「六枚已跟踪文本彼此自洽 + 与已跟踪证据件逐字段同源 +
+    一枚被闸常数从外部钉住的 manifest sha256」；而「那次真机运行真的发生过」这一维**只在原机 `full`
+    分支被证明**（sqlite 本体、逐枚绝对路径 sha1、`completed` 从原始件真读）。该维度目前依赖
+    SDD 台账 **R32 / 3B 报告 F9** 的一次本机复现 + 人审。要判据级保证时走 3B §12.2 交下来的 B1 义务
+    （锚移远端变量 / 双人签），**不要把 CI 侧的 GREEN 读成"真机证据在场"**。
 
 ## 7. 延迟项登记（defer，含归属）
 

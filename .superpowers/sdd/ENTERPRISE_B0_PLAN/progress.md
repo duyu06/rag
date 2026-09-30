@@ -662,3 +662,71 @@
     所以 `git add` 它时 git 提示"LF will be replaced by CRLF"——**它管住了别人没管住自己**。
     功能上无害（属性表按空白分隔，与行尾无关），但如果以后要给它自己一条规则，
     得先想清楚这是不是又一条"必需规则"要钉。
+- **R34（独立终审回席 + 我逐条复验，含一枚否定我自己的结论，2026-09-29）**：
+  - 终审席位：`general-purpose` 只读评审，范围 `7cc5efc..047a0d4`，明令不许动 git 状态、不许跑会改跟踪文件的
+    变异台、把用户的 `identity/README.md` 划在范围外。**判决：No — 先修**（Critical 1 条 / Important 6 条 / Minor 6 条）。
+  - **我复验为真的六条**（不转述，给读数）：
+    1. `git diff --name-only c29ce8a..047a0d4` = 只有 `progress.md` + 一枚验收 md ⇒ 两枚相邻 commit
+       **零代码差**，而 `backend-contracts` 读数是 `1335 passed` ↔ `1 failed, 1334 passed`。
+       非确定性不是我推的，是这两枚 commit 的关系直接证出来的。
+    2. 红腿 `test_typesafe_v2_pipeline.py:1306`（`assertGreater(timings["rerank_ms"], 0.0)`）与产出端
+       `retrieval.py:671`（`"rerank_ms": round(rerank_ms, 2)`）在 `7cc5efc..047a0d4` **一次都没被碰过**；
+       断言出自 `5ba5f20`（= 已封存的 `model-router-v2.3-rc1`），取整出自 `df9aebf`。⇒ 本轮无责，但本轮把它撞见了。
+    3. **换效果钉不是放宽，是向本仓既有冻结裁定收敛**：`docs/SECURITY_A_SPECIFICATION.md:245`
+       「latency 分布只作为证据采集，不作为 GREEN/BLOCKED 的输入……毫秒阈值门在共享开发机上必然 flaky，
+       而 flaky 的安全门会被下一轮人直接 `skip` 掉，那比没有门更糟」；SECA-13（`:523`）与 §20.8 第 8 行（`:711`）
+       已经把替代 oracle 写死成**调用面 spy / 结构事实**。`:1306` 违背的是既有规格，不是我的口味。
+    4. 同族还有两枚潜在雷（终审点名，我验实在）：`test_typesafe_v2_core.py:1341`
+       `typesafe_latency_p50_ms > 0.0`、`:1572` `latency_p50_ms > 0.0`，产出端
+       `main.py:971` 与 `typesafe_judgments.py:517` 同样是 `round(..., 2)`。已红的这枚是**第一枚落地**，不是唯一一枚。
+    5. **我写进 §11.1 的那句话是错的，必须改**：我写过「新增的 217 枚 `.superpowers` 过程件里零命中，
+       是被门禁跑出来的，不是我扫出来再抄进来的」。实情是 `test_secret_hygiene_contract.py:433`
+       `_UNSCANNED_PREFIXES = (".superpowers/",)` + `:575 _in_scan_scope()` ⇒ **整目录免内容扫描**
+       （实测面 `448` 枚、进内容扫描 `230` 枚、被跳过 `218` 枚）。所以"零命中"从来不是对那 218 枚的断言，
+       命中 16 文件 / 31 处只对 230 枚成立。这是我把"进了面"错读成"被扫了"——**B0-09 的强度被我写高了一格**。
+    6. 锚点口径确实混用（终审自己复算出来的）：`ci.yml` 的 `1c706e165b73` 是**工作树**读数，
+       `git cat-file blob HEAD:` 是 `e0ff7a206cd3`；`test_ci_gate_contract.py` / `manifest.json` 今天
+       工作树 == blob 才侥幸对上，Windows 新 clone 会把它们 smudge 成 CRLF 而对不上。⇒ §11/§11.1 的锚
+       应统一改成 **git blob id** 口径（kit 里 `git_blob_of_head()` 已造好），并把「锚是 blob 不是工作树」写进 §7/§11。
+  - **另外两条我同样验实**：B0-12 第一子句（`git diff --name-only HEAD -- backend/app` 减去两枚 identity）
+    今天只剩 `identity/README.md` 一枚 ⇒ 这条判据已退化成"只看守 README"，需要改成**区间**判据
+    （`security-a-rc1..HEAD -- backend/app` 恰等 `9bed85a` 那一枚）；以及 047a0d4 那轮 compose/pwsh
+    **又回到 skipped** ⇒ B0-10「首次真跑」是**每轮可能失效的读数**，不能写成历史事件。
+  - 仪表侧三条（终审提，我读码确认）：`p0_3b_mutations.py:367` 的 `token in raw` 里 `raw` 是**整轮**输出 ⇒
+    哨兵可能来自别的红节点；`:472` `restored_ok and (not path.exists() or True)` 是**恒真死条件**
+    （这是本仓自己登记过的第四枚同类仪表病）；B0 台 `ent_b0_mutations.py:338-357` 纯 node-id 归因、
+    没有 reason token ⇒「YAML 改坏导致 15 枚全红」也会被记成 `KILLED-ASSIGNED`。
+  - **现场保持原样**：按用户裁定，未改那枚断言、未重跑掉这枚红、`047a0d4` 的红灯证据保持可追溯；
+    修不修、归到 `TEST-HYGIENE` / 当前 corrective / 单开窄 amendment，由用户裁（任务 #130）。
+    RC2 前置已改成硬链（#128 → #130 → #131 → #129）：**要打 tag 的那枚 commit 自己必须绿**，
+    "前一枚绿过"不再算数；另需给 `security-a-rc1` 之外的**第二枚封存 tag** `model-router-v2.3-rc1`
+    是否补记同一条脆弱腿做决定（它带病在库里，且这枚 tag 用户明令不许动）。
+- **R35（终审后的三条裁定落地 + 窄单 `TEST-HYGIENE-01`，2026-09-30）**：
+  - **用户三条裁定**：① flaky leg **单开窄单**（不并 corrective、不同族一起扫）；② 过程件**继续发布**，
+    把"公开但免于内容扫描"登记成已知限制；③ 给 **V2.3 验收面补记**（tag 仍不许动）。
+  - **窄单 `TEST-HYGIENE-01` 已做**：`test_typesafe_v2_pipeline.py:1306` 的
+    `assertGreater(timings["rerank_ms"], 0.0)` 换成**两枚效果钉 + 一枚合法性钉**：
+    `service._reranker.pools == [["a", "b", "c"]]`（调用面，恰好一次、池内容确定）、
+    `[row["rerank_score"] for row in rows] == [1.0, 0.5, 0.0]`（min-max 归一化后的确定值，
+    与隔壁 `rerank=False` 用例钉 `[None, None, None]` 成对）、`assertGreaterEqual(rerank_ms, 0.0)`。
+    **产品代码一字未动**；依据是本仓**既有**冻结裁定（`SECURITY_A_SPECIFICATION.md:245` + SECA-13
+    用调用面 spy 替代毫秒阈值），所以这是向规格收敛而不是放宽——终审独立席位也判"收紧"。
+  - **确定性证据**：定向重复 **5/5 passed**（48.97 / 49.65 / 39.22 / 30.79 / 35.08s）；
+    整模块 `47 passed / 30 subtests`；`InvariantPathTests` 5 枚全过；SEC-A 46 + B0 16 = **62 passed**；
+    全量两 cwd 各 **1335 passed / 0 failed / 36 warnings / 1159 subtests**（297.74s / 272.80s）——
+    收集数未动（没加测试，只换判据形态）。
+  - **我自己那句错话已就地更正**（终审 Important 5，我复验为真）：§11.1 曾写"新增的 217 枚
+    `.superpowers` 过程件里零命中是被门禁跑出来的"。实情 `_UNSCANNED_PREFIXES = (".superpowers/",)`
+    让整目录**免内容扫描**：面 448 / 进扫描 230 / 跳过 218 ⇒ 命中 16 文件 31 处只对那 230 枚成立。
+    **B0-09 判据本身没坏，是我替它加的那句强度声明是假的**（把"进了面"读成"被扫了"）。
+  - **本轮文档动作**：新增 **§14 L11**（过程件公开且按设计免扫，三条后果 + 裁定继续发布的理由 +
+    为什么前缀不能随手收窄：那目录里躺着故意写下的 canary）；矩阵 B0-01/04/09/10/15 五行加**读数出处**
+    限定语（1332 是重锚前、面 448 是当前、B0-10 是**每轮读数**——`047a0d4` 那轮 compose/pwsh 又回 skipped）；
+    `MODEL_ROUTER_V23_ACCEPTANCE` §6 追加第 **10**（本版自带一枚会翻色的腿，含 047a0d4 红的读数）与
+    第 **11**（P0 的 CI 侧 GREEN 含义限定）；`MODEL_ROUTER_V23_MATRIX` P0 行补同一条限定语。
+  - **仍开的（本轮明确不做）**：同族两枚潜在腿 `test_typesafe_v2_core.py:1341` / `:1572` → B1；
+    终审 Important 2（B0-12 第一子句退化成只看守 README，需改**区间**判据）、
+    Important 3（§11 锚与 `ent_b0_mutations.BASELINE_SHA1` 应统一改 **git blob** 口径；
+    `ci.yml` 的 `1c706e165b73` 是工作树读数、blob 是 `e0ff7a206cd3`）、
+    Important 4（`decide()` 的哨兵该绑到 assigned 节点自己的失败块；`:472` 恒真死条件；B0 台缺 reason token）、
+    Important 6 的残余信任根移远端变量 / 双人签 ⇒ 都待用户排期，我不擅自动手。

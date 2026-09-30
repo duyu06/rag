@@ -23,21 +23,21 @@ B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反
 
 | ID | 判据 | 读数 | 状态 |
 | --- | --- | --- | --- |
-| B0-01 | pytest 收集数 == 钉住常数 | `EXPECTED_COLLECTED = 1332`；本地两 cwd 与发布容器三处同数；门 `test_collected_count_matches_the_pinned_number` 绿 | **GREEN**（远端比对归 B0-03） |
+| B0-01 | pytest 收集数 == 钉住常数 | `EXPECTED_COLLECTED = 1332`（**该读数取自重锚前**，`05334eb` 起现行常数是 1335，见 §11.1）；本地两 cwd 与发布容器三处同数；门 `test_collected_count_matches_the_pinned_number` 绿 | **GREEN**（远端比对归 B0-03） |
 | B0-02 | 远端 `backend-contracts` **整 job** success | run `36472389872` ⇒ job **success**，非成功步骤数 = 0 | **GREEN** |
 | B0-03 | 同 commit 本地与远端收集数逐位相同 | 本地两 cwd `1335 passed / 0 failed / 1159 subtests`；远端同 commit `1335 passed / 2 warnings / 1159 subtests in 54.59s` ⇒ 枚数与子测数逐位相同（warnings 36↔2 属 §14 L9 的 env 耦合，不作跨环境判据） | **GREEN** |
-| B0-04 | §8.1 四格全绿且 `.env` 还原逐字节一致 | 四格 `1332 passed / 36 warnings / 1133 subtests`、rc=0、0 failed/0 errors/0 skipped；`.env` sha `4d7f974107dd` 前后相同 | **GREEN** |
+| B0-04 | §8.1 四格全绿且 `.env` 还原逐字节一致 | 四格 `1332 passed / 36 warnings / 1133 subtests`（同为重锚前读数，现行 1335）、rc=0、0 failed/0 errors/0 skipped；`.env` sha `4d7f974107dd` 前后相同 | **GREEN** |
 | B0-05 | 单 runner 钉绿 | 门绿；`ci.yml` 内无 `unittest discover` 步 | **GREEN** |
 | B0-06 | 依赖同源钉绿（含豁免表形状） | 门绿；豁免表恰 `pytest` + `torch`（CPU 发行源），多一处少一处皆红 | **GREEN** |
 | B0-07 | `.gitattributes` 的 no-op 性 | 静态 `checked=2 / offenders=0`；动态工作树聚合 sha 四时点恒等，`git status` 仅多出 `?? .gitattributes` 一行 | **GREEN** |
 | B0-08 | 行尾钉：无 `i/crlf`；`i/-text` == 枚举 3 枚；解析覆盖 313/313 | 门绿（含修复轮补的非空地板） | **GREEN** |
-| B0-09 | SECA-20 扫描门零漂移 | 面 316→318（逐枚归因），**命中 16 文件 / 31 处与 SEC-A 封版一字未动**，`EXEMPTIONS` 与 HEAD 逐字节相同 ⇒ 零新增豁免是被证明的 | **GREEN** |
-| B0-10 | compose 与 pwsh 两道首次真起跑各有结论 | run `36472389872`：两步均 **success** —— 它们**有史以来第一次被执行**（此前恒被上游红步吞掉，正是 §5.2 描述的机制在运行） | **GREEN** |
+| B0-09 | SECA-20 扫描门零漂移 | 面 316→318（B0 当时；`c29ce8a` 后为 448，见 §11.1 与 **L11**），**命中 16 文件 / 31 处与 SEC-A 封版一字未动**，`EXEMPTIONS` 与 HEAD 逐字节相同 ⇒ 零新增豁免是被证明的。**覆盖范围要说平**：命中对账只覆盖进内容扫描的那 230 枚，`.superpowers/**` 那 218 枚按设计免扫（L11） | **GREEN** |
+| B0-10 | compose 与 pwsh 两道首次真起跑各有结论 | run `36472389872`：两步均 **success** —— 它们**有史以来第一次被执行**（此前恒被上游红步吞掉，正是 §5.2 描述的机制在运行）。**但这是每轮读数，不是既成事实**：`047a0d4` 那轮主门一红，两道又立即回到 `skipped` ⇒ 判据应读作「在主门确定化之后连续 success」 | **GREEN** |
 | B0-11 | §9 变异逐发红 + 还原一致 | **8/8 `KILLED-ASSIGNED`**，0 `KILLED-INCIDENTAL`、0 `COLLECTION-BROKEN`；`--check` 12/12 rc=0；聚合面三时点回台账 | **GREEN** |
 | B0-12 | `backend/app/**` 未被 B0 改动 | 卡 J 三子句：`git diff --name-only HEAD -- backend/app` 减去两枚 identity 后为空；`--cached` 侧空；两枚 identity sha `3bc681bbc52c` / `2cfab9f18182` == 基线 | **GREEN** |
 | B0-13 | 全量 pytest 的 CI 耗时读数与 cache 取舍 | 远端套件 **54.59s**、SECA-20 子集 1.19s；本地 Windows 两格 182.78s / 183.95s；容器 3.12/Linux 107.52s。门内子进程收集占模块 96%、约全量 10–16%。**cache 命中率无分步读数** ⇒ 取舍半边仍开 | **GREEN**（耗时）／**PENDING_EXTERNAL**（cache 取舍） |
 | B0-14 | `G20` 新开 + `G0` 勘误落档 | 已落：`docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md` 新增 `G20 门禁收集面与行尾` 行；`G0` 行加"有测试步 ≠ 测试被收集"勘误并指向 G20 | **GREEN** |
-| B0-15 | 容器内 3.12 那一格有读数 | `rag-backend:security-a-rc1` / Python 3.12.14 / 无 `.env`：`1332 collected`，格内 `3 failed, 1329 passed`（三枚归因见 §4） | **GREEN** |
+| B0-15 | 容器内 3.12 那一格有读数 | `rag-backend:security-a-rc1` / Python 3.12.14 / 无 `.env`：`1332 collected`（重锚前读数，现行 1335），格内 `3 failed, 1329 passed`（三枚归因见 §4） | **GREEN** |
 
 ## 3. 本轮交付面
 
@@ -147,6 +147,17 @@ V2.3 P0 闸的外部锚取的是**工作树** sha256，Windows 干净 clone 因�
 这一格证明的是**修法没有把 CI 改坏**（门 15 多一条必需规则 + `.gitattributes` 多一行）。
 剩下的诚实边界：`.gitattributes` 自己没有 `eol=` 规则（`git add` 时会提示"LF will be replaced by CRLF"），
 它管住了别人没管住自己——功能上无害（属性表按空白分隔，与行尾无关），登记在此不做第二轮扩张。
+
+**L11（用户 2026-09-29 裁定登记，不是待办）：交付面里有一整块"公开但免于内容扫描"的过程件。**
+`test_secret_hygiene_contract.py:433` `_UNSCANNED_PREFIXES = (".superpowers/",)` ⇒ SECA-20 只把这批文件
+**计入面**、**不扫内容**（实测面 448 枚 / 进扫描 230 枚 / 跳过 218 枚）。后果要说白：
+① 「命中 16 文件 / 31 处、零新增豁免」这条判据的覆盖范围是那 230 枚，**不得写成"整面已扫"**；
+② 那 218 枚（SDD 台账、报告、变异台读数）是**公开**的，里面有 hex 摘要、run id、模型名、证伪样本路径，
+   它们的洁净度目前只有手工取证（§3.1 那一类声明）担保，没有机器判据；
+③ 这个前缀是**有意为之**：那目录里躺着故意写下的 canary 字面量与被逐字复制进过程的 `app/` 源码副本，
+   把豁免表绑上去会让"下一轮快照入库"红在与凭据无关的地方（源码 `:427-430` 的理由）。
+裁定：**继续发布**（评审与接手人要能读到台账与证据），并把本条作为长期已知限制挂着；
+真正的历史/全仓工具化扫描仍是 SEC-A §18 那笔未做的债。若日后要收窄前缀，得先处理 canary 撞门这条路。
 
 ## 8. 开放边界（不假装已解决）
 
@@ -271,9 +282,17 @@ identity 两枚 `3bc681bbc52c` / `2cfab9f18182`（未触碰）、
 **交付面 313 → 447 的逐枚归因**（`git ls-tree -r 7cc5efc` vs `git ls-files -c -o --exclude-standard` 实测差集 134 枚）：
 `.superpowers/**` +121（SDD 过程件与 evidence 目录）、`docs/` +10（含 6 枚 P0 portable evidence JSON 与三份额外文档）、
 `.gitattributes` +1、`backend/tests/test_ci_gate_contract.py` +1、`scripts/b0_collection_probe.py` +1。
-⇒ 面涨了 134 枚而**命中仍是 16 文件 / 31 处、`EXEMPTIONS` 一字未动**，且这是在远端那台机器上被证明的
-（§10.3 的 `Run SECA-20 delivery-surface secret scan` = success）。这条比 B0-09 的原读数强：
-新增的 217 枚 `.superpowers` 过程件里零命中，是被门禁跑出来的，不是我扫出来再抄进来的。
+（`c29ce8a` 又 `-f` 入库一枚变异台读数 ⇒ 独立终审复量时面是 **448**，其中 `.superpowers/**` 共 **218** 枚。）
+
+**上面这段话里有一句是错的，就地更正（2026-09-29，独立终审回席后我复验）**：我曾写「新增的 217 枚
+`.superpowers` 过程件里零命中，是被门禁跑出来的，不是我扫出来再抄进来的」。**实情不是这样**：
+`test_secret_hygiene_contract.py:433` 有 `_UNSCANNED_PREFIXES = (".superpowers/",)`，`:575 _in_scan_scope()`
+让整目录**免于内容扫描**（实测：面 448 枚 / 进内容扫描 230 枚 / 被前缀跳过 218 枚）。⇒
+「命中 16 文件 / 31 处、零新增豁免」这条**只对那 230 枚**成立；那 218 枚既进了面、又按设计不被扫，
+所以"它们零命中"从来不是门禁跑出来的结论，而是我**把"进了面"读成了"被扫了"**。
+B0-09 的既有判据本身不受影响（面计数与命中对账都真），受影响的是我为它加的那句强度声明。
+用户 2026-09-29 裁定：过程件**继续发布**，但把这件事登记成 §14 的一条已知限制（见 **L11**），
+不靠删面或改扫描范围来让数字好看。
 
 **`.env` 一维**：`backend/.env` 此刻**仍在原位**（1561 B、0 CRLF / LF 行、sha256 前 12 位 `4d7f974107dd`
 与收口时点逐字符相同 ⇒ §8.1 的"移出再逐字节还原"确实还原了）。它被 `.gitignore:6` 的精确路径挡在
