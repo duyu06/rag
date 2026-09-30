@@ -16,9 +16,9 @@
 
 1. **目标不止 `backend/`**：B0 的门钉在 CI 交付面上，所以四枚目标里两枚在仓库根
    （`.github/workflows/ci.yml` / `.gitattributes`）。路径一律 `REPO / rel`。
-2. **needle 按磁盘字节形态写**：实测 ci.yml 是 147 枚 CRLF / 0 枚裸 LF ⇒ 三枚 ci.yml 的
-   needle 用 `LC(...)` 拼 `\r\n`；conftest.py、门模块、`.gitattributes` 全是 LF ⇒ 用 `L(...)`。
-   拿 `\n` 拼 ci.yml 的 needle 我第一次就撞过，结果是 `TARGET-NOT-FOUND`（0 命中），不是错改。
+2. **needle 一律按 LF 书写，行尾在匹配/注入时按目标文件适配**（`edits_for`）：旧口径把
+   ci.yml 的 CRLF 写进 needle，于是同一台子在 Linux clone 上逐发 `TARGET-NOT-FOUND`——
+   那不再是"门被杀掉"的证据，而是"这台子只在这台机器上跑得动"的证据（终审 Important 3）。
 3. **还原除 sha1 外另核一次 `cmp`**：sha1 相同是"我算的两次一致"，`cmp` 是"外部工具逐字节
    比对读到的原件"。SEC-A Task 4 那一轮登记过 `git diff` 对未跟踪文件恒返 0 的假绿（D5），
    本台的 `.gitattributes` 与门模块**正是未跟踪件**，所以还原证明不沾 git。
@@ -69,15 +69,35 @@ CRLF = "\r\n"
 
 
 def LC(*lines: str) -> str:
-    """按 **CRLF** 拼 needle：ci.yml 磁盘上是 147 枚 CRLF、0 枚裸 LF，只能用这一形。"""
-    return "".join(line + CRLF for line in lines)
+    """2026-09-30 起与 `L` **同形**（一律按 LF 拼）；行尾在匹配与注入时按目标文件自己的形态适配。
+
+    旧形把"ci.yml 磁盘上是 CRLF"写进 needle，等于把**这台机器的检出形态**当成判据的一部分：
+    同一枚 needle 在 Linux clone 上零命中 ⇒ 八发逐发 `TARGET-NOT-FOUND`，"8/8 KILLED-ASSIGNED"
+    根本不可跨机复现（独立终审 Important 3 点名的就是这一格）。现在 needle 只描述**内容**。
+    函数名保留，是为了让八发旁边那些历史注释仍然对得上。
+    """
+    return L(*lines)
+
+
+def _eol_of(text: str) -> str:
+    return "\r\n" if "\r\n" in text else "\n"
+
+
+def _adapt(needle: str, eol: str) -> str:
+    return needle if eol == "\n" else needle.replace("\n", eol)
+
+
+def edits_for(spec: dict, text: str) -> "list[tuple[str, str]]":
+    """把 LF 书写的编辑对换成目标文件自己的行尾（匹配与注入走同一份口径）。"""
+    eol = _eol_of(text)
+    return [(_adapt(old, eol), _adapt(new, eol)) for old, new in spec["edits"]]
 
 
 #: 门册所在节点。八发的判据全部落在这一枚模块里（规格 §6.1—§6.4），所以定向跑整模块。
 GATE_MODULE = "tests/test_ci_gate_contract.py"
 
-#: 四枚目标在**未变异**状态的 sha1，`--check` 拿它做"字节还原一致"的比对基准：不是"我记得没改"，
-#: 是"树和开工那天同一份字节"。
+#: 四枚目标在**未变异**状态旧口径是"工作树原始字节的 sha1"，`--check` 拿它做"字节还原一致"的
+#: 比对基准：不是"我记得没改"，是"树和开工那天同一份字节"。
 #: 门模块那一枚在修复轮 2 重锚过（I-1）：`450484c09592…`（修复轮 1 之前的旧值，被 R20 的地板改动
 #: 作废）→ `a0b9f37f32bb…`。重锚**不是**照抄磁盘现值，而是从
 #: `snap-task6-fix1-post/test_ci_gate_contract.py` 取的，并与树上那份 `cmp` rc=0、sha1 逐字符相同
@@ -85,11 +105,18 @@ GATE_MODULE = "tests/test_ci_gate_contract.py"
 #: 为什么不锚"磁盘当前"：锚磁盘等于让"还原"这道证明跟着树一起漂，而 `--check` 长期 rc=1 又会被
 #: 读成"预期的噪音"——那一族（假红→忽略）本仓库已经写过两张卡。地板本身是 R20 有罪判决的改动，
 #: 新常数把"这轮之后树该长什么样"钉死，下一次合法改动仍会红、仍要重新标定。
-BASELINE_SHA1 = {
-    "backend/tests/conftest.py": "b0c5eee33ccdb49824405a10b8e282b4d52ab36d",
-    ".github/workflows/ci.yml": "931846cba8575e2e994633abc39a48492c1ea029",
-    ".gitattributes": "5738e2743ea768943e083cb1ff85fd9793ee7f57",
-    "backend/tests/test_ci_gate_contract.py": "4bba148e804dcb81fe97ce7a632f649e9414e3e6",
+#:
+#: **2026-09-30 换口径（独立终审 Important 3）**：上面那些 sha1 全是"**工作树字节**"的身份，
+#: 而同一枚 commit 在 Windows 与 Linux 上检出成两种行尾（ci.yml 工作树 152 枚 CRLF、blob 全 LF），
+#: 于是 `--check` 的字节核对与 ci.yml 那几发的 needle 都只在**本机**成立。现在锚成
+#: **git blob 身份**（`git hash-object` 先过 clean filter ⇒ 与检出行尾无关），四枚值取自**已提交树**：
+#: `git hash-object -- <path>` 与 `git rev-parse HEAD:<path>` 逐字符相同（本机实测四枚全等）。
+#: 旧 sha1 留在上面这段里当历史，不删——删了就没有"口径为什么换"这条线索。
+BASELINE_BLOB = {
+    "backend/tests/conftest.py": "b73a900b48c04560dd9669adc8f2ac90c77f98af",
+    ".github/workflows/ci.yml": "5b5b75187d88fb21a3cd494e51e520ed7a40cba2",
+    ".gitattributes": "08affc389b706632c02f11f114ebd821009087dd",
+    "backend/tests/test_ci_gate_contract.py": "c8076c18d030df5662b9caa89df4bea4e6500382",
 }
 
 # ---------------------------------------------------------------------------
@@ -246,9 +273,23 @@ def sha1(path: Path) -> str:
     return hashlib.sha1(path.read_bytes()).hexdigest()
 
 
-def anchor_counts(spec: dict) -> "list[int]":
-    text = (REPO / spec["rel"]).read_bytes().decode("utf-8")
-    return [text.count(old) for old, _ in spec["edits"]]
+def blob_id(rel: str) -> str:
+    """git 对内容的身份证：先过 clean filter ⇒ 与这台机器检不检出 CRLF 无关。"""
+    proc = subprocess.run(["git", "hash-object", "--", rel], cwd=REPO,
+                          capture_output=True, text=True)
+    return proc.stdout.strip() if proc.returncode == 0 else "MISSING"
+
+
+def anchor_counts(spec: dict, text: "str | None" = None) -> "list[int]":
+    """needle 命中数：**唯一一份实现**，`--check` 与注入前预检都走这里。
+
+    2026-09-30 踩过一次两入口分家的坑：`--check` 走了行尾适配而主循环没有 ⇒ ci.yml 三发在
+    真跑时 `TARGET-NOT-FOUND`，而 `--check` 报的是 ANCHOR-OK。台子的两个入口读不同形态的
+    needle，就等于同一判据有两份实现——留一份。
+    """
+    if text is None:
+        text = (REPO / spec["rel"]).read_bytes().decode("utf-8")
+    return [text.count(old) for old, _ in edits_for(spec, text)]
 
 
 def compare_with_cmp(path: Path, original: bytes) -> "tuple[str, int]":
@@ -282,15 +323,15 @@ def check() -> int:
             bad += 1
         print(f"{status}\t{spec['code']}\tcounts={counts}\t{spec['rel']}")
     print()
-    for rel, expected in sorted(BASELINE_SHA1.items()):
-        path = REPO / rel
-        actual = sha1(path) if path.is_file() else "MISSING"
+    for rel, expected in sorted(BASELINE_BLOB.items()):
+        actual = blob_id(rel) if (REPO / rel).is_file() else "MISSING"
         ok = actual == expected
         bad += 0 if ok else 1
-        print(f"{'RESTORED-OK' if ok else 'RESTORED-MISMATCH'}\t{rel}\t{actual[:12]}"
+        print(f"{'BLOB-OK' if ok else 'BLOB-MISMATCH'}\t{rel}\t{actual[:12]}"
               f"{' == ' + expected[:12] if ok else ' != ' + expected[:12]}")
-    total = len(MUTATIONS) + len(BASELINE_SHA1)
-    print(f"\n{total - bad}/{total} 项通过（锚点 {len(MUTATIONS)} 发 + 字节 {len(BASELINE_SHA1)} 枚）")
+    total = len(MUTATIONS) + len(BASELINE_BLOB)
+    print(f"\n{total - bad}/{total} 项通过（锚点 {len(MUTATIONS)} 发 + git blob 身份 "
+          f"{len(BASELINE_BLOB)} 枚；口径是内容的身份证，与检出行尾无关）")
     return 1 if bad else 0
 
 
@@ -421,7 +462,7 @@ def main(argv: "list[str]") -> int:
         original = path.read_bytes()
         before = sha1(path)
         text = original.decode("utf-8")
-        counts = [text.count(old) for old, _ in spec["edits"]]
+        counts = anchor_counts(spec, text)   # 与 --check 同一份实现，不再两处各写一边
         if any(c == 0 for c in counts):
             print(f"{code}\tTARGET-NOT-FOUND\tcounts={counts}\t树未动", flush=True)
             row.update(verdict="TARGET-NOT-FOUND", anchors=f"counts={counts}", note="树未动")
@@ -433,7 +474,7 @@ def main(argv: "list[str]") -> int:
             rows.append(row)
             continue
         mutated = text
-        for old, new in spec["edits"]:
+        for old, new in edits_for(spec, text):
             mutated = mutated.replace(old, new, 1)
         assert mutated != text, f"{code} 注入是空操作"
         # 先入表再注入：`finally` 里的还原回填靠 rows[-1] 认"这一发那一行"，
@@ -444,7 +485,8 @@ def main(argv: "list[str]") -> int:
             print(f"[{code}] 注入 {spec['rel']} {before[:12]} -> {sha1(path)[:12]}"
                   f"（锚点唯一 {counts}）", flush=True)
             rc, raw = run_node(GATE_MODULE, code)
-            print(f"[{code}] pytest（{GATE_MODULE} 全 16 枚）: {summarize(raw)}", flush=True)
+            print(f"[{code}] pytest（{GATE_MODULE} 全 {len(gate_roster())} 枚）: "
+                  f"{summarize(raw)}", flush=True)
             red = [gate_name(n) for n in failed_nodes(raw)]
             verdict, missing = decide(rc, red, assigned)
             for name in red:

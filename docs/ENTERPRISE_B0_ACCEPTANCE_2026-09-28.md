@@ -325,6 +325,59 @@ README** ⇒ 那条「B0 不动 app 面」的审计在 CORR-01 之后退化成�
   （152 CRLF / 0 bare LF —— plan §Step 1 那句「CRLF 数随新增行数上升、bareLF 必须仍为 0」在这里成立）；
   门文件 `5ac7220e6c55` → **`5ef3cc91a117`**（879 LF / 0 CR）。
 
+### 11.3 锚口径改成 git blob（独立终审 Important 3，用户 2026-09-30 裁定开工）
+
+**上面 §11 / §11.1 / §11.2 里所有 12 位锚取的都是「工作树原始字节的 sha256 前 12 位」，那是一台机器的读数**：
+`* text=auto` 之下同一枚 commit 在 Windows 检出成 CRLF、在 Linux 检出成 LF，于是锚在两台机器上是两个数。
+本节把锚的**规范口径**改成 **git blob 身份**，旧锚一律保留不删（它们是各时点的工作树读数，是历史）：
+
+```bash
+# 复现式（两端同值，与检出行尾无关）：
+git rev-parse HEAD:<path>        # 提交树里那枚 blob
+git hash-object -- <path>        # 工作树过 clean filter 之后 ⇒ CRLF 工作树也得到同一枚 blob
+```
+
+| 件 | 旧锚（工作树字节 sha256[:12]） | git blob 身份 |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` | `1c706e165b73`（本机 CRLF 态）→ `b84cb8bcaa10` | **`5b5b75187d88`** |
+| `backend/tests/test_ci_gate_contract.py` | `a0b9f37f32bb` → `893d59b4d74b` → `5ac7220e6c55` → `5ef3cc91a117` | **`c8076c18d030`** |
+| `.gitattributes` | `c5d07b5dc438` → `b85430dbe6d1` | **`08affc389b70`** |
+| `backend/tests/conftest.py` | `b0c5eee33ccd`（sha1 旧形） | **`b73a900b48c0`** |
+| `backend/tests/test_secret_hygiene_contract.py` | `fd39d7d374f9` | **`0d2f82dbcf0e`** |
+| `backend/app/identity/__init__.py` | `2cfab9f18182` | **`c96a778ed721`** |
+| `backend/tests/real_llm_failover_kit.py` | `bc5c90c7616c` | **`77a0f2489456`** |
+| `backend/tests/test_real_llm_failover_gate.py` | `1ecc82b411e1` | **`3073f8a158c5`** |
+| `backend/tests/test_feishu_identity_contract.py` | `19394dbd78c6` | **`8bb57e24bb0e`** |
+| `docs/evidence/…/manifest.json` | `c39a09f83b6a`（sha256 口径，仍是 P0 闸的外部锚） | **`af6db0a0c641`** |
+| `baseline/collected-node-ids.txt` | `398913ffba87` | **`745e9ad012b8`** |
+
+**为什么 manifest 那一枚不换口径**：P0 闸的 `PORTABLE_MANIFEST_SHA256` 钉的是 **sha256**，
+那是判据本身而不是记账锚；它的工作树依赖已经被 `docs/evidence/** text eol=lf`（§7 L10）消掉，
+所以留在 sha256 形是对的做法——改它等于动判据。
+
+**B0 变异台同步换口径**（`.superpowers/sdd/ENTERPRISE_B0_PLAN/mutations/ent_b0_mutations.py`）：
+
+- `BASELINE_SHA1` → `BASELINE_BLOB`（四枚值取自已提交树，`git hash-object` 与 `git rev-parse HEAD:`
+  逐字符相同），比对函数从「工作树原始字节 sha1」改成 `blob_id()`。旧 sha1 留在文件注释里当历史。
+- needle 不再按本机行尾写：`LC(...)` 与 `L(...)` 同形（一律 LF），匹配与注入时由 `edits_for()`
+  按目标文件自己的行尾适配。
+- **双形态实测**（同一枚 needle 在 LF 与 CRLF 两种检出形态下的命中数，判据：两种都恰好 1）：
+  N1–N8 八发全部 `BOTH-FORM-OK`（N6 是 `[1, 1]` 两枚编辑对，两种形态都对）。
+- **这台子怎么自己把 bug 报出来的（要留案）**：第一轮重跑 `--check` 报 12/12 通过，真跑却 N2/N3/N4
+  逐发 `TARGET-NOT-FOUND`、整轮 rc=1 —— 因为我改了注入路径却漏改主循环的命中预检，
+  **同一判据两份实现**必然漂。修法是收敛成唯一实现 `anchor_counts(spec, text=None)`，两个入口都走它。
+- **重跑读数**：`--check` 12/12（锚点 8 发 + git blob 身份 4 枚）；整轮 **8/8 `KILLED-ASSIGNED`、
+  `BENCH_RC=0`**，还原四枚锚定件 `git hash-object == HEAD blob` 全等；
+  台后复跑 `test_ci_gate_contract.py` + `test_secret_hygiene_contract.py` = **63 passed**。
+  门 × 击杀溯源表本轮 17 枚里红 9 枚，`NEVER` 是真读数（含第 17 枚新门——它不在 B0 八发的射程里，
+  它的三发证伪在 §11.2）。
+
+**一条没做的事，不许含混过去**：真在 Linux 上跑一遍这台账**没有做**——本地 `python:3.12-slim` /
+`python:3.13-slim` 无 git、`rag-backend:latest` 无 git 且无 pytest，而我不会擅自装系统依赖或拉新镜像。
+所以「跨机可复现」当前的证据形态是**构造性**的（双形态锚点 + blob 身份与检出行尾无关 + `--check` 用
+`git hash-object` 过 clean filter），不是"另一台机器实测过一遍"。要补那一格，需要一台带 git 的
+Linux 环境或允许拉 `python:3.12` 全量镜像 —— 登记为待办，不写进结论。
+
 **远端确认（run `36689505511` @ `fe65f08`，2026-09-30）**：`backend-contracts` **success、非成功步骤数 0**，
 `1336 passed, 2 warnings, 1159 subtests passed in 55.02s`；SECA-20 子集 `5 passed, 41 deselected in 1.25s`。
 两件事由这一格同时证成：① **`fetch-depth: 0` 是真的在起作用**——新门在 CI 里通过这件事本身就要求基线

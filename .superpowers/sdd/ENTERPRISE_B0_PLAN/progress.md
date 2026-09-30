@@ -790,3 +790,27 @@
     Important 4（变异台三处仪表：哨兵绑到 assigned 节点失败块、`:472` 恒真死条件、B0 台缺 reason token）；
     同族两枚潜在腿 `test_typesafe_v2_core.py:1341`/`:1572` 归 B1。**rc2 的授权仍在这些之后**（终审原话：
     先修 1306、拿一枚真绿的代码 commit、把 Important 2/3/4/5/7 的文档与判据缺口对齐再签）。
+- **R39（Important 3 落地：锚与变异台改 git blob / 行尾无关口径，2026-09-30）**：
+  - **锚的规范口径改成 git blob**：`git rev-parse HEAD:<path>` == `git hash-object -- <path>`
+    （后者过 clean filter ⇒ CRLF 工作树也得到同一枚 blob）。验收新增 **§11.3**，11 枚件的 blob 身份成表；
+    §11/§11.1/§11.2 的旧 sha256 锚**全部保留不删**（它们是各时点的工作树读数，是历史）。
+    `manifest.json` 那枚**不换**——P0 闸的 `PORTABLE_MANIFEST_SHA256` 是判据而不是记账锚，
+    它的工作树依赖已被 §7 L10 的 `eol=lf` 消掉；改它等于动判据。
+  - **B0 台换口径**：`BASELINE_SHA1` → `BASELINE_BLOB`（四枚取自已提交树，比对函数 `blob_id()`）；
+    `LC(...)` 与 `L(...)` 同形（needle 一律 LF），匹配与注入由 `edits_for()` 按目标文件行尾适配。
+  - **双形态实测**：同一枚 needle 在 LF 与 CRLF 两种检出形态下的命中数，N1–N8 全部 `BOTH-FORM-OK`
+    （N6 两枚编辑对都是 `[1,1]`）；blob 身份四枚全等（含 `ci.yml` 这种工作树 CRLF 的件）。
+  - **台子自己抓到我的 bug（留案）**：第一轮重跑 `--check` 报 12/12，真跑却 N2/N3/N4 逐发
+    `TARGET-NOT-FOUND`、rc=1 —— 我只改了注入路径，漏改主循环的命中预检 ⇒ **同一判据两份实现必然漂**。
+    修法不是补那行，而是收敛成唯一实现 `anchor_counts(spec, text=None)`，两个入口同走。
+  - **重跑读数**：`--check` 12/12；整轮 **8/8 `KILLED-ASSIGNED`、`BENCH_RC=0`**；还原四枚锚定件
+    `hash-object == HEAD blob` 全等；台后门 17 + SEC-A 46 = **63 passed**。
+    溯源表本轮 17 枚里红 9 枚，`NEVER` 是真读数（第 17 枚新门不在 B0 八发射程内，它的三发证伪在 §11.2）。
+  - **我自己打错的一枚锚，当场改**：§11.3 表里 manifest 的 blob 我先写成 `af6db0a0c41f`（按截断显示
+    猜的次序），真值是 `af6db0a0c641`（`git rev-parse` 与 `git hash-object` 双读一致）。已改。
+    ⇒ 教训：**锚必须整串读出来再截，不能从被截断的显示里回填**。
+  - **没做的事（登记为待办，不写进结论）**：真在 Linux 上跑一遍这台台子。**本地做不到**：
+    `python:3.12-slim`/`python:3.13-slim` 无 git、`rag-backend:latest` 无 git 且无 pytest，
+    我不擅自装系统依赖或拉新镜像。所以"跨机可复现"目前只有**构造性证据**（双形态锚点 + blob 与
+    检出行尾无关 + `--check` 走 clean filter），不是"另一台机器实测过"。
+  - 终审 Important 3 到此关闭；剩下 Important 4（仪表三处）与同族两枚潜在腿仍开着，rc2 在后。
