@@ -34,14 +34,14 @@ B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反
 | B0-09 | SECA-20 扫描门零漂移 | 面 316→318（B0 当时；`c29ce8a` 后为 448，见 §11.1 与 **L11**），**命中 16 文件 / 31 处与 SEC-A 封版一字未动**，`EXEMPTIONS` 与 HEAD 逐字节相同 ⇒ 零新增豁免是被证明的。**覆盖范围要说平**：命中对账只覆盖进内容扫描的那 230 枚，`.superpowers/**` 那 218 枚按设计免扫（L11） | **GREEN** |
 | B0-10 | compose 与 pwsh 两道首次真起跑各有结论 | run `36472389872`：两步均 **success** —— 它们**有史以来第一次被执行**（此前恒被上游红步吞掉，正是 §5.2 描述的机制在运行）。**但这是每轮读数，不是既成事实**：`047a0d4` 那轮主门一红，两道又立即回到 `skipped` ⇒ 判据应读作「在主门确定化之后连续 success」 | **GREEN** |
 | B0-11 | §9 变异逐发红 + 还原一致 | **8/8 `KILLED-ASSIGNED`**，0 `KILLED-INCIDENTAL`、0 `COLLECTION-BROKEN`；`--check` 12/12 rc=0；聚合面三时点回台账 | **GREEN** |
-| B0-12 | `backend/app/**` 未被 B0 改动 | 卡 J 三子句：`git diff --name-only HEAD -- backend/app` 减去两枚 identity 后为空；`--cached` 侧空；两枚 identity sha `3bc681bbc52c` / `2cfab9f18182` == 基线 | **GREEN** |
+| B0-12 | `backend/app/**` 未被 B0 改动 | 卡 J 三子句：`git diff --name-only HEAD -- backend/app` 减去两枚 identity 后为空；`--cached` 侧空；两枚 identity sha `3bc681bbc52c` / `2cfab9f18182` == 基线。**独立终审点名**：第一子句今天只剩用户自己的 `identity/README.md` ⇒ 这条审计对「这一串 commit 里 app 面只允许 CORR-01 那一处」不设防；已补成区间机器判据（§11.2） | **GREEN**（判据已加强） |
 | B0-13 | 全量 pytest 的 CI 耗时读数与 cache 取舍 | 远端套件 **54.59s**、SECA-20 子集 1.19s；本地 Windows 两格 182.78s / 183.95s；容器 3.12/Linux 107.52s。门内子进程收集占模块 96%、约全量 10–16%。**cache 命中率无分步读数** ⇒ 取舍半边仍开 | **GREEN**（耗时）／**PENDING_EXTERNAL**（cache 取舍） |
 | B0-14 | `G20` 新开 + `G0` 勘误落档 | 已落：`docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md` 新增 `G20 门禁收集面与行尾` 行；`G0` 行加"有测试步 ≠ 测试被收集"勘误并指向 G20 | **GREEN** |
 | B0-15 | 容器内 3.12 那一格有读数 | `rag-backend:security-a-rc1` / Python 3.12.14 / 无 `.env`：`1332 collected`（重锚前读数，现行 1335），格内 `3 failed, 1329 passed`（三枚归因见 §4） | **GREEN** |
 
 ## 3. 本轮交付面
 
-**新增**：`.gitattributes`、`backend/tests/test_ci_gate_contract.py`（16 枚门）、
+**新增**：`.gitattributes`、`backend/tests/test_ci_gate_contract.py`（16 枚门；**2026-09-30 起 17 枚**，见 §11.2）、
 `scripts/b0_collection_probe.py`、`docs/ENTERPRISE_B0_SPECIFICATION.md`、`docs/ENTERPRISE_B0_PLAN.md`、
 本文件、`.superpowers/sdd/ENTERPRISE_B0_PLAN/**`（台账 / briefs / 报告 / 评审件 / 变异台 / evidence / baseline）。
 
@@ -297,4 +297,31 @@ B0-09 的既有判据本身不受影响（面计数与命中对账都真），�
 **`.env` 一维**：`backend/.env` 此刻**仍在原位**（1561 B、0 CRLF / LF 行、sha256 前 12 位 `4d7f974107dd`
 与收口时点逐字符相同 ⇒ §8.1 的"移出再逐字节还原"确实还原了）。它被 `.gitignore:6` 的精确路径挡在
 跟踪面与扫描面之外（`git ls-files` 无此项），所以 447 枚里没有它 —— 与 §8.1 的结论一致：该维度中性。
+
+### 11.2 第 17 枚门（独立终审 Important 2，用户 2026-09-30 裁定开工）
+
+终审实测：卡 J 的第一子句 `git diff --name-only HEAD -- backend/app` 减掉两枚 identity 后**只剩用户自己的
+README** ⇒ 那条「B0 不动 app 面」的审计在 CORR-01 之后退化成近似恒真。本轮把它换成**区间判据**并机器化：
+
+- 新门 `test_the_app_surface_delta_since_the_sealed_base_is_exactly_the_registered_exception`：
+  基线取 **sha 常数** `7cc5efc0460a…`（= tag `security-a-rc1`；不取 tag 名是为了把失败模式收敛成一种
+  ——「历史没取全」——而不是「tag 没了」或「浅签出」两种）；要求 `基线..HEAD` 的 `backend/app/**` 差集
+  **恰等于**登记表 `{backend/app/identity/__init__.py}`，两个方向都红：未登记的改动 / 被悄悄摘掉的例外。
+- **它把 CI 的一个隐含前提变成了判据**：浅签出没有历史 ⇒ 这枚门必须**哑红而不是绿**。因此 `ci.yml` 的
+  `backend-contracts` checkout 步加了 `fetch-depth: 0`（仓库对象包实测 490 KiB，代价可忽略）。
+- **三发证伪都在临时 clone 里真跑过**（不写主仓、跑完即删）：
+  P1 `--depth 1` clone ⇒ 该门 `1 failed`，文案点名「基线 commit 7cc5efc0460a 在本签出里不可解析 ⇒
+  这枚门**哑了**，绝不能读成『app 面没有改动』… 需要 fetch-depth: 0」；
+  P2 在 clone 里追加一枚改 `backend/app/config.py` 的 commit ⇒ 红，报
+  `未登记的改动 ['backend/app/config.py']；被摘掉的例外 []`；
+  P3 在 clone 里把 CORR-01 那枚文件还原成基线 ⇒ 红，报
+  `未登记的改动 []；被摘掉的例外 ['backend/app/identity/__init__.py']`。
+- 读数变化（都是实测量）：`EXPECTED_COLLECTED` **1335 → 1336**（+1 = 这枚新门），探针 `TOTAL 1336`，
+  明细基线 `baseline/collected-node-ids.txt` 同步重生成 1336 行（`398913ffba87`）；门模块 **17 passed**。
+  顺手补终审 Minor 8：常数上方注释原来只推导到 1332，现在写全
+  `1332 = 1316+16 / 1335 = +3（CORR-01 三枚钉）/ 1336 = +1（本枚）`。
+- 新锚（**取自工作树字节**，与 §11 同口径；`ci.yml` 在 index 侧是 LF-normalized 的另一个值，这层混用
+  正是终审 Important 3 待裁的那件事）：`ci.yml` `1c706e165b73` → **`b84cb8bcaa10`**
+  （152 CRLF / 0 bare LF —— plan §Step 1 那句「CRLF 数随新增行数上升、bareLF 必须仍为 0」在这里成立）；
+  门文件 `5ac7220e6c55` → **`5ef3cc91a117`**（879 LF / 0 CR）。
 

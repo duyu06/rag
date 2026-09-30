@@ -10,7 +10,12 @@ jobs:
   backend-contracts:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 是被判据逼出来的，不是洁癖：第 17 枚门量的是**一枚区间的 app 面差集**，
+      # 默认浅签出只有一个 commit、没有历史 ⇒ 那枚门永远读不到基线（红了也是哑红）。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

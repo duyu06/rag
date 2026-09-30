@@ -24,7 +24,7 @@
 | G17 版本治理 | 部分 | `retrieval_schema_version` 有且 demo 自动重建；用户文档不触发、无双索引灰度回滚 |
 | G18 Prompt 版本 | 缺失 | RAG/Agent prompt 为源码常量无版本号（仅 TypeSafe 有 PROMPT_VERSION） |
 | G19 Golden Dataset | 部分 | case schema 有雏形；缺 tenant/role/expected_sections/expected_answer_contains/answerable/forbidden_document 字段 |
-| G20 门禁收集面与行尾 | **已由 B0 闭合（2026-09-29）** | 新开：收集面完整性（裸函数被 runner 看不见）、单一 runner、依赖与 `requirements.txt` 同源、收集数钉、`.gitattributes` 行尾确定性。B0 交付：`backend/tests/test_ci_gate_contract.py` 16 枚门 + 八发变异台；远端 `backend-contracts` 首绿（1335 passed / 0 failed，compose 与 pwsh 两道首次真跑即绿）。**不含** lint/typecheck/pip-audit/gitleaks/OpenAPI（仍是 G0 的缺项） |
+| G20 门禁收集面与行尾 | **已由 B0 闭合（2026-09-29）** | 新开：收集面完整性（裸函数被 runner 看不见）、单一 runner、依赖与 `requirements.txt` 同源、收集数钉、`.gitattributes` 行尾确定性。B0 交付：`backend/tests/test_ci_gate_contract.py` 16 枚门 + 八发变异台（**2026-09-30 追加第 17 枚**：app 面区间判据 `security-a-rc1..HEAD` 恰等 CORR-01 那一处，收集数随之 1335→1336，见验收 §11.2）；远端 `backend-contracts` 首绿（1335 passed / 0 failed，compose 与 pwsh 两道首次真跑即绿）。**不含** lint/typecheck/pip-audit/gitleaks/OpenAPI（仍是 G0 的缺项） |
 
 ## 缺失能力 Top 排序（重要性 × 成本，靠前先做）
 

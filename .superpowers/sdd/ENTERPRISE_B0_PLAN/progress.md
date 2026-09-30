@@ -745,3 +745,32 @@
     **连续计数是 1/2**。窄单的修复让那枚腿**不再依赖时序**（效果钉本身是确定的），但"按构造确定"
     与"实测连续绿"是两件事，我不拿前者冒充后者。补齐 2/2 有两条路：对同一枚 commit `gh run rerun`
     （同码不同 runner，其实是对"非确定性"更直接的证伪），或等下一枚自然 commit。**待用户选**。
+- **R37（第 17 枚门：B0-12 区间化 + 连续绿 2/2 达成，2026-09-30）**：
+  - **连续绿先记账**：`2e4fccf` = run **`36684075268`**（`backend-contracts` success、
+    `1335 passed / 2 warnings / 1159 subtests in 52.70s`）；`d1bab29` = run **`36685239481`**
+    （success、**非成功步骤数 0**、`1335 passed / 1159 subtests in 45.17s`，compose 与 pwsh 两步均 success）
+    ⇒ 主门确定化之后**连续两枚 commit 绿**，2/2 达成。
+    两枚都是**零代码差**的读数（一枚 docs、一枚台账）⇒ 它们证的是"同码不同 runner 不翻色"，
+    下面这枚带代码差的 commit 才是第三格。
+  - **Important 2 落地**（用户挑的这一条）：新门
+    `test_the_app_surface_delta_since_the_sealed_base_is_exactly_the_registered_exception`
+    要求 `7cc5efc0460a…(= tag security-a-rc1)..HEAD` 的 `backend/app/**` 差集**恰等于**
+    `{backend/app/identity/__init__.py}`，双向红。基线取 **sha 常数不取 tag 名**——把失败模式
+    收敛成"历史没取全"一种。实测 `git diff --name-only security-a-rc1..HEAD -- backend/app`
+    恰为此一枚（终审的说法我复验为真）。
+  - **`ci.yml` 加 `fetch-depth: 0` 是被判据逼出来的**：浅签出没历史 ⇒ 新门必须**哑红不绿**。
+    P1 在 `--depth 1` clone 里真跑：`1 failed` + 文案点名「…绝不能读成『app 面没有改动』… 需要
+    fetch-depth: 0」；P2（clone 里改 `backend/app/config.py` 并提交）报
+    `未登记的改动 ['backend/app/config.py']；被摘掉的例外 []`；P3（把 CORR-01 文件还原成基线）报
+    `未登记的改动 []；被摘掉的例外 ['backend/app/identity/__init__.py']`。三发都在临时 clone、跑完即删，
+    **主仓一次都没被写过**。
+  - **读数**：门模块 **17 passed**；`EXPECTED_COLLECTED 1335 → 1336`，探针 `TOTAL 1336`，
+    明细基线重生成 1336 行 `398913ffba87`；全量套件（仓根 cwd）**1336 passed / 36 warnings /
+    1159 subtests in 252.82s，rc=0**（含 SEC-A 46 ⇒ `ci.yml` 新注释没有把扫描面弄红）；
+    `ci.yml` 147 → 152 CRLF / **0 bare LF**，锚 `1c706e165b73` → `b84cb8bcaa10`（工作树口径）；
+    门文件锚 `5ac7220e6c55` → `5ef3cc91a117`。顺手补终审 Minor 8（常数上方注释原来只推到 1332）。
+  - **文档**：验收新增 **§11.2**（含三发证伪原文与新锚）、B0-12 行加"判据已加强"限定、
+    交付面那行标"2026-09-30 起 17 枚"、G20 行加同一条日期化说明。原读数一律保留不删。
+  - **仍未做（等裁）**：终审 Important 3（锚与 bench 基线改 **git blob** 口径——本轮又出现一次混用：
+    `ci.yml` 工作树 `b84cb8bcaa10` vs blob `e0ff7a206cd3`）、Important 4（仪表三处）、
+    同族两枚潜在腿 → B1。

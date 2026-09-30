@@ -97,11 +97,11 @@ def _per_module(ids: list[str]) -> "dict[str, int]":
     return out
 
 
-# 常数每加一枚门就要重新实测回写（不许凑）：1316 是 Task 1 的基线，本文件现在贡献 16 枚
-# （卡 H / 卡 I 各加一枚 = 15，R9 ② 的第 16 枚 = 含 `: ` 的 plain scalar 必须加引号）。
-# Task 3 修复轮 1 的读数：`python scripts/b0_collection_probe.py` → TOTAL 1332，
-# `--node-ids | grep test_ci_gate_contract | wc -l` → 16 ⇒ 1316 + 16 = 1332，两侧都是实测量。
-EXPECTED_COLLECTED = 1335
+# 常数每加一枚门就要**重新实测**回写（不许凑）：1316 是 Task 1 的基线，本文件从 16 枚起算。
+# 1332 = 1316 + 16（Task 3 实测）；1335 = +3（`9bed85a` SEC-A-CORR-01 的三枚结构钉，属加测试）；
+# 1336 = +1（第 17 枚门 B0-12 区间化，独立终审 Important 2）。每一格都由
+# `python scripts/b0_collection_probe.py` 现场量出，不是推导出来的。
+EXPECTED_COLLECTED = 1336
 
 
 def test_collected_count_matches_the_pinned_number():
@@ -817,7 +817,46 @@ def test_eol_rules_are_a_no_op_for_the_current_tree():
     assert checked, "`.sh` / `.ps1` 一枚都不在面上：这条 no-op 证明退化成了空判"
     assert not offenders, "加规则会改动工作树：" + "；".join(offenders)
 
-#: 16 枚，逐枚点名，与本文件实际定义的 `def test_` 一一对应。判据不靠"遍历我自己"——
+#: B0-12 的区间化判据（独立终审 Important 2；用户 2026-09-30 裁定开工）。基线取 `security-a-rc1`
+#: 那枚 commit 的 **sha 常数**而不是 tag 名：tag 按裁定不可变也不许移位，而浅签出能不能解析 tag
+#: 取决于 runner 的 fetch 形态——钉 sha 把失败模式收敛成**一种**（"历史没取全"），而不是两种。
+APP_SURFACE_BASE_SHA = "7cc5efc0460abb01171c20cee61ef01bf5282a3d"
+#: 基线到 HEAD 之间 `backend/app/**` 上唯一被登记的改动：SEC-A-CORR-01（errata §5 的最小修正面）。
+ALLOWED_APP_SURFACE_CHANGES = frozenset({"backend/app/identity/__init__.py"})
+
+
+def test_the_app_surface_delta_since_the_sealed_base_is_exactly_the_registered_exception():
+    """B0 不许动 `backend/app/**`；CORR-01 是**单独裁定**的一次 ⇒ 把这条区间钉成机器判据。
+
+    为什么必须机器化：卡 J 那三子句原本是人做的审计，而它的第一子句
+    `git diff --name-only HEAD -- backend/app` 减掉两枚 identity 后今天只剩用户自己的 README，
+    对"这一串 commit 里 app 面只允许 CORR-01 那一处"**完全不设防**（独立终审实测并点名）。
+    区间判据两个方向都红：多出未登记的 app 改动，或有人把已登记的例外从表里悄悄摘掉。
+    """
+    probe = subprocess.run(["git", "cat-file", "-e", APP_SURFACE_BASE_SHA + "^{commit}"],
+                           cwd=REPO_ROOT, capture_output=True, text=True)
+    if probe.returncode != 0:
+        raise AssertionError(
+            f"基线 commit {APP_SURFACE_BASE_SHA[:12]} 在本签出里不可解析 ⇒ 这枚门**哑了**，"
+            f"绝不能读成『app 面没有改动』。修法在 CI 侧：`actions/checkout` 需要 "
+            f"fetch-depth: 0（否则浅签出没有历史）。stderr: {probe.stderr.strip()[:200]}")
+    listing = subprocess.run(["git", "diff", "--name-only",
+                              APP_SURFACE_BASE_SHA + "..HEAD", "--", "backend/app"],
+                             cwd=REPO_ROOT, capture_output=True, text=True)
+    assert listing.returncode == 0, f"区间 diff 取不到：{listing.stderr.strip()[:200]}"
+    changed = frozenset(line.strip().replace("\\", "/")
+                        for line in listing.stdout.splitlines() if line.strip())
+    unexpected = sorted(changed - ALLOWED_APP_SURFACE_CHANGES)
+    dropped = sorted(ALLOWED_APP_SURFACE_CHANGES - changed)
+    assert not unexpected and not dropped, (
+        f"app 面相对基线 {APP_SURFACE_BASE_SHA[:12]}（= tag security-a-rc1）的差集与登记表不符："
+        f"未登记的改动 {unexpected}；被摘掉的例外 {dropped}。"
+        f"登记表当前只许可 {sorted(ALLOWED_APP_SURFACE_CHANGES)} 一处（SEC-A-CORR-01）。"
+        f"要新增改动请走一条有出处的修正单，并把那一枚加进 ALLOWED_APP_SURFACE_CHANGES——"
+        f"**别把整条判据改成 allowlist 为空或干脆摘掉它**")
+
+
+#: 17 枚，逐枚点名，与本文件实际定义的 `def test_` 一一对应。判据不靠"遍历我自己"——
 #: 只遍历本模块的用例，对本文件被摘走任何东西都无感。
 _OWN_TEST_NAMES = (
     "test_collected_count_matches_the_pinned_number",
@@ -836,4 +875,5 @@ _OWN_TEST_NAMES = (
     "test_index_has_no_crlf_entries",
     "test_non_text_index_entries_are_exactly_the_enumerated_set",
     "test_eol_rules_are_a_no_op_for_the_current_tree",
+    "test_the_app_surface_delta_since_the_sealed_base_is_exactly_the_registered_exception",
 )
