@@ -730,3 +730,18 @@
     `ci.yml` 的 `1c706e165b73` 是工作树读数、blob 是 `e0ff7a206cd3`）、
     Important 4（`decide()` 的哨兵该绑到 assigned 节点自己的失败块；`:472` 恒真死条件；B0 台缺 reason token）、
     Important 6 的残余信任根移远端变量 / 双人签 ⇒ 都待用户排期，我不擅自动手。
+- **R36（RC2 候选 commit 自身的主门读数，2026-09-30）**：
+  - `git push` 落地 `047a0d4..2e4fccf` 两枚（`41e7c5f` 窄单 + `2e4fccf` 文档），CI 只对 push 的 **tip**
+    起一轮 ⇒ 被读的就是将要打 tag 的那枚 commit 本身，不是"前一枚绿过"。
+  - run **`36684075268` @ `2e4fccf`**：`backend-contracts` **success**，**非成功步骤数 = 0**；
+    主门 `1335 passed, 2 warnings, 1159 subtests passed in 52.70s`；
+    `Run SECA-20 delivery-surface secret scan` = `5 passed, 41 deselected in 1.11s`；
+    **`Validate Docker Compose configuration` 与 `Validate Windows deployment script syntax` 两步本轮均 success**
+    （B0-10 那条"每轮读数"在这一轮是绿的，读数按轮记，不改写成既成事实）。
+  - 整 run 仍 failure：`backend-integration` / `backend-quality`（`argon2` / `typesafe_sdk` 依赖清单漂移），
+    与 R33/R35 同一条债，规格 §1 明令不得触碰 ⇒ rc2 的 tag note 里必须写"tag 级 CI 仍非全绿"。
+  - **还差一口气的那件事**：终审建议把 B0-02/03/10 的判据读成"主门确定化后**连续两枚** commit 的
+    job 级 success"。目前的序列是 `c29ce8a` success → `047a0d4` failure → `2e4fccf` success ⇒
+    **连续计数是 1/2**。窄单的修复让那枚腿**不再依赖时序**（效果钉本身是确定的），但"按构造确定"
+    与"实测连续绿"是两件事，我不拿前者冒充后者。补齐 2/2 有两条路：对同一枚 commit `gh run rerun`
+    （同码不同 runner，其实是对"非确定性"更直接的证伪），或等下一枚自然 commit。**待用户选**。
