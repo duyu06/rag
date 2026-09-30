@@ -1295,15 +1295,22 @@ class InvariantPathTests(PipelineTestsBase):
     def test_mode_off_with_typesafe_enabled_uses_cross_encoder_path(self) -> None:
         # 硬前置：mode=off 并入 use_local_reranker，否则判定层关掉会连精排一起消失。
         external = RecordingJudgmentService()
+        service = self.make_service({"a": 1.0, "b": 3.0, "c": 2.0})
         with patch.object(settings, "typesafe_mode", "off"):
-            rows, timings = self.search(
-                self.make_service({"a": 1.0, "b": 3.0, "c": 2.0}), external
-            )
+            rows, timings = self.search(service, external)
 
         self.assertEqual(external.calls, [])
         self.assertEqual([row["id"] for row in rows], ["b", "c", "a"])
         self.assertEqual(set(timings), set(V1_TIMING_KEYS))
-        self.assertGreater(timings["rerank_ms"], 0.0)
+        # 「精排真的跑过」由调用面与产物证明，不由毫秒阈值证明。`rerank_ms` 出自
+        # `retrieval.py:671` 的 `round(rerank_ms, 2)`：快 runner 上一段**真实执行**合法地取整成
+        # `0.0`，拿 `> 0.0` 当判据就是一枚会自己翻色的门。本仓已冻结过同一条裁定
+        # （SEC-A 规格 §245「latency 分布只作为证据采集，不作为 GREEN/BLOCKED 的输入」+ SECA-13
+        # 用调用面 spy 替代耗时阈值），这里向既有裁定收敛，判据面积只增不减：
+        # 池内容 + 归一化分数都是确定值，且隔壁 `rerank=False` 那枚用例钉的正是 `pools == []`。
+        self.assertEqual(service._reranker.pools, [["a", "b", "c"]])
+        self.assertEqual([row["rerank_score"] for row in rows], [1.0, 0.5, 0.0])
+        self.assertGreaterEqual(timings["rerank_ms"], 0.0)
         self.assertNotIn("judge_input_count", timings)
         self.assertNotIn("typesafe_mode", timings)
         self.assertEqual(self.vectors_patch.call_count, 0)
