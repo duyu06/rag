@@ -822,3 +822,51 @@
     其中带代码差的有 `fe65f08`（新门 + `fetch-depth: 0`）与 `eb921c6`（台子与锚换口径）两枚。
   - 工作树只剩：用户自己的 `identity/README.md`，以及 `test_real_llm_failover_gate.py` 的 stat-dirty
     （`git diff` 为空、内容 == HEAD blob）。
+
+- **R41（Important 4 落地：两台北方仪表改成"按节点归因"，2026-09-30）**：
+  - **终审要的那三处**：① 红因哨兵必须落在**这一发点名的那枚节点自己的失败块**里，不能拿整轮
+    输出当证据；② P0 台 `:500` 那行旧代码是 `(not path.exists() or True)`——**恒真**，删除件是否
+    真没了从来没核过；③ B0 台八发压根没有 reason 哨兵，"杀了"只等于"那枚红了"。
+  - **B0 台**：新增 `failed_reasons()`（`ent_b0_mutations.py:417`，从 `=== FAILURES ====` 切到
+    `=== short test summary info ====`，按块头建 `节点 → 它那块全文`）+ `reason_excerpt()`；
+    `decide()` 改三元组 `(verdict, unexpected, unmatched)`，多一枚 `KILLED-WRONG-REASON`；八发每发
+    补 `"reasons"` 哨兵表。哨兵里的计数不写死：`expand_count_tokens()` 支持 `{EC}`/`{EC-3}`/`{EC-1}`，
+    真值由 `expected_collected()` 现读门模块 ⇒ 加测试不会把哨兵漂成假红。门册也改成现读
+    `re.findall(r"^def (test_\w+)")`，不再另抄一份清单。
+  - **P0 台**：同形 `failure_blocks()`（`p0_3b_mutations.py:361`），`decide()` 绑 `ASSIGNED` 那枚
+    的块；块拿不到判 `KILLED-NO-BLOCK`，块里没有哨兵判 `KILLED-WRONG-REASON`；恒真那行改成
+    `restored_ok = restored_ok and (not path.exists())`；台账分组键改成 `verdict.split("-RESTORED")[0]`
+    （旧写法把 `KILLED-WRONG-REASON-RESTORED-OK` 归进各自的新类，"14 发全杀"那行会失真）。
+  - **我在这一轮里自己造的四枚 bug，全部是台子/复算抓出来的，留案**：
+    1. 拼接时删掉了 `SUCCESS_VERDICT`、又删掉 `gate_name()` ⇒ 两枚 `NameError`。跑一遍就炸，没逃掉。
+    2. heredoc 里的 `\n` 被吞 ⇒ f-string 未终结，语法错。同形错两次；结论同前：**改这类文件用
+       显式重写整段，不做行内 splice**。
+    3. 块头正则我第一版写 `^_{3,}\s*(.+?)\s*_{3,}$` ⇒ P0 十四发**全判 `KILLED-NO-BLOCK`**。原因是
+       pytest 对长节点名只补 1 个下划线。仪表在这里**拒绝认证而不是放过**，是对的形状。
+    4. 放宽成 `^_+\s*(.+?)\s*_+\s*$` 之后，pytest 的 `_ _ _ _` 分隔线自己成了块头，切在 E 行之前
+       ⇒ 块里没有断言行。终版：块头必须含 `\btest_\w+` 才算。
+  - **N6 的哨兵是我猜错的，被台子当场驳回**：我按"index 面"的印象写了 token，实测那一发的真红因是
+    `git ls-files` 跟踪面为空 ⇒ `KILLED-WRONG-REASON`。回去读这发的规格抬头（§6.4 覆盖度钉的**空判
+    地板**），把两枚节点的哨兵都改成 `跟踪面一枚都没有`。**这正是这台子存在的理由：它抓的不是产品，
+    是我的归因。**
+  - **离线复算先行**：正则两处改完，先拿**已存盘的旧 dump**重放，不花正式轮——P0 14/14 全部落进
+    自己节点的块、N6 那块捞出地板消息；确认解析器之后才跑真台。
+  - **正式轮读数（两份全文在 `tmp/`）**：
+    - B0 八发 `tmp/b0-bench-official-2026-09-30.txt`：**8/8 `KILLED-ASSIGNED`、`B0_RC=0`**；
+      逐发的红因都落在自己块里（N1 `收集数 1333 ≠ 钉住的 1336`、N6 两枚都是地板那句、N7 双红）；
+      N3 按计划外附带红 `test_extra_pip_arguments_are_exactly_the_exemption_table` 记为允许；
+      还原八发全 `sha1 与注入前相同 + cmp rc=0`。溯源表 17 枚门本轮观测红 9 枚，`NEVER` 是真读数。
+    - P0 十四发 `tmp/p0-bench-official-2026-09-30.txt`：**14/14 `KILLED-ASSIGNED-RESTORED-OK`、
+      `P0_RC=0`**，park 目录已删；M1–M5 逐枚哨兵（`phi3:mini-M1…`、`ornith-M4:latest`、
+      "不含 §6 那族加载失败特征"）、M6–M9 `[I1]/[I2]/[I6]/[I7]`、N1–N4 `[T-彩排]/[T-收尾]/[T-传输层]`
+      全部命中各自块。
+  - **台后零残留与门禁读数**：`--check` **12/12**（8 发锚点 + 4 枚 git blob 身份全等）；
+    `git diff --name-only` 只剩两台北方脚本 + 用户自己的 `identity/README.md`
+    （`test_real_llm_failover_gate.py` 是 stat-dirty，diff 为空）；
+    门 17 + SEC-A 46 = **63 passed**；全量两 cwd **1336 passed / 36 warnings / 1159 subtests**
+    （backend cwd 255.98s、仓库根 cwd 248.24s）。
+  - **仍未做（不写进结论）**：Linux 上重跑这两台子（本地无带 git 的镜像，不擅自装系统依赖）；
+    同族两枚潜在腿 `test_typesafe_v2_core.py:1341`/`:1572` 仍归 B1；
+    `backend-integration`/`backend-quality` 的 `argon2`/`typesafe_sdk` 依赖漂移 B0 无权收。
+  - 终审 Important 2/3/4 至此全部关闭。rc2 的前置只剩 #131（候选 commit 自身远端 GREEN 的链条）
+    与**用户的明确授权**。

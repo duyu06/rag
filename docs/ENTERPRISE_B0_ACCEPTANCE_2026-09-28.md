@@ -33,7 +33,7 @@ B0 做完之后，"CI 有一步在跑测试"这句话第一次可以被机器反
 | B0-08 | 行尾钉：无 `i/crlf`；`i/-text` == 枚举 3 枚；解析覆盖 313/313 | 门绿（含修复轮补的非空地板） | **GREEN** |
 | B0-09 | SECA-20 扫描门零漂移 | 面 316→318（B0 当时；`c29ce8a` 后为 448，见 §11.1 与 **L11**），**命中 16 文件 / 31 处与 SEC-A 封版一字未动**，`EXEMPTIONS` 与 HEAD 逐字节相同 ⇒ 零新增豁免是被证明的。**覆盖范围要说平**：命中对账只覆盖进内容扫描的那 230 枚，`.superpowers/**` 那 218 枚按设计免扫（L11） | **GREEN** |
 | B0-10 | compose 与 pwsh 两道首次真起跑各有结论 | run `36472389872`：两步均 **success** —— 它们**有史以来第一次被执行**（此前恒被上游红步吞掉，正是 §5.2 描述的机制在运行）。**但这是每轮读数，不是既成事实**：`047a0d4` 那轮主门一红，两道又立即回到 `skipped` ⇒ 判据应读作「在主门确定化之后连续 success」 | **GREEN** |
-| B0-11 | §9 变异逐发红 + 还原一致 | **8/8 `KILLED-ASSIGNED`**，0 `KILLED-INCIDENTAL`、0 `COLLECTION-BROKEN`；`--check` 12/12 rc=0；聚合面三时点回台账 | **GREEN** |
+| B0-11 | §9 变异逐发红 + 还原一致 | **8/8 `KILLED-ASSIGNED`**，0 `KILLED-INCIDENTAL`、0 `COLLECTION-BROKEN`；`--check` 12/12 rc=0；聚合面三时点回台账。**2026-09-30 加强**：这一行原来只要求"那枚红了"，独立终审 Important 4 把它改成"红因必须落在这一发点名的那枚节点自己的失败块里"⇒ 新增 `KILLED-WRONG-REASON` / `KILLED-NO-BLOCK` 两枚不通过态，并抓到 P0 台一枚恒真还原条件。重跑读数 **B0 8/8 + P0 14/14 全 `KILLED-ASSIGNED(-RESTORED-OK)`、两台 rc=0**（§11.4） | **GREEN**（判据已加强） |
 | B0-12 | `backend/app/**` 未被 B0 改动 | 卡 J 三子句：`git diff --name-only HEAD -- backend/app` 减去两枚 identity 后为空；`--cached` 侧空；两枚 identity sha `3bc681bbc52c` / `2cfab9f18182` == 基线。**独立终审点名**：第一子句今天只剩用户自己的 `identity/README.md` ⇒ 这条审计对「这一串 commit 里 app 面只允许 CORR-01 那一处」不设防；已补成区间机器判据（§11.2） | **GREEN**（判据已加强） |
 | B0-13 | 全量 pytest 的 CI 耗时读数与 cache 取舍 | 远端套件 **54.59s**、SECA-20 子集 1.19s；本地 Windows 两格 182.78s / 183.95s；容器 3.12/Linux 107.52s。门内子进程收集占模块 96%、约全量 10–16%。**cache 命中率无分步读数** ⇒ 取舍半边仍开 | **GREEN**（耗时）／**PENDING_EXTERNAL**（cache 取舍） |
 | B0-14 | `G20` 新开 + `G0` 勘误落档 | 已落：`docs/ENTERPRISE_ACCEPTANCE_GAP_ANALYSIS.md` 新增 `G20 门禁收集面与行尾` 行；`G0` 行加"有测试步 ≠ 测试被收集"勘误并指向 G20 | **GREEN** |
@@ -385,3 +385,56 @@ commit 可解析，没有历史它必然哑红（P1 已实测那个红相）；�
 相同"仍然成立**（本地两 cwd 与远端同为 `1336 / 1159`）。连续绿计数到这里是 **3/2**
 （`2e4fccf`、`d1bab29`、`fe65f08`），其中只有第三枚带代码差。
 
+
+### 11.4 变异台改成「按节点归因」（独立终审 Important 4，用户 2026-09-30 裁定开工）
+
+终审这一条要的不是"台子跑没跑绿"，而是**台子有没有资格说它跑绿了**。旧形态有一处实质漏洞和两处
+仪表缺陷：
+
+1. **红因可以借位**。旧 `decide()` 拿哨兵字符串去**整轮** `--tb` 输出里找。P0 那台里
+   `COLLATERAL` 那枚探针会把 problems 全集印出来 ⇒ 别的节点替这一发"红了"也能被记成杀对。
+   新形态先切块（`failed_reasons()` / `failure_blocks()`：从 `=== FAILURES ====` 切到
+   `=== short test summary info ====`，块头必须含 `test_…` 才算），哨兵只许落在
+   **这一发点名的那枚节点自己的块**里；块取不到判 `KILLED-NO-BLOCK`，块里没有哨兵判
+   `KILLED-WRONG-REASON`。这两枚新状态是**不通过**，不是换个说法通过。
+2. **恒真条件**。P0 台核对"被删掉的文件真的没了"那行旧写 `(not path.exists() or True)`，
+   恒真 ⇒ 这一支从来没核过任何东西。改成 `restored_ok = restored_ok and (not path.exists())`。
+3. **B0 八发压根没有 reason 哨兵**，"杀了"只等于"那枚红了"。现每发补 `"reasons"` 表，
+   哨兵里的计数不写死：`{EC}` / `{EC-3}` / `{EC-1}` 由 `expected_collected()` 现读门模块，
+   门册也改成现读 `^def (test_\w+)`。**理由同 §4：抄一份清单就会漂，而漂掉的清单正是这台子要抓的病。**
+   台账分组键也改成 `verdict.split("-RESTORED")[0]`，否则 `KILLED-WRONG-REASON-RESTORED-OK`
+   会被归进新类，"N 发全杀"那行当场失真。
+
+**台子在这一轮里抓的是我自己**，三件都留案：
+
+- 块头正则我第一版写死 `^_{3,}` ⇒ P0 十四发**全判 `KILLED-NO-BLOCK`**（pytest 对长节点名只补 1 枚
+  下划线）。放宽后又让 pytest 的 `_ _ _ _` 分隔线自己成了块头，切在断言行之前 ⇒ 块里没有 E 行。
+  终版要求块头含 `\btest_\w+`。**这两次都是仪表拒绝认证，而不是放过**——形状是对的。
+- N6 的哨兵我按"index 面"的印象猜写，实测真红因是 `git ls-files` 跟踪面为空，台子当场判
+  `KILLED-WRONG-REASON`。回去读这发的规格抬头（§6.4 覆盖度钉的**空判地板**）才把两枚节点的哨兵
+  改成 `跟踪面一枚都没有`。**变异台这一发的靶子不是产品，是我的归因。**
+- 改坏的部分（删掉 `SUCCESS_VERDICT`、`gate_name()` 两枚 `NameError`，以及 heredoc 里 `\n` 被吞
+  导致 f-string 未终结）都由"跑一遍"当场炸出，没有逃到读数里。
+- **正则两处改完先拿已存盘的旧 dump 离线复算**（P0 14/14 全部落进自己节点的块、N6 那块捞出地板句），
+  确认解析器之后才花正式轮。
+
+**正式轮读数**（全文落盘在 `.superpowers/sdd/ENTERPRISE_B0_PLAN/tmp/`，该目录不进交付面）：
+
+| 台 | 落盘 | 判决面 | rc |
+| --- | --- | --- | --- |
+| B0 八发 | `b0-bench-official-2026-09-30.txt` | **8/8 `KILLED-ASSIGNED`**，逐发红因均在自身块内；八发还原全 `sha1 同 + cmp rc=0`；17 枚门本轮观测红 9 枚，`NEVER` 为真读数 | `B0_RC=0` |
+| P0 十四发 | `p0-bench-official-2026-09-30.txt` | **14/14 `KILLED-ASSIGNED-RESTORED-OK`**；M1–M5 逐枚模型串、M6–M9 `[I1]/[I2]/[I6]/[I7]`、N1–N4 `[T-彩排]/[T-收尾]/[T-传输层]` 全部命中各自块；park 目录已删 | `P0_RC=0` |
+
+**台后门禁与零残留**：`ent_b0_mutations.py --check` **12/12**（锚点 8 发 + 4 枚 git blob 身份全等）；
+`git diff --name-only` 只剩两台北方脚本与用户自己的 `backend/app/identity/README.md`
+（`test_real_llm_failover_gate.py` 是 stat-dirty，`git diff` 为空 ⇒ 内容 == HEAD blob）；
+`test_ci_gate_contract.py` + `test_secret_hygiene_contract.py` = **63 passed**；
+全量套件两 cwd 各一遍 = **1336 passed / 36 warnings / 1159 subtests**
+（`backend/` cwd 255.98s，仓库根 cwd 248.24s）。
+
+**§11.3 那一条仍然挂着**：Linux 上重跑这两台子**没做**（本地没有带 git 的可用镜像，我不擅自装系统
+依赖）。本节所有读数都是**一台 Windows 机器**上的读数；跨机性靠的是"blob 身份与检出行尾无关"这一
+构造，不是第二次实测。
+
+**远端确认（本节这枚 commit 自身的 run）**：待补——按 §11.2/终审裁定，per-run GREEN 不能由前一枚
+commit 代持，所以这一格必须等本轮 push 之后那一趟 CI 回来才写。

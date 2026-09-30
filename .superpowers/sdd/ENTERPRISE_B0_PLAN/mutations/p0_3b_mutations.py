@@ -358,15 +358,42 @@ def run_gate() -> tuple[int, list[str], str]:
     return proc.returncode, red, raw
 
 
+def failure_blocks(raw: str) -> dict[str, str]:
+    """把 `--tb=long` 的输出按**失败块**切开，键是块头里出现的 `test_…` 名字。
+
+    终审 Important 4 的第一条：旧版 `decide()` 里 `token in raw` 的 `raw` 是**整轮**输出，
+    于是别的节点（尤其那枚会打印 problems 全集的 `COLLATERAL` 探针）只要把同一串印出来，
+    这一发就被记成"杀对了"。红因必须落在**这一发点名的那枚节点自己的块**里才算。
+    """
+    blocks: dict[str, str] = {}
+    try:
+        body = raw.split("=== FAILURES ====", 1)[1].split("=== short test summary info ====", 1)[0]
+    except IndexError:
+        return blocks
+    header = re.compile(r"^_+\s*(.+?)\s*_+\s*$", re.MULTILINE)
+
+    marks = [(m.start(), m.group(1)) for m in header.finditer(body)
+             if re.search(r"\btest_\w+", m.group(1))]
+    for index, (start, title) in enumerate(marks):
+        end = marks[index + 1][0] if index + 1 < len(marks) else len(body)
+        for name in re.findall(r"test_\w+", title):
+            blocks[name] = body[start:end]
+    return blocks
+
+
 def decide(rc: int, red: list[str], raw: str, token: str) -> str:
     assigned_red = ASSIGNED in red
     if rc == 0:
         return "SURVIVED"
     if not red:
         return "COLLECTION-BROKEN"
-    if assigned_red and token in raw:
-        return "KILLED-ASSIGNED"
-    return "KILLED-INCIDENTAL"
+    if not assigned_red:
+        return "KILLED-INCIDENTAL"
+    block = failure_blocks(raw).get(ASSIGNED.split("::")[-1], "")
+    if not block:
+        # 取不到块 = 归因没法核，宁可报"没挣到"，也不回退到"整轮里找一遍"的旧错法
+        return "KILLED-NO-BLOCK"
+    return "KILLED-ASSIGNED" if token in block else "KILLED-WRONG-REASON"
 
 
 def check_only() -> int:
@@ -469,7 +496,10 @@ def main(argv: list[str]) -> int:
                 op.restore()
             for path, (blob, copy) in originals.items():
                 if blob is None:
-                    restored_ok = restored_ok and (not path.exists() or True)
+                    # 开工时这枚文件**不存在**（新建型 op）⇒ 还原的正确形态是"它又不存在了"。
+                    # 旧版这里写的是 `(not path.exists() or True)`，恒真 ⇒ 这一支从来没核过任何东西
+                    # （终审 Important 4 点名的第三个仪表病：本仓自己登记过的"仪表不响、结论照抄"）。
+                    restored_ok = restored_ok and (not path.exists())
                     continue
                 external = subprocess.run(["cmp", str(path), str(copy)],
                                           capture_output=True, text=True)
@@ -495,7 +525,10 @@ def main(argv: list[str]) -> int:
     shutil.rmtree(park, ignore_errors=True)
     counts = {}
     for verdict in tally.values():
-        key = verdict.split("-")[0]
+        # 分组键保留到"判决本体"，只剥掉还原后缀：旧版 `split("-")[0]` 会把
+        # KILLED-WRONG-REASON / KILLED-NO-BLOCK 也归进 `KILLED`，于是台账上"14 发全杀"
+        # 能在红因没对上的时候照样印出来 —— 那正是终审要修的"仪表不响、结论照抄"。
+        key = verdict.split("-RESTORED")[0]
         counts[key] = counts.get(key, 0) + 1
     print("\n== 台账 ==")
     for name in wanted:

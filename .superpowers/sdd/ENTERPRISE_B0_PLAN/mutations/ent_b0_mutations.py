@@ -142,6 +142,8 @@ MUTATIONS: list[dict] = [
               '_SESSION_GUARD: "LedgerGuard | None" = None'),
         )],
         "nodes": ["test_collected_count_matches_the_pinned_number"],
+        "reasons": {
+            "test_collected_count_matches_the_pinned_number": "收集数 {EC-3} ≠ 钉住的 {EC}"},
     },
     # §6.2 单 runner 钉。必须是**真的 step**，不能是注释：`_step_script()` 会把整行 `#` 注释
     # 剥掉，所以树上原本那句"原既有步 unittest discover 已删除"的注释杀不掉这枚门（这正是
@@ -159,6 +161,8 @@ MUTATIONS: list[dict] = [
                '      - name: "Run backend contract suite (single runner: pytest)"'),
         )],
         "nodes": ["test_backend_contracts_has_no_unittest_discover_step"],
+        "reasons": {
+            "test_backend_contracts_has_no_unittest_discover_step": "F1 复活"},
     },
     # §6.3 依赖同源钉：把"同源"换回 f6c67b5 那版的手写清单（远端当场 ModuleNotFoundError 的
     # 原形）。锚 `-r backend/requirements.txt` 在 ci.yml 命中 1 次（`hashFiles('backend/
@@ -176,6 +180,8 @@ MUTATIONS: list[dict] = [
                ' "qdrant-client>=1.12,<2" "httpx>=0.27,<1" "PyJWT>=2.9,<3"'),
         )],
         "nodes": ["test_install_face_uses_requirements_txt_as_the_source"],
+        "reasons": {
+            "test_install_face_uses_requirements_txt_as_the_source": "依赖又变成 YAML 里的手写清单"},
     },
     # §6.3 豁免表形状钉：多装一枚没豁免过的包（`bandit`）。锚取安装步最后一整行，
     # `--disable-pip-version-check pytest` 全文件唯一（SECA-20 那步是 `python -m pytest`，
@@ -190,6 +196,8 @@ MUTATIONS: list[dict] = [
                "          python -m pip install --disable-pip-version-check bandit"),
         )],
         "nodes": ["test_extra_pip_arguments_are_exactly_the_exemption_table"],
+        "reasons": {
+            "test_extra_pip_arguments_are_exactly_the_exemption_table": "安装面漂移"},
     },
     # §6.4 行尾钉：删 `*.sh text eol=lf` 整行（含其换行 ⇒ 行整体消失，不是留一枚空规则）。
     # `.gitattributes` 磁盘上是 LF、CR 字节 0（Task 4 §1 实测），所以用 L。锚在文件里唯一。
@@ -202,6 +210,8 @@ MUTATIONS: list[dict] = [
             "",
         )],
         "nodes": ["test_gitattributes_carries_the_required_rules"],
+        "reasons": {
+            "test_gitattributes_carries_the_required_rules": "缺必需规则"},
     },
     # §6.4 覆盖度钉的**空判角落**（Task 4 评审登记：这条钉原本没有非空地板）。两枚编辑一起才
     # 表达得出那一形——只收 tracked 一侧会得到 `313 == 0`，那是响亮地红，不是评审说的那一格；
@@ -227,6 +237,13 @@ MUTATIONS: list[dict] = [
         ],
         "nodes": ["test_index_has_no_crlf_entries",
                   "test_non_text_index_entries_are_exactly_the_enumerated_set"],
+        # N6 的规格标签就是「§6.4 覆盖度钉的空判地板」，它的计划红因**本来就是地板**：两侧同时
+        # 收空 ⇒ 若没有 `assert tracked` / `assert parsed`，两枚消费门会拿着 `0 == 0` 放行。
+        # 所以这里绑的是地板那句，不是"抓到某枚 CRLF/非文本漂移"那句（第一版我绑错成后者，
+        # 台子当场判 KILLED-WRONG-REASON：红了，但红的理由不是这发声称要证的那件事）。
+        "reasons": {
+            "test_index_has_no_crlf_entries": "跟踪面一枚都没有",
+            "test_non_text_index_entries_are_exactly_the_enumerated_set": "跟踪面一枚都没有"},
     },
     # §6.1 + 卡 H：改名一枚**门自己的** `def test_`（改函数名，不改文件名）。这一发补的是
     # M-1 指出的那一格：16 枚里有 4 枚从来没有被观测到红过，其中
@@ -248,6 +265,9 @@ MUTATIONS: list[dict] = [
         )],
         "nodes": ["test_collected_count_matches_the_pinned_number",
                   "test_the_gate_module_itself_is_collected"],
+        "reasons": {
+            "test_collected_count_matches_the_pinned_number": "收集数 {EC-1} ≠ 钉住的 {EC}",
+            "test_the_gate_module_itself_is_collected": "门自己被摘了或哑了"},
     },
     # §6.3 豁免表的"为什么"地板（门 11）：把 `pytest` 那行的理由砍到 12 字符以下。
     # 这一枚门此前也没被观测到红过（M-1 的另一格）。它咬的是"豁免行写成占位符"那一形——
@@ -265,6 +285,8 @@ MUTATIONS: list[dict] = [
             L('    "pytest": (1, "占位"),  # 变异台 N8：理由砍到地板以下'),
         )],
         "nodes": ["test_every_exemption_row_states_why"],
+        "reasons": {
+            "test_every_exemption_row_states_why": "短到不像是理由"},
     },
 ]
 
@@ -343,7 +365,8 @@ def run_node(node: str, code: str = "") -> "tuple[int, str]":
     ⇒ 八份读数盖进同一份文件、只剩最后一份，那轮只能把 N1 重跑一遍才找回它的全文。
     """
     proc = subprocess.run(
-        [sys.executable, "-m", "pytest", node, "-q", "--tb=line", "-p", "no:cacheprovider"],
+        [sys.executable, "-m", "pytest", node, "-q", "--tb=long", "-rf",
+         "-p", "no:cacheprovider"],
         cwd=str(BACKEND),
         capture_output=True,
         text=True,
@@ -372,42 +395,105 @@ def summarize(raw: str) -> str:
     return "(无摘要)"
 
 
+#: 只有 KILLED-ASSIGNED 算这一发做成了；其余每一态都要把整轮的 rc 顶成非 0。
 def gate_name(node_id: str) -> str:
     return node_id.split("::", 1)[1] if "::" in node_id else node_id
 
 
-def decide(rc: int, red: "list[str]", assigned: "list[str]") -> "tuple[str, list[str]]":
-    """把这一发的读数**归因**到计划钉住的那枚门上（I-2）。返回 `(判决, 没红的计划门)`。
-
-    `rc != 0` 说的是"整枚 16 门模块红了"，不是"这发该杀的门红了"。这两个含义在修复轮 1 之前被
-    当成同一个用，于是 N6 报 `KILLED` 而它计划钉住的那枚门当时正空判绿——仪表读错了自己的宾语。
-    三种非理想态各有独立含义，不许混：
-
-    * `SURVIVED`：rc=0，这发在树上什么门都没杀掉 ⇒ 那枚门是纸门。
-    * `COLLECTION-BROKEN`：rc≠0 但一条 `FAILED/ERROR` 都读不到 ⇒ 命令没跑到断言层
-      （解释器起不来、参数炸、收集期崩）。它连"哪枚门红"都没回答，因此**不是** KILLED。
-    * `KILLED-INCIDENTAL`：别的门红了、计划钉住的那枚绿 ⇒ **这一发失败**（要么针打偏了，
-      要么那枚门对这一形真的无感），整轮 rc 非 0，绝不许"顺手把期望改成红的那枚"。
-    """
-    hit = {gate_name(n) for n in red}
-    missing = [name for name in assigned if name not in hit]
-    if rc == 0:
-        return "SURVIVED", missing
-    if not red:
-        return "COLLECTION-BROKEN", assigned
-    return ("KILLED-ASSIGNED" if not missing else "KILLED-INCIDENTAL"), missing
-
-
-#: 只有 KILLED-ASSIGNED 算这一发做成了；其余每一态都要把整轮的 rc 顶成非 0。
 SUCCESS_VERDICT = "KILLED-ASSIGNED"
 
 
-def explain(verdict: str, missing: "list[str]", rc: int) -> str:
+def reason_excerpt(block: "str | None") -> str:
+    """从一枚节点的失败块里取**它自己那句判据文案**（pytest 的 `E ` 首行）。"""
+    if not block:
+        return "（未取到这一枚节点的失败块 ⇒ 红因没法核）"
+    for line in block.splitlines():
+        if line.strip().startswith("E "):
+            return line.strip()[2:].strip()[:150]
+    head = block.strip().splitlines()
+    return "（块里没有 E 行）" + (head[0][:120] if head else "")
+
+
+def failed_reasons(raw: str) -> "dict[str, str]":
+    """节点 → **它自己那一块**失败输出（`--tb=long` 的 `=== FAILURES ===` 段里按块头切）。
+
+    终审 Important 4 要的就是这个：旧版 `decide()` 拿红因去整轮输出里找，而"计划那枚红了"
+    与"红的理由是这发注入的那个"是两件事。有了块，两件事才分得开。
+    """
+    out: "dict[str, str]" = {}
+    try:
+        body = raw.split("=== FAILURES ====", 1)[1].split("=== short test summary info ====", 1)[0]
+    except IndexError:
+        return out
+    marks = [(m.start(), m.group(1)) for m in
+             re.finditer(r"^_+\s*(.+?)\s*_+\s*$", body, re.MULTILINE)
+             if re.search(r"\btest_\w+", m.group(1))]
+    for index, (start, title) in enumerate(marks):
+        end = marks[index + 1][0] if index + 1 < len(marks) else len(body)
+        for name in re.findall(r"\btest_\w+", title):
+            out[name] = body[start:end]
+    return out
+
+
+def decide(rc: int, red: "list[str]", assigned: "list[str]",
+           reasons: "dict[str, str] | None" = None,
+           expected: "dict[str, str] | None" = None) -> "tuple[str, list[str], list[str]]":
+    """判决三态 + **红因核对**。返回 `(verdict, 计划里没红的门, 红因没对上的门)`。
+
+    `expected` 是这一发给每枚计划门声明的"必须出现在它自己那行红因里的哨兵"。
+    给了就必须对上；对不上判 `KILLED-WRONG-REASON`——红是红了，但不是这发挣来的红。
+    没给（观测阶段）则退回旧行为，并在返回值里把"未核红因"的节点列出来，不假装核过。
+    """
+    if rc == 0:
+        return "SURVIVED", [n for n in assigned], []
+    if not red:
+        return "COLLECTION-BROKEN", [n for n in assigned], []
+    missing = [n for n in assigned if n not in red]
+    unmatched: "list[str]" = []
+    if expected:
+        for node in assigned:
+            token = expected.get(node)
+            if token is None:
+                continue
+            got = (reasons or {}).get(node, "")   # 这一枚节点自己的失败块，不是整轮输出
+            if expand_count_tokens(token) not in got:
+                unmatched.append(node)
+    if missing:
+        return "KILLED-INCIDENTAL", missing, unmatched
+    if unmatched:
+        return "KILLED-WRONG-REASON", [], unmatched
+    return "KILLED-ASSIGNED", [], []
+
+
+def expand_count_tokens(token: str) -> str:
+    """把哨兵里的 `{EC}` / `{EC-3}` 展开成门模块**当前实测**的收集数常数（减 n）。
+
+    为什么不写死数字：N1 一发的红因实测是 `收集数 1333 ≠ 钉住的 1336`（藏掉
+    `test_web_security.py` 是 3 枚，不是我以为的 17 枚）——写死常数的哨兵会在下一次加测试时
+    变成假红，而"减多少"本身就是这一发注入的物理量，必须跟着常数走。
+    """
+    ec = expected_collected()
+    return re.sub(r"\{EC(?:-(\d+))?\}", lambda m: str(ec - int(m.group(1) or 0)), token)
+
+
+def expected_collected() -> int:
+    """从门模块现读 `EXPECTED_COLLECTED`，不另抄一份（抄的那份会漂）。"""
+    text = (REPO / "backend/tests/test_ci_gate_contract.py").read_bytes().decode("utf-8")
+    found = re.search(r"^EXPECTED_COLLECTED = (\d+)", text, re.MULTILINE)
+    assert found, "门模块里读不到 EXPECTED_COLLECTED：这台的哨兵口径漂了"
+    return int(found.group(1))
+
+
+def explain(verdict: str, missing: "list[str]", rc: int,
+            unmatched: "list[str] | None" = None) -> str:
     """判决不是 KILLED-ASSIGNED 时，把"到底哪儿没对上"写进表格——读数不该只剩一个词。"""
     if verdict == SUCCESS_VERDICT:
         return "-"
     if verdict == "KILLED-INCIDENTAL":
         return f"计划门未红：{missing} ⇒ 红的是别的门，这一发的归因不成立"
+    if verdict == "KILLED-WRONG-REASON":
+        return (f"计划门红了，但它的红因不是这发注入的理由：{unmatched or missing}"
+                " ⇒ 归因不成立（终审 Important 4：红因必须参与判决）")
     if verdict == "COLLECTION-BROKEN":
         return f"rc={rc} 而红面为空 ⇒ 命令没跑到断言层（收集/启动炸了），不是 KILLED"
     return "rc=0 ⇒ 这一发在树上没杀掉任何门，那枚门是纸门"
@@ -457,7 +543,8 @@ def main(argv: "list[str]") -> int:
         assigned = list(spec["nodes"])
         row = {"code": code, "spec": spec["spec"], "rel": spec["rel"],
                "anchors": "1 次/编辑", "assigned": ",".join(assigned) or "-",
-               "red": [], "verdict": "-", "note": "-", "restore": "n/a"}
+               "red": [], "verdict": "-", "note": "-", "restore": "n/a",
+               "unmatched": []}
         path = REPO / spec["rel"]
         original = path.read_bytes()
         before = sha1(path)
@@ -488,15 +575,20 @@ def main(argv: "list[str]") -> int:
             print(f"[{code}] pytest（{GATE_MODULE} 全 {len(gate_roster())} 枚）: "
                   f"{summarize(raw)}", flush=True)
             red = [gate_name(n) for n in failed_nodes(raw)]
-            verdict, missing = decide(rc, red, assigned)
+            reasons = failed_reasons(raw)
+            verdict, missing, unmatched = decide(rc, red, assigned,
+                                                 reasons, spec.get("reasons"))
+            row["unmatched"] = unmatched
             for name in red:
-                print(f"[{code}]   RED {name}")
+                # 红因跟到**这一枚节点自己那行**：只有"红了 + 名字对"是不足以算归因的
+                print(f"[{code}]   RED {name} :: {reason_excerpt(reasons.get(name))}")
             print(f"[{code}]   计划钉住 {assigned}")
             print(f"[{code}]   实测红面 {red if red else '（空）'}")
             print(f"[{code}]   判决 {verdict}"
                   + (f"（计划门里没红的：{missing}）" if missing and verdict != SUCCESS_VERDICT else ""),
                   flush=True)
-            row.update(red=red, verdict=verdict, note=explain(verdict, missing, rc))
+            row.update(red=red, verdict=verdict,
+                       note=explain(verdict, missing, rc, unmatched))
         finally:
             path.write_bytes(original)
             after = sha1(path)
